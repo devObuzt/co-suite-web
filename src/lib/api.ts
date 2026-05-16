@@ -1,0 +1,271 @@
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+
+function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("cosuite_token");
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Request failed" }));
+    throw new Error(err.detail || "Request failed");
+  }
+
+  return res.json();
+}
+
+export const api = {
+  auth: {
+    signup: (data: { email: string; password: string; full_name: string }) =>
+      request<{ access_token: string; user: { id: string; email: string; full_name: string } }>("/auth/signup", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    login: (data: { email: string; password: string }) =>
+      request<{ access_token: string; user: { id: string; email: string; full_name: string } }>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+  },
+
+  suites: {
+    list: () => request<Suite[]>("/suites/"),
+    create: (data: { name: string; website_url?: string }) =>
+      request<Suite>("/suites/", { method: "POST", body: JSON.stringify(data) }),
+    get: (id: string) => request<Suite>(`/suites/${id}`),
+  },
+
+  onboarding: {
+    extractBrand: (data: {
+      suite_id: string;
+      urls?: string[];
+      business_name?: string;
+      industry?: string;
+      description?: string;
+    }) => request<{ brand: Brand }>("/onboarding/extract-brand", { method: "POST", body: JSON.stringify(data) }),
+    saveBrand: (data: { suite_id: string; brand: Brand }) =>
+      request<{ ok: boolean }>("/onboarding/save-brand", { method: "POST", body: JSON.stringify(data) }),
+    generateStrategy: (data: { suite_id: string }) =>
+      request<{ strategy: MarketingStrategy }>("/onboarding/generate-strategy", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+  },
+
+  content: {
+    generate: (suiteId: string) =>
+      request<{ message: string }>(`/content/${suiteId}/generate`, { method: "POST", body: "{}" }),
+    list: (suiteId: string, status?: string) =>
+      request<Post[]>(`/content/${suiteId}${status ? `?status=${status}` : ""}`),
+    approve: (suiteId: string, postId: string) =>
+      request<{ ok: boolean }>(`/content/${suiteId}/${postId}/approve`, { method: "POST", body: "{}" }),
+    reject: (suiteId: string, postId: string) =>
+      request<{ ok: boolean }>(`/content/${suiteId}/${postId}/reject`, { method: "POST", body: "{}" }),
+    regenerate: (suiteId: string, postId: string) =>
+      request<{ message: string }>(`/content/${suiteId}/${postId}/regenerate`, { method: "POST", body: "{}" }),
+    publish: (suiteId: string, postId: string, platforms: string[] = ["facebook", "instagram"]) =>
+      request<{ ok: boolean; results: Record<string, string>; status: string }>(
+        `/content/${suiteId}/${postId}/publish`,
+        { method: "POST", body: JSON.stringify({ platforms }) }
+      ),
+  },
+
+  analytics: {
+    get: (suiteId: string, days = 28) =>
+      request<AnalyticsData>(`/analytics/${suiteId}?days=${days}`),
+  },
+
+  billing: {
+    get: (suiteId: string) => request<Subscription>(`/billing/${suiteId}`),
+    usage: (suiteId: string) => request<UsageEvent[]>(`/billing/${suiteId}/usage`),
+    updateSeats: (suiteId: string, seat_count: number) =>
+      request<Subscription>(`/billing/${suiteId}/seats`, { method: "PATCH", body: JSON.stringify({ seat_count }) }),
+    toggleAutoPay: (suiteId: string, enabled: boolean) =>
+      request<{ ok: boolean }>(`/billing/${suiteId}/auto-pay`, { method: "PATCH", body: JSON.stringify({ enabled }) }),
+    subscribeUrl: (suiteId: string) => request<{ url: string }>(`/billing/${suiteId}/subscribe-url`),
+    payUrl: (suiteId: string) => request<{ url: string; amount: number }>(`/billing/${suiteId}/pay-url`),
+  },
+
+  connections: {
+    get: (suiteId: string) => request<Connections>(`/connections/${suiteId}`),
+    metaAuthUrl: (suiteId: string) => request<{ url: string }>(`/connections/${suiteId}/meta/auth-url`),
+    metaCallback: (suiteId: string, code: string) =>
+      request<{ pages: MetaPage[] }>("/connections/meta/callback", {
+        method: "POST",
+        body: JSON.stringify({ suite_id: suiteId, code }),
+      }),
+    metaSelectPage: (data: {
+      suite_id: string; page_id: string; page_name: string;
+      page_access_token: string; ig_user_id?: string; ig_username?: string;
+    }) => request<{ ok: boolean }>("/connections/meta/select-page", { method: "POST", body: JSON.stringify(data) }),
+    disconnect: (suiteId: string, platform: string) =>
+      request<{ ok: boolean }>(`/connections/${suiteId}/${platform}`, { method: "DELETE" }),
+  },
+};
+
+export interface InsightPoint { date: string; value: number }
+
+export interface AnalyticsData {
+  days: number;
+  error?: string;
+  facebook?: {
+    name?: string;
+    fans?: number;
+    followers?: number;
+    insights?: {
+      page_impressions?: InsightPoint[];
+      page_reach?: InsightPoint[];
+      page_engaged_users?: InsightPoint[];
+      page_fan_adds?: InsightPoint[];
+    };
+    recent_posts?: {
+      id: string; message: string; created_time: string;
+      image?: string; likes: number; comments: number; shares: number;
+    }[];
+  };
+  instagram?: {
+    username?: string;
+    followers?: number;
+    media_count?: number;
+    profile_picture?: string;
+    insights?: {
+      impressions?: InsightPoint[];
+      reach?: InsightPoint[];
+      profile_views?: InsightPoint[];
+      follower_count?: InsightPoint[];
+    };
+    recent_media?: {
+      id: string; caption: string; media_type: string;
+      timestamp: string; likes: number; comments: number;
+      image?: string; url?: string;
+    }[];
+  };
+}
+
+export interface Subscription {
+  suite_id: string;
+  tier: "solo" | "team" | "enterprise";
+  status: "active" | "frozen" | "cancelled";
+  seat_count: number;
+  credit_balance: number;
+  auto_pay_enabled: boolean;
+  monthly_total: number;
+  price_per_seat: number;
+  freeze_threshold: number;
+}
+
+export interface UsageEvent {
+  id: string;
+  event_type: string;
+  actual_cost_usd: number;
+  billed_amount: number;
+  created_at: string;
+}
+
+export interface Connections {
+  facebook?: { connected: boolean; page_id: string; page_name: string };
+  instagram?: { connected: boolean; ig_user_id: string; username: string };
+  tiktok?: { connected: boolean; username: string };
+}
+
+export interface MetaPage {
+  id: string;
+  name: string;
+  access_token: string;
+  instagram_business_account?: { id: string; name: string; username: string; profile_picture_url?: string };
+}
+
+export interface Suite {
+  id: string;
+  name: string;
+  slug: string;
+  status: "onboarding" | "active" | "suspended";
+  brand: Brand | null;
+  strategy: MarketingStrategy | null;
+}
+
+export interface Post {
+  id: string;
+  format: "image" | "carousel" | "video";
+  status: "pending" | "approved" | "rejected" | "scheduled" | "published";
+  topic: string | null;
+  caption: string | null;
+  hashtags: string[] | null;
+  media_urls: string[] | null;
+  ai_metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface Brand {
+  name?: string;
+  tagline?: string;
+  description?: string;
+  services?: string[];
+  products?: string[];
+  colors?: { primary?: string; secondary?: string; accent?: string };
+  tone?: string;
+  industry?: string;
+  location?: string;
+  logo_url?: string;
+  logo_description?: string;
+  target_audience?: string;
+  competitors?: string[];
+  unique_value?: string;
+  how_they_help?: string;
+  esp?: string;
+  dialect?: string;
+  social_links?: { instagram?: string; facebook?: string; tiktok?: string };
+  // AI suggestions
+  color_palette?: { primary: string; secondary: string; accent: string; reasoning?: string };
+  font_suggestions?: string[];
+  logo_concepts?: { concept: string }[];
+}
+
+export interface CompetitorEntry {
+  name: string;
+  website: string | null;
+  social_links: { instagram: string | null; facebook: string | null; tiktok: string | null };
+  google_profile: string | null;
+  usp: string;
+  esp: string;
+}
+
+export interface AudiencePersona {
+  name: string;
+  age: number;
+  profession: string;
+  needs: string;
+  challenges: string;
+}
+
+export interface MarketingPlan {
+  services: string[];
+  keywords: string[];
+  competitors: CompetitorEntry[];
+  audience: {
+    problem: string;
+    demographics: { age: string; gender: string; language: string; social_status: string };
+    geography: { countries: string[]; regions: string[]; cities: string[] };
+    interests: string[];
+    facebook_interests: string[];
+    digital_behavior: string;
+    personas: AudiencePersona[];
+  };
+  content_themes: string[];
+}
+
+export interface MarketingStrategy {
+  marketing_plan: MarketingPlan;
+  marketing_message: string;
+  language: string;
+}
