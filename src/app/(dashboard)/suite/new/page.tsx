@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   Loader2, Plus, X, CheckCircle2, ChevronRight,
-  Globe, AtSign, AlertCircle,
+  AtSign, AlertCircle,
 } from "lucide-react";
 
 type Step = "name" | "links" | "extracting" | "complete" | "strategy" | "preview" | "done";
@@ -25,18 +25,6 @@ const PLATFORMS = [
   { id: "linkedin",  label: "LinkedIn",  placeholder: "https://linkedin.com/company/yours", hint: "LinkedIn company" },
   { id: "other",     label: "Other",     placeholder: "Any other relevant link",            hint: "Other link" },
 ];
-
-function platformColor(id: string) {
-  const map: Record<string, string> = {
-    website: "bg-zinc-700",
-    instagram: "bg-gradient-to-r from-purple-600 to-pink-500",
-    facebook: "bg-blue-600",
-    tiktok: "bg-zinc-900 border border-zinc-600",
-    linkedin: "bg-blue-700",
-    other: "bg-zinc-700",
-  };
-  return map[id] || "bg-zinc-700";
-}
 
 // ── Step indicator ────────────────────────────────────────────────────────────
 
@@ -526,34 +514,6 @@ export default function NewSuitePage() {
           <p className="text-white font-medium text-xl">Suite created!</p>
           <p className="text-zinc-400 text-sm mt-1">Redirecting to your dashboard…</p>
         </div>
-      )}
-    </div>
-  );
-}
-
-// ── Field helper ──────────────────────────────────────────────────────────────
-
-function Field({ label, value, onChange, textarea }: {
-  label: string; value?: string; onChange: (v: string) => void; textarea?: boolean;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-zinc-400 text-xs">{label}</Label>
-      {textarea ? (
-        <textarea
-          value={value || ""}
-          onChange={(e) => onChange(e.target.value)}
-          rows={3}
-          dir="auto"
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-white text-sm placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
-        />
-      ) : (
-        <Input
-          value={value || ""}
-          onChange={(e) => onChange(e.target.value)}
-          dir="auto"
-          className="bg-zinc-800 border-zinc-700 text-white text-sm"
-        />
       )}
     </div>
   );
