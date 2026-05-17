@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, Brand, MarketingStrategy } from "@/lib/api";
+import { useT } from "@/lib/i18n/LanguageContext";
+import { LANGUAGES } from "@/lib/i18n/translations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,6 +63,7 @@ function StepIndicator({ current }: { current: Step }) {
 
 export default function NewSuitePage() {
   const router = useRouter();
+  const t = useT();
   const [step, setStep] = useState<Step>("name");
   const [suiteName, setSuiteName] = useState("");
   const [suiteId, setSuiteId] = useState("");
@@ -79,9 +82,19 @@ export default function NewSuitePage() {
     howTheyHelp: "",
     usp: "",
     esp: "",
+    audienceLanguages: [] as string[],
   });
   const [strategy, setStrategy] = useState<MarketingStrategy | null>(null);
   const [strategyError, setStrategyError] = useState("");
+
+  function toggleAudienceLang(code: string) {
+    setCompleteData((d) => ({
+      ...d,
+      audienceLanguages: d.audienceLanguages.includes(code)
+        ? d.audienceLanguages.filter((c) => c !== code)
+        : [...d.audienceLanguages, code],
+    }));
+  }
 
   // ── Step 1: name ─────────────────────────────────────────────────────────
 
@@ -144,6 +157,7 @@ export default function NewSuitePage() {
         howTheyHelp: res.brand?.how_they_help || "",
         usp: res.brand?.unique_value || "",
         esp: res.brand?.esp || "",
+        audienceLanguages: res.brand?.audience_languages || [],
       });
       setStep("complete");
     } catch {
@@ -156,6 +170,7 @@ export default function NewSuitePage() {
         howTheyHelp: "",
         usp: "",
         esp: "",
+        audienceLanguages: [],
       });
       setStep("complete");
     }
@@ -172,6 +187,9 @@ export default function NewSuitePage() {
       how_they_help: completeData.howTheyHelp,
       unique_value: completeData.usp,
       esp: completeData.esp,
+      audience_languages: completeData.audienceLanguages.length > 0
+        ? completeData.audienceLanguages
+        : ["ar"],
     };
     setBrand(updatedBrand);
     try {
@@ -342,7 +360,7 @@ export default function NewSuitePage() {
         <div className="text-center py-16 space-y-4">
           <Loader2 size={44} className="text-indigo-400 animate-spin mx-auto" />
           <div>
-            <p className="text-white font-medium text-lg">Researching your business…</p>
+            <p className="text-white font-medium text-lg">{t("suite.new.analyzing")}</p>
             <p className="text-zinc-400 text-sm mt-2 transition-all">{extractLog}</p>
           </div>
           <div className="flex flex-col items-center gap-1.5 text-xs text-zinc-600 mt-6">
@@ -366,7 +384,7 @@ export default function NewSuitePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-zinc-300">Business name</Label>
+                <Label className="text-zinc-300">{t("suite.new.businessName")}</Label>
                 <Input
                   value={completeData.businessName}
                   onChange={(e) => setCompleteData((d) => ({ ...d, businessName: e.target.value }))}
@@ -375,7 +393,7 @@ export default function NewSuitePage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-zinc-300">Services / Products <span className="text-zinc-500 text-xs">(comma-separated)</span></Label>
+                <Label className="text-zinc-300">{t("suite.new.services")}</Label>
                 <Input
                   value={completeData.services}
                   onChange={(e) => setCompleteData((d) => ({ ...d, services: e.target.value }))}
@@ -385,7 +403,7 @@ export default function NewSuitePage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-zinc-300">Target audience</Label>
+                <Label className="text-zinc-300">{t("suite.new.audience")}</Label>
                 <textarea
                   value={completeData.targetAudience}
                   onChange={(e) => setCompleteData((d) => ({ ...d, targetAudience: e.target.value }))}
@@ -397,7 +415,7 @@ export default function NewSuitePage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-zinc-300">How do you help them?</Label>
+                <Label className="text-zinc-300">{t("suite.new.howHelp")}</Label>
                 <textarea
                   value={completeData.howTheyHelp}
                   onChange={(e) => setCompleteData((d) => ({ ...d, howTheyHelp: e.target.value }))}
@@ -409,7 +427,7 @@ export default function NewSuitePage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-zinc-300">USP — What makes you unique?</Label>
+                <Label className="text-zinc-300">{t("suite.new.usp")}</Label>
                 <Input
                   value={completeData.usp}
                   onChange={(e) => setCompleteData((d) => ({ ...d, usp: e.target.value }))}
@@ -419,7 +437,7 @@ export default function NewSuitePage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-zinc-300">ESP — How does the client feel after working with you?</Label>
+                <Label className="text-zinc-300">{t("suite.new.esp")}</Label>
                 <Input
                   value={completeData.esp}
                   onChange={(e) => setCompleteData((d) => ({ ...d, esp: e.target.value }))}
@@ -427,6 +445,26 @@ export default function NewSuitePage() {
                   required
                   className="bg-zinc-800 border-zinc-700 text-white"
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-zinc-300">{t("suite.new.audienceLanguages")}</Label>
+                <p className="text-zinc-500 text-xs">{t("suite.new.audienceLanguagesDesc")}</p>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {LANGUAGES.map((l) => (
+                    <button
+                      key={l.code}
+                      type="button"
+                      onClick={() => toggleAudienceLang(l.code)}
+                      className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                        completeData.audienceLanguages.includes(l.code)
+                          ? "bg-indigo-600 border-indigo-500 text-white"
+                          : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                      }`}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               {error && (
                 <div className="flex items-center gap-2 text-red-400 text-sm bg-red-950/40 border border-red-900 rounded-lg px-4 py-2.5">
@@ -436,7 +474,7 @@ export default function NewSuitePage() {
             </CardContent>
           </Card>
           <Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 gap-2">
-            <ChevronRight size={15} /> Build my marketing strategy
+            <ChevronRight size={15} /> {t("suite.new.buildStrategy")}
           </Button>
         </form>
       )}
@@ -450,14 +488,14 @@ export default function NewSuitePage() {
                 {strategyError}
               </div>
               <Button onClick={runGenerateStrategy} className="bg-indigo-600 hover:bg-indigo-500">
-                Try again
+                {t("suite.new.tryAgain")}
               </Button>
             </div>
           ) : (
             <>
               <Loader2 size={44} className="text-indigo-400 animate-spin mx-auto" />
               <div>
-                <p className="text-white font-medium text-lg">Building your marketing strategy…</p>
+                <p className="text-white font-medium text-lg">{t("suite.new.generatingStrategy")}</p>
                 <p className="text-zinc-400 text-sm mt-2">Researching competitors, building audience profiles, generating your marketing message</p>
               </div>
               <div className="flex flex-col items-center gap-1.5 text-xs text-zinc-600 mt-6">
@@ -476,7 +514,7 @@ export default function NewSuitePage() {
         <div className="space-y-4">
           <Card className="bg-zinc-900 border-zinc-800 text-white">
             <CardHeader>
-              <CardTitle>Your marketing strategy is ready</CardTitle>
+              <CardTitle>{t("suite.new.strategyReady")}</CardTitle>
               <CardDescription className="text-zinc-400">
                 Your marketing message and full plan are saved. Access them anytime from the Strategy tab in your dashboard.
               </CardDescription>
@@ -500,7 +538,7 @@ export default function NewSuitePage() {
                 onClick={() => { setStep("done"); setTimeout(() => router.push(`/suite/${suiteId}`), 800); }}
                 className="bg-indigo-600 hover:bg-indigo-500 gap-2 w-full"
               >
-                <CheckCircle2 size={14} /> Go to my suite dashboard
+                <CheckCircle2 size={14} /> {t("suite.new.goToDashboard")}
               </Button>
             </CardContent>
           </Card>

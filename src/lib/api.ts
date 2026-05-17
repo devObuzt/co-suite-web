@@ -223,6 +223,7 @@ export interface Brand {
   unique_value?: string;
   how_they_help?: string;
   esp?: string;
+  audience_languages?: string[];
   dialect?: string;
   social_links?: { instagram?: string; facebook?: string; tiktok?: string };
   // AI suggestions

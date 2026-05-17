@@ -1,5 +1,6 @@
 "use client";
 import { use, useEffect, useRef, useState } from "react";
+import { useT } from "@/lib/i18n/LanguageContext";
 import Image from "next/image";
 import Link from "next/link";
 import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry } from "@/lib/api";
@@ -18,6 +19,7 @@ const API_MEDIA = process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") || "ht
 
 export default function SuiteDashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const t = useT();
   const [suite, setSuite] = useState<Suite | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -106,16 +108,16 @@ export default function SuiteDashboardPage({ params }: { params: Promise<{ id: s
       <Tabs defaultValue="content" className="w-full">
         <TabsList className="bg-zinc-900 border border-zinc-800">
           <TabsTrigger value="content" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white text-zinc-400">
-            <Zap size={14} className="mr-1.5" /> Content
+            <Zap size={14} className="mr-1.5" /> {t("tab.content")}
           </TabsTrigger>
           <TabsTrigger value="analytics" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white text-zinc-400">
-            <BarChart3 size={14} className="mr-1.5" /> Analytics
+            <BarChart3 size={14} className="mr-1.5" /> {t("tab.analytics")}
           </TabsTrigger>
           <TabsTrigger value="schedule" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white text-zinc-400">
-            <Calendar size={14} className="mr-1.5" /> Schedule
+            <Calendar size={14} className="mr-1.5" /> {t("tab.schedule")}
           </TabsTrigger>
           <TabsTrigger value="strategy" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white text-zinc-400">
-            <Target size={14} className="mr-1.5" /> Strategy
+            <Target size={14} className="mr-1.5" /> {t("tab.strategy")}
           </TabsTrigger>
         </TabsList>
 
