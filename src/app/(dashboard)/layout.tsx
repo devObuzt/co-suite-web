@@ -9,14 +9,24 @@ import { useT } from "@/lib/i18n/LanguageContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuthStore();
+  const { user, logout, _hasHydrated } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
   const t = useT();
 
   useEffect(() => {
-    if (!user) router.push("/login");
-  }, [user, router]);
+    // Wait for Zustand to finish reading localStorage before redirecting
+    if (_hasHydrated && !user) router.push("/login");
+  }, [_hasHydrated, user, router]);
+
+  // Show spinner while auth state is loading from localStorage
+  if (!_hasHydrated) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-zinc-700 border-t-indigo-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!user) return null;
 
