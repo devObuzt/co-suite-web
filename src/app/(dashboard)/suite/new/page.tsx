@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { api, Brand, MarketingStrategy } from "@/lib/api";
 import { useT, useLanguage } from "@/lib/i18n/LanguageContext";
 import { LANGUAGES, LangCode } from "@/lib/i18n/translations";
-import { getSuggestions } from "@/lib/i18n/suggestions";
+import { getSuggestions, findNicheIndex, getEnglishNiche } from "@/lib/i18n/suggestions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -108,7 +108,7 @@ export default function NewSuitePage() {
   // Step A
   const [bizName, setBizName] = useState("");
   // Step B
-  const [selectedNiche, setSelectedNiche] = useState("");
+  const [selectedNicheIdx, setSelectedNicheIdx] = useState(-1); // index into suggestions.niches
   const [customNiche, setCustomNiche] = useState("");
   const [showNicheInput, setShowNicheInput] = useState(false);
   // Step C
@@ -186,7 +186,7 @@ export default function NewSuitePage() {
       clearTimeout(t2);
       setBrand(res.brand);
       setBizName(res.brand?.name || suiteName);
-      setSelectedNiche(res.brand?.industry || "");
+      setSelectedNicheIdx(findNicheIndex(res.brand?.industry || ""));
       setOrderedLangs(res.brand?.audience_languages || []);
       setServiceItems([...(res.brand?.services || []), ...(res.brand?.products || [])].filter(Boolean));
       setUspPoints(res.brand?.usp_points || (res.brand?.unique_value ? [res.brand.unique_value] : []));
@@ -201,7 +201,7 @@ export default function NewSuitePage() {
       clearTimeout(t1);
       clearTimeout(t2);
       setBizName(suiteName);
-      setSelectedNiche("");
+      setSelectedNicheIdx(-1);
       setOrderedLangs([]);
       setServiceItems([]);
       setStep("step-a");
@@ -469,26 +469,27 @@ export default function NewSuitePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-2">
-                {[...new Set([selectedNiche, ...suggestions.niches].filter(Boolean))].map((n) => (
+                {suggestions.niches.map((n, idx) => (
                   <button
-                    key={n}
-                    onClick={() => { setSelectedNiche(n); setShowNicheInput(false); }}
+                    key={idx}
+                    onClick={() => { setSelectedNicheIdx(idx); setShowNicheInput(false); setCustomNiche(""); }}
                     className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                      selectedNiche === n
+                      selectedNicheIdx === idx
                         ? "bg-indigo-600 border-indigo-500 text-white"
                         : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
                     }`}
+                    dir="auto"
                   >{n}</button>
                 ))}
                 <button
-                  onClick={() => setShowNicheInput(true)}
+                  onClick={() => { setShowNicheInput(true); setSelectedNicheIdx(-1); }}
                   className="px-3 py-1.5 rounded-full text-sm border border-dashed border-zinc-600 text-zinc-500 hover:border-zinc-400"
                 >{t("suite.new.otherNiche")}</button>
               </div>
               {showNicheInput && (
                 <Input
                   value={customNiche}
-                  onChange={(e) => { setCustomNiche(e.target.value); setSelectedNiche(e.target.value); }}
+                  onChange={(e) => setCustomNiche(e.target.value)}
                   placeholder="Type your niche..."
                   className="bg-zinc-800 border-zinc-700 text-white"
                   autoFocus
@@ -498,8 +499,9 @@ export default function NewSuitePage() {
           </Card>
           <div className="flex gap-3">
             <Button onClick={async () => {
-              const niche = selectedNiche || customNiche;
-              if (niche) await saveStep("b", { niche, industry: niche });
+              const englishNiche = selectedNicheIdx >= 0 ? getEnglishNiche(selectedNicheIdx) : customNiche;
+              const localNiche = selectedNicheIdx >= 0 ? suggestions.niches[selectedNicheIdx] : customNiche;
+              if (englishNiche) await saveStep("b", { niche: localNiche, industry: englishNiche });
               setStep("step-c");
             }} className="bg-indigo-600 hover:bg-indigo-500 gap-2">
               <ChevronRight size={15} /> {t("suite.new.confirmCategory")}
@@ -675,7 +677,7 @@ export default function NewSuitePage() {
               <div className="space-y-2">
                 <Label className="text-zinc-300">{t("suite.new.interests")}</Label>
                 <div className="flex flex-wrap gap-2">
-                  {(suggestions.interests[selectedNiche] || suggestions.interests["default"]).map((interest) => (
+                  {(suggestions.interests[suggestions.niches[selectedNicheIdx]] || suggestions.interests["default"]).map((interest) => (
                     <button
                       key={interest}
                       onClick={() => setSelectedInterests((prev) =>

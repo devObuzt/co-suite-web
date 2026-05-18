@@ -160,3 +160,17 @@ export const SUGGESTIONS: Record<LangCode, SuggestionSets> = {
 export function getSuggestions(lang: LangCode): SuggestionSets {
   return SUGGESTIONS[lang] || SUGGESTIONS["en"];
 }
+
+/** Find the canonical index of an English niche string (fuzzy match). Returns -1 if not found. */
+export function findNicheIndex(englishNiche: string): number {
+  if (!englishNiche) return -1;
+  const q = englishNiche.toLowerCase();
+  return SUGGESTIONS.en.niches.findIndex(
+    (n) => n.toLowerCase() === q || q.includes(n.toLowerCase()) || n.toLowerCase().includes(q)
+  );
+}
+
+/** Get the English canonical niche name for a given index. */
+export function getEnglishNiche(idx: number): string {
+  return SUGGESTIONS.en.niches[idx] || "";
+}
