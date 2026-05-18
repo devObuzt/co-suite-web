@@ -116,6 +116,11 @@ export default function NewSuitePage() {
   const [espPoints, setEspPoints] = useState<string[]>([]);
   // Step G
   const [generatingAssets, setGeneratingAssets] = useState(false);
+  const [logoStyle, setLogoStyle] = useState<"icon_only" | "with_name" | "initials">("icon_only");
+  const [uploadingAsset, setUploadingAsset] = useState(false);
+  const [localColors, setLocalColors] = useState<{ primary: string; secondary: string; accent: string }>({
+    primary: "#4f46e5", secondary: "#818cf8", accent: "#c7d2fe",
+  });
 
   // ── Step 1: name ─────────────────────────────────────────────────────────
 
@@ -177,6 +182,11 @@ export default function NewSuitePage() {
       setServiceItems([...(res.brand?.services || []), ...(res.brand?.products || [])].filter(Boolean));
       setUspPoints(res.brand?.usp_points || (res.brand?.unique_value ? [res.brand.unique_value] : []));
       setEspPoints(res.brand?.esp_points || (res.brand?.esp ? [res.brand.esp] : []));
+      setLocalColors({
+        primary: res.brand?.colors?.primary || "#4f46e5",
+        secondary: res.brand?.colors?.secondary || "#818cf8",
+        accent: res.brand?.colors?.accent || "#c7d2fe",
+      });
       setStep("step-a");
     } catch {
       clearTimeout(t1);
@@ -212,13 +222,42 @@ export default function NewSuitePage() {
   async function generateAssets(types: string[]) {
     setGeneratingAssets(true);
     try {
-      const res = await api.onboarding.generateBrandAssets({ suite_id: suiteId, generate: types });
+      const res = await api.onboarding.generateBrandAssets({
+        suite_id: suiteId,
+        generate: types,
+        logo_style: logoStyle,
+      });
       setBrand(res.brand);
+      if (res.brand.colors) {
+        setLocalColors({
+          primary: res.brand.colors.primary || localColors.primary,
+          secondary: res.brand.colors.secondary || localColors.secondary,
+          accent: res.brand.colors.accent || localColors.accent,
+        });
+      }
     } catch {
       // ignore
     } finally {
       setGeneratingAssets(false);
     }
+  }
+
+  async function uploadBrandAsset(assetType: "logo" | "font", file: File, language?: string) {
+    setUploadingAsset(true);
+    try {
+      const res = await api.onboarding.uploadBrandAsset(suiteId, assetType, file, language);
+      setBrand(res.brand);
+    } catch {
+      // ignore
+    } finally {
+      setUploadingAsset(false);
+    }
+  }
+
+  async function saveColors() {
+    await saveStep("g-colors", {
+      colors: { primary: localColors.primary, secondary: localColors.secondary, accent: localColors.accent },
+    });
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -755,44 +794,104 @@ export default function NewSuitePage() {
           <Card className="bg-zinc-900 border-zinc-800 text-white">
             <CardHeader>
               <CardTitle>{t("suite.new.stepGTitle")}</CardTitle>
-              <CardDescription className="text-zinc-400">
-                {t("suite.new.stepGSubtitle")}
-              </CardDescription>
+              <CardDescription className="text-zinc-400">{t("suite.new.stepGSubtitle")}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5">
-              {/* Logo */}
-              <div className="space-y-2">
+            <CardContent className="space-y-6">
+
+              {/* ── LOGO ── */}
+              <div className="space-y-3">
                 <Label className="text-zinc-300">{t("suite.new.logoLabel")}</Label>
-                {brand?.logo_url ? (
-                  <img src={brand.logo_url} alt="logo" className="h-24 object-contain bg-zinc-800 rounded-lg p-3" />
-                ) : (
-                  <div className="h-24 bg-zinc-800 rounded-lg flex items-center justify-center text-zinc-600 text-sm border border-dashed border-zinc-700">
-                    {t("suite.new.noLogoFound")}
-                  </div>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => generateAssets(["logo"])}
-                  disabled={generatingAssets}
-                  className="border-zinc-700 text-zinc-400 hover:bg-zinc-800 gap-2"
-                >
-                  {generatingAssets ? <Loader2 size={13} className="animate-spin" /> : null}
-                  {t("suite.new.generateLogo")}
-                </Button>
-              </div>
-              {/* Colors */}
-              <div className="space-y-2">
-                <Label className="text-zinc-300">{t("suite.new.colorsLabel")}</Label>
-                <div className="flex gap-4">
-                  {(["primary", "secondary", "accent"] as const).map((key) => (
-                    <div key={key} className="flex flex-col items-center gap-1">
-                      <div
-                        className="w-10 h-10 rounded-lg border border-zinc-700"
-                        style={{ backgroundColor: (brand?.colors as Record<string, string> | undefined)?.[key] || "#333" }}
+
+                {/* Logo preview */}
+                <div className="flex items-start gap-4">
+                  {brand?.logo_url ? (
+                    <div className="relative">
+                      <img
+                        src={brand.logo_url}
+                        alt="logo"
+                        className="h-24 w-24 object-contain bg-zinc-800 rounded-xl border border-zinc-700 p-2"
                       />
-                      <span className="text-xs text-zinc-500 capitalize">{key}</span>
-                      <span className="text-xs text-zinc-500 font-mono">{brand?.colors?.[key] || "—"}</span>
+                      {brand.logo_source && (
+                        <span className="absolute -top-1.5 -right-1.5 text-xs bg-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded-full">
+                          {brand.logo_source === "ai-generated" ? "AI" : brand.logo_source === "uploaded" ? "↑" : "🔗"}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="h-24 w-24 bg-zinc-800 rounded-xl border border-dashed border-zinc-600 flex items-center justify-center text-zinc-600 text-xs text-center p-2">
+                      {t("suite.new.noLogoFound")}
+                    </div>
+                  )}
+                  <div className="space-y-2 flex-1">
+                    {/* Upload button */}
+                    <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-white cursor-pointer text-sm transition-colors w-full">
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) await uploadBrandAsset("logo", file);
+                        }}
+                      />
+                      {uploadingAsset ? <Loader2 size={14} className="animate-spin" /> : null}
+                      Upload logo
+                    </label>
+
+                    {/* Logo style selector */}
+                    <div className="space-y-1">
+                      <p className="text-zinc-500 text-xs">AI generation style:</p>
+                      <div className="flex gap-2">
+                        {(["icon_only", "with_name", "initials"] as const).map((style) => (
+                          <button
+                            key={style}
+                            onClick={() => setLogoStyle(style)}
+                            className={`px-2.5 py-1 rounded-lg text-xs border transition-colors ${
+                              logoStyle === style
+                                ? "bg-indigo-600 border-indigo-500 text-white"
+                                : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                            }`}
+                          >
+                            {style === "icon_only" ? "Icon only" : style === "with_name" ? "With name" : "Initials"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* AI generate */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => generateAssets(["logo"])}
+                      disabled={generatingAssets}
+                      className="border-zinc-700 text-zinc-400 hover:bg-zinc-800 gap-2 w-full"
+                    >
+                      {generatingAssets ? <Loader2 size={13} className="animate-spin" /> : null}
+                      {t("suite.new.generateLogo")}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── COLORS ── */}
+              <div className="space-y-3">
+                <Label className="text-zinc-300">{t("suite.new.colorsLabel")}</Label>
+                <div className="grid grid-cols-3 gap-3">
+                  {(["primary", "secondary", "accent"] as const).map((key) => (
+                    <div key={key} className="space-y-1.5">
+                      <p className="text-zinc-500 text-xs capitalize">{key}</p>
+                      <div className="flex items-center gap-2">
+                        <label className="relative cursor-pointer">
+                          <input
+                            type="color"
+                            value={localColors[key]}
+                            onChange={(e) => setLocalColors((prev) => ({ ...prev, [key]: e.target.value }))}
+                            onBlur={saveColors}
+                            className="w-10 h-10 rounded-lg border border-zinc-700 cursor-pointer bg-transparent p-0.5"
+                          />
+                        </label>
+                        <span className="text-xs text-zinc-400 font-mono">{localColors[key]}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -807,18 +906,52 @@ export default function NewSuitePage() {
                   {t("suite.new.generateColors")}
                 </Button>
               </div>
-              {/* Fonts */}
-              <div className="space-y-2">
+
+              {/* ── FONTS ── */}
+              <div className="space-y-3">
                 <Label className="text-zinc-300">{t("suite.new.fontsLabel")}</Label>
-                {(brand?.font_suggestions || []).length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
+
+                {/* AI-suggested fonts */}
+                {(brand?.font_suggestions || []).length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
                     {(brand?.font_suggestions || []).map((f) => (
                       <span key={f} className="text-sm bg-zinc-800 text-zinc-300 px-3 py-1.5 rounded-lg border border-zinc-700">{f}</span>
                     ))}
                   </div>
-                ) : (
-                  <p className="text-zinc-500 text-sm">{t("suite.new.noFontsFound")}</p>
                 )}
+
+                {/* Font upload per language */}
+                <div className="space-y-2">
+                  <p className="text-zinc-500 text-xs">Upload fonts per language:</p>
+                  {(orderedLangs.length > 0 ? orderedLangs : ["all"]).map((code) => {
+                    const langName = code === "ar" ? "العربية" : code === "he" ? "עברית" : code === "en" ? "English" : code === "fr" ? "Français" : code === "es" ? "Español" : code === "tr" ? "Türkçe" : "All";
+                    const uploadedFonts = (brand?.fonts_by_language?.[code] || brand?.fonts_by_language?.["all"] || []);
+                    return (
+                      <div key={code} className="flex items-center gap-3 bg-zinc-800 rounded-lg px-3 py-2">
+                        <span className="text-zinc-300 text-sm w-20 shrink-0" dir={code === "ar" || code === "he" ? "rtl" : "ltr"}>{langName}</span>
+                        <div className="flex-1 flex flex-wrap gap-1">
+                          {uploadedFonts.map((font) => (
+                            <span key={font.url} className="text-xs bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded">{font.name}</span>
+                          ))}
+                          {uploadedFonts.length === 0 && <span className="text-zinc-600 text-xs">No font uploaded</span>}
+                        </div>
+                        <label className="cursor-pointer text-xs text-indigo-400 hover:text-indigo-300 transition-colors shrink-0">
+                          <input
+                            type="file"
+                            accept=".ttf,.otf,.woff,.woff2"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) await uploadBrandAsset("font", file, code);
+                            }}
+                          />
+                          {uploadingAsset ? <Loader2 size={12} className="animate-spin inline" /> : "↑ Upload"}
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -830,11 +963,16 @@ export default function NewSuitePage() {
                   {t("suite.new.generateFonts")}
                 </Button>
               </div>
+
             </CardContent>
           </Card>
+
           <Button
             onClick={async () => {
-              await saveStep("g", {});
+              await saveStep("g", {
+                colors: { primary: localColors.primary, secondary: localColors.secondary, accent: localColors.accent },
+                logo_style: logoStyle,
+              });
               setStep("strategy");
               await runGenerateStrategy();
             }}
@@ -842,10 +980,15 @@ export default function NewSuitePage() {
           >
             <ChevronRight size={15} /> {t("suite.new.buildStrategy2")}
           </Button>
-          <button onClick={async () => {
-            setStep("strategy");
-            await runGenerateStrategy();
-          }} className="text-zinc-500 text-sm hover:text-zinc-300 w-full text-center">{t("suite.new.skipBrand")}</button>
+          <button
+            onClick={async () => {
+              setStep("strategy");
+              await runGenerateStrategy();
+            }}
+            className="text-zinc-500 text-sm hover:text-zinc-300 w-full text-center"
+          >
+            {t("suite.new.skipBrand")}
+          </button>
         </div>
       )}
 

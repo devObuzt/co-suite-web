@@ -10,7 +10,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(!(options.body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
@@ -65,11 +65,23 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
-    generateBrandAssets: (data: { suite_id: string; generate: string[] }) =>
+    generateBrandAssets: (data: { suite_id: string; generate: string[]; logo_style?: string }) =>
       request<{ brand: Brand; generated: Record<string, unknown> }>(
         "/onboarding/generate-brand-assets",
         { method: "POST", body: JSON.stringify(data) }
       ),
+    uploadBrandAsset: (suiteId: string, assetType: "logo" | "font", file: File, language?: string) => {
+      const form = new FormData();
+      form.append("suite_id", suiteId);
+      form.append("asset_type", assetType);
+      form.append("file", file);
+      if (language) form.append("language", language);
+      return request<{ url: string; brand: Brand }>("/onboarding/upload-brand-asset", {
+        method: "POST",
+        body: form,
+        headers: {},  // let browser set multipart boundary
+      });
+    },
   },
 
   content: {
@@ -255,6 +267,9 @@ export interface Brand {
   color_palette?: { primary: string; secondary: string; accent: string; reasoning?: string };
   font_suggestions?: string[];
   logo_concepts?: { concept: string }[];
+  logo_style?: "icon_only" | "with_name" | "initials";
+  logo_source?: "uploaded" | "ai-generated" | "scraped";
+  fonts_by_language?: Record<string, Array<{ name: string; url: string; format: string }>>;
 }
 
 export interface CompetitorEntry {
