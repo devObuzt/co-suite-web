@@ -973,23 +973,46 @@ export default function NewSuitePage() {
               <div className="space-y-3">
                 <Label className="text-zinc-300">{t("suite.new.colorsLabel")}</Label>
                 <div className="grid grid-cols-3 gap-3">
-                  {(["primary", "secondary", "accent"] as const).map((key) => (
-                    <div key={key} className="space-y-1.5">
-                      <p className="text-zinc-500 text-xs capitalize">{key}</p>
-                      <div className="flex items-center gap-2">
-                        <label className="relative cursor-pointer">
+                  {(["primary", "secondary", "accent"] as const).map((key) => {
+                    const hex = localColors[key] || "#000000";
+                    const r = parseInt(hex.slice(1, 3), 16) || 0;
+                    const g = parseInt(hex.slice(3, 5), 16) || 0;
+                    const b = parseInt(hex.slice(5, 7), 16) || 0;
+                    return (
+                      <div key={key} className="space-y-1.5">
+                        <p className="text-zinc-500 text-xs capitalize">{key}</p>
+                        {/* Color swatch + native picker */}
+                        <label className="relative cursor-pointer block">
                           <input
                             type="color"
                             value={localColors[key]}
                             onChange={(e) => setLocalColors((prev) => ({ ...prev, [key]: e.target.value }))}
                             onBlur={saveColors}
-                            className="w-10 h-10 rounded-lg border border-zinc-700 cursor-pointer bg-transparent p-0.5"
+                            className="w-full h-9 rounded-lg border border-zinc-700 cursor-pointer bg-transparent p-0.5"
                           />
                         </label>
-                        <span className="text-xs text-zinc-400 font-mono">{localColors[key]}</span>
+                        {/* Hex input */}
+                        <input
+                          type="text"
+                          value={localColors[key]}
+                          maxLength={7}
+                          placeholder="#000000"
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (/^#[0-9a-fA-F]{0,6}$/.test(v)) {
+                              setLocalColors((prev) => ({ ...prev, [key]: v }));
+                              if (v.length === 7) saveColors();
+                            }
+                          }}
+                          className="w-full bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs font-mono rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                        {/* RGB display */}
+                        <p className="text-zinc-600 text-xs font-mono">
+                          rgb({r}, {g}, {b})
+                        </p>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <Button
                   variant="outline"
