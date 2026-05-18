@@ -43,6 +43,8 @@ export const api = {
     create: (data: { name: string; website_url?: string }) =>
       request<Suite>("/suites/", { method: "POST", body: JSON.stringify(data) }),
     get: (id: string) => request<Suite>(`/suites/${id}`),
+    marketResearch: (suiteId: string) =>
+      request<{ results: MarketResult[] }>(`/suites/${suiteId}/market-research`),
   },
 
   onboarding: {
@@ -309,4 +311,11 @@ export interface MarketingStrategy {
   marketing_plan: MarketingPlan;
   marketing_message: string;
   language: string;
+}
+
+export interface MarketResult {
+  title: string;
+  url: string;
+  snippet: string;
+  platform: "instagram" | "tiktok" | "facebook" | "web";
 }

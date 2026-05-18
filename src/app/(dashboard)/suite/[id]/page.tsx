@@ -45,7 +45,10 @@ export default function SuiteDashboardPage({ params }: { params: Promise<{ id: s
             {suite.name[0].toUpperCase()}
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">{suite.name}</h1>
+            <Link href={`/suite/${id}/profile`} className="group flex items-center gap-2 hover:text-indigo-300 transition-colors">
+              <h1 className="text-2xl font-bold text-white">{suite.name}</h1>
+              <span className="text-zinc-600 text-xs group-hover:text-indigo-400 transition-colors">→ Profile</span>
+            </Link>
             <div className="flex items-center gap-2 mt-1">
               <Badge className="bg-emerald-950 text-emerald-400 border-emerald-800 border text-xs" variant="outline">
                 {suite.status}
@@ -56,53 +59,19 @@ export default function SuiteDashboardPage({ params }: { params: Promise<{ id: s
         </div>
         <div className="flex gap-2">
           <Link href={`/suite/${id}/billing`}>
-            <Button variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 gap-2">
+            <Button variant="outline" className="border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-400 hover:text-white gap-2">
               <CreditCard size={14} /> Billing
             </Button>
           </Link>
-          <Button variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 gap-2">
+          <Button variant="outline" className="border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-400 hover:text-white gap-2">
             <Settings size={14} /> Settings
           </Button>
         </div>
       </div>
 
-      {/* Brand summary */}
-      {brand && (
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="bg-zinc-900 border-zinc-800 col-span-2">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-zinc-400 font-normal">About</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-white text-sm leading-relaxed">{brand.description || brand.tagline || "No description."}</p>
-              {brand.services && brand.services.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {brand.services.slice(0, 6).map((s) => (
-                    <span key={s} className="text-xs bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded">{s}</span>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-zinc-400 font-normal">Brand colors</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {Object.entries(brand.colors || {}).filter(([, v]) => v).map(([k, v]) => (
-                <div key={k} className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded border border-zinc-700" style={{ backgroundColor: v as string }} />
-                  <span className="text-zinc-400 text-xs capitalize">{k}</span>
-                  <span className="text-white text-xs font-mono ml-auto">{v as string}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
       {/* Connections */}
       <ConnectionsPanel suiteId={id} />
+      <CompetitorsSection suiteId={id} strategy={suite?.strategy ?? null} />
 
       {/* Tabs */}
       <Tabs defaultValue="content" className="w-full">
@@ -712,6 +681,101 @@ function StatCard({ label, value, icon, icon2, sub }: {
 
 function sum(series?: InsightPoint[]): number {
   return (series || []).reduce((acc, pt) => acc + pt.value, 0);
+}
+
+// ─── Competitors & Market Research ─────────────────────────────────────────
+
+function CompetitorsSection({
+  suiteId,
+  strategy,
+}: {
+  suiteId: string;
+  strategy: MarketingStrategy | null;
+}) {
+  const [results, setResults] = useState<import("@/lib/api").MarketResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const data = await api.suites.marketResearch(suiteId);
+      setResults(data.results);
+      setLoaded(true);
+    } catch {
+      setLoaded(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const knownCompetitors = strategy?.marketing_plan?.competitors || [];
+
+  return (
+    <div className="space-y-3 mb-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-zinc-400 flex items-center gap-1.5">
+          <Globe size={13} /> Competitors & Market
+        </h3>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={load}
+          disabled={loading}
+          className="border-zinc-700 text-zinc-400 hover:bg-zinc-800 gap-1.5 h-7 text-xs"
+        >
+          {loading ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+          Research market
+        </Button>
+      </div>
+
+      {/* Known competitors from strategy */}
+      {knownCompetitors.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {knownCompetitors.map((c: CompetitorEntry) => (
+            <a
+              key={c.name}
+              href={c.website || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 hover:border-zinc-500 transition-colors"
+            >
+              <Globe size={11} className="text-zinc-500" />
+              {c.name}
+            </a>
+          ))}
+        </div>
+      )}
+
+      {/* Web search results */}
+      {loaded && results.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {results.map((r, i) => (
+            <a
+              key={i}
+              href={r.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex gap-2 items-start bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 hover:border-zinc-500 transition-colors"
+            >
+              {r.platform === "instagram" && <AtSign size={13} className="text-pink-400 mt-0.5 shrink-0" />}
+              {r.platform === "tiktok" && <Video size={13} className="text-zinc-400 mt-0.5 shrink-0" />}
+              {r.platform === "facebook" && <Globe size={13} className="text-blue-500 mt-0.5 shrink-0" />}
+              {r.platform === "web" && <Globe size={13} className="text-blue-400 mt-0.5 shrink-0" />}
+              <div className="min-w-0">
+                <p className="text-zinc-200 text-xs font-medium truncate" dir="auto">{r.title}</p>
+                <p className="text-zinc-500 text-xs mt-0.5 line-clamp-2" dir="auto">{r.snippet}</p>
+              </div>
+            </a>
+          ))}
+        </div>
+      )}
+
+      {loaded && results.length === 0 && (
+        <p className="text-zinc-600 text-xs">No results found. Set up your audience location in the business profile to get better results.</p>
+      )}
+    </div>
+  );
 }
 
 // ─── Strategy Panel ──────────────────────────────────────────────────────────
