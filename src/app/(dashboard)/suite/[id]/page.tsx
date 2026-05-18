@@ -138,7 +138,7 @@ export default function SuiteDashboardPage({ params }: { params: Promise<{ id: s
         </TabsContent>
 
         <TabsContent value="strategy" className="mt-4">
-          <StrategyPanel strategy={suite?.strategy ?? null} suiteId={id} onRegenerate={async () => {
+          <StrategyPanel strategy={suite?.strategy ?? null} suiteId={id} brand={suite?.brand ?? null} onRegenerate={async () => {
             try {
               const res = await api.onboarding.generateStrategy({ suite_id: id });
               setSuite((s) => s ? { ...s, strategy: res.strategy } : s);
@@ -719,10 +719,12 @@ function sum(series?: InsightPoint[]): number {
 function StrategyPanel({
   strategy,
   suiteId: _suiteId,
+  brand,
   onRegenerate,
 }: {
   strategy: MarketingStrategy | null;
   suiteId: string;
+  brand: import("@/lib/api").Brand | null;
   onRegenerate: () => Promise<void>;
 }) {
   const [regenerating, setRegenerating] = useState(false);
@@ -744,6 +746,138 @@ function StrategyPanel({
 
   return (
     <div className="space-y-4">
+      {/* Business Profile */}
+      {brand && (
+        <Card className="bg-zinc-900 border-zinc-800 text-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-zinc-400 font-normal">Business Profile</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {/* A: Name */}
+            {brand.name && (
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-zinc-500 text-xs mb-0.5">Business name</p>
+                  <p className="text-white text-sm" dir="auto">{brand.name}</p>
+                </div>
+              </div>
+            )}
+            {/* B: Category */}
+            {(brand.niche || brand.industry) && (
+              <div>
+                <p className="text-zinc-500 text-xs mb-0.5">Category</p>
+                <p className="text-white text-sm">{brand.niche || brand.industry}</p>
+              </div>
+            )}
+            {/* C: Languages */}
+            {(brand.audience_languages || []).length > 0 && (
+              <div>
+                <p className="text-zinc-500 text-xs mb-1">Audience languages</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(brand.audience_languages || []).map((code, idx) => (
+                    <span key={code} className={`text-xs px-2 py-0.5 rounded-full border ${
+                      idx === 0 ? "bg-indigo-950 border-indigo-800 text-indigo-300" : "border-zinc-700 text-zinc-400"
+                    }`}>
+                      {code === "ar" ? "العربية" : code === "he" ? "עברית" : code === "en" ? "English" : code === "fr" ? "Français" : code === "es" ? "Español" : code === "tr" ? "Türkçe" : code}
+                      {idx === 0 && <span className="ml-1 text-indigo-500 text-xs">main</span>}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* D: Services */}
+            {(brand.services || []).length > 0 && (
+              <div>
+                <p className="text-zinc-500 text-xs mb-1">Services & Products</p>
+                <div className="flex flex-wrap gap-1">
+                  {(brand.services || []).slice(0, 6).map((s) => (
+                    <span key={s} className="text-xs bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded border border-zinc-700" dir="auto">{s}</span>
+                  ))}
+                  {(brand.services || []).length > 6 && (
+                    <span className="text-xs text-zinc-500">+{(brand.services || []).length - 6} more</span>
+                  )}
+                </div>
+              </div>
+            )}
+            {/* E: Audience location */}
+            {brand.audience_location && (
+              <div>
+                <p className="text-zinc-500 text-xs mb-0.5">Target location</p>
+                <p className="text-white text-sm">
+                  {brand.audience_location.scope === "world"
+                    ? "Worldwide"
+                    : (brand.audience_location.countries || []).join(", ") || brand.location || "—"}
+                </p>
+                {(brand.audience_location.cities || []).length > 0 && (
+                  <p className="text-zinc-400 text-xs mt-0.5">{(brand.audience_location.cities || []).join(", ")}</p>
+                )}
+              </div>
+            )}
+            {/* E: Interests */}
+            {(brand.audience_interests || []).length > 0 && (
+              <div>
+                <p className="text-zinc-500 text-xs mb-1">Audience interests</p>
+                <div className="flex flex-wrap gap-1">
+                  {(brand.audience_interests || []).map((i) => (
+                    <span key={i} className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded border border-zinc-700">{i}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* F: USP */}
+            {(brand.usp_points || []).length > 0 && (
+              <div>
+                <p className="text-zinc-500 text-xs mb-1">Why choose us (USP)</p>
+                <ul className="space-y-0.5">
+                  {(brand.usp_points || []).map((p) => (
+                    <li key={p} className="text-white text-sm flex items-start gap-1.5" dir="auto">
+                      <span className="text-indigo-400 shrink-0">·</span>{p}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {/* F: ESP */}
+            {(brand.esp_points || []).length > 0 && (
+              <div>
+                <p className="text-zinc-500 text-xs mb-1">Client feels (ESP)</p>
+                <ul className="space-y-0.5">
+                  {(brand.esp_points || []).map((p) => (
+                    <li key={p} className="text-white text-sm flex items-start gap-1.5" dir="auto">
+                      <span className="text-indigo-400 shrink-0">·</span>{p}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {/* G: Brand assets */}
+            {(brand.logo_url || brand.colors?.primary) && (
+              <div>
+                <p className="text-zinc-500 text-xs mb-2">Brand assets</p>
+                <div className="flex items-center gap-3">
+                  {brand.logo_url && (
+                    <img src={brand.logo_url} alt="logo" className="h-10 w-10 object-contain bg-zinc-800 rounded border border-zinc-700 p-1" />
+                  )}
+                  {brand.colors?.primary && (
+                    <div className="flex gap-1.5">
+                      {(["primary", "secondary", "accent"] as const).map((k) => brand.colors?.[k] && (
+                        <div key={k} className="w-6 h-6 rounded border border-zinc-700"
+                          style={{ backgroundColor: brand.colors?.[k] as string || "transparent" }}
+                          title={k}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {(brand.font_suggestions || []).length > 0 && (
+                    <span className="text-xs text-zinc-400">{(brand.font_suggestions || [])[0]}</span>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Marketing message */}
       <Card className="bg-indigo-950/40 border-indigo-800 text-white">
         <CardHeader className="pb-2">
