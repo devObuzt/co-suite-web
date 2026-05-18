@@ -60,6 +60,16 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    saveBrandStep: (data: { suite_id: string; step: string; data: Partial<Brand> }) =>
+      request<{ ok: boolean }>("/onboarding/save-brand-step", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    generateBrandAssets: (data: { suite_id: string; generate: string[] }) =>
+      request<{ brand: Brand; generated: Record<string, unknown> }>(
+        "/onboarding/generate-brand-assets",
+        { method: "POST", body: JSON.stringify(data) }
+      ),
   },
 
   content: {
@@ -224,6 +234,21 @@ export interface Brand {
   how_they_help?: string;
   esp?: string;
   audience_languages?: string[];
+  niche?: string;
+  audience_location?: {
+    countries: string[];
+    cities: string[];
+    scope: "world" | "region" | "custom";
+  };
+  audience_interests?: string[];
+  usp_points?: string[];
+  esp_points?: string[];
+  brand_generated?: {
+    logo_url?: string;
+    logo_prompt?: string;
+    colors_generated?: boolean;
+    fonts_generated?: boolean;
+  };
   dialect?: string;
   social_links?: { instagram?: string; facebook?: string; tiktok?: string };
   // AI suggestions
