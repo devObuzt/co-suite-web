@@ -712,10 +712,10 @@ function CompetitorsSection({
   const knownCompetitors = strategy?.marketing_plan?.competitors || [];
 
   return (
-    <div className="space-y-3 mb-4">
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3 mb-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-zinc-400 flex items-center gap-1.5">
-          <Globe size={13} /> Competitors & Market
+        <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+          <Globe size={14} className="text-indigo-400" /> Competitors & Market
         </h3>
         <Button
           size="sm"
