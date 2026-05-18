@@ -66,6 +66,15 @@ export default function NewSuitePage() {
   const { lang } = useLanguage();
   const suggestions = getSuggestions(lang);
 
+  const LOCATION_SCOPES: { value: string; label: string }[] = [
+    { value: "Worldwide", label: t("suite.new.scopeWorldwide") },
+    { value: "Middle East", label: t("suite.new.scopeMiddleEast") },
+    { value: "Europe", label: t("suite.new.scopeEurope") },
+    { value: "North America", label: t("suite.new.scopeNorthAmerica") },
+    { value: "Asia", label: t("suite.new.scopeAsia") },
+    { value: "Custom", label: t("suite.new.scopeCustom") },
+  ];
+
   const STEPS: { key: Step; label: string }[] = [
     { key: "name", label: t("suite.new.stepName") },
     { key: "links", label: t("suite.new.stepLinks") },
@@ -202,7 +211,7 @@ export default function NewSuitePage() {
   async function runGenerateStrategy() {
     setStrategyError("");
     try {
-      const res = await api.onboarding.generateStrategy({ suite_id: suiteId });
+      const res = await api.onboarding.generateStrategy({ suite_id: suiteId, user_language: lang });
       setStrategy(res.strategy);
       setStep("preview");
     } catch (err: unknown) {
@@ -226,6 +235,7 @@ export default function NewSuitePage() {
         suite_id: suiteId,
         generate: types,
         logo_style: logoStyle,
+        user_language: lang,
       });
       setBrand(res.brand);
       if (res.brand.colors) {
@@ -633,16 +643,16 @@ export default function NewSuitePage() {
               <div className="space-y-2">
                 <Label className="text-zinc-300">{t("suite.new.location")}</Label>
                 <div className="flex flex-wrap gap-2">
-                  {["Worldwide", "Middle East", "Europe", "North America", "Asia", "Custom"].map((scope) => (
+                  {LOCATION_SCOPES.map(({ value, label }) => (
                     <button
-                      key={scope}
-                      onClick={() => setLocationScope(scope)}
+                      key={value}
+                      onClick={() => setLocationScope(value)}
                       className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                        locationScope === scope
+                        locationScope === value
                           ? "bg-indigo-600 border-indigo-500 text-white"
                           : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
                       }`}
-                    >{scope}</button>
+                    >{label}</button>
                   ))}
                 </div>
                 {locationScope === "Custom" && (
@@ -844,12 +854,12 @@ export default function NewSuitePage() {
                         }}
                       />
                       {uploadingAsset ? <Loader2 size={14} className="animate-spin" /> : null}
-                      Upload logo
+                      {t("suite.new.uploadLogo")}
                     </label>
 
                     {/* Logo style selector */}
                     <div className="space-y-1">
-                      <p className="text-zinc-500 text-xs">AI generation style:</p>
+                      <p className="text-zinc-500 text-xs">{t("suite.new.aiStyle")}</p>
                       <div className="flex gap-2">
                         {(["icon_only", "with_name", "initials"] as const).map((style) => (
                           <button
@@ -861,7 +871,7 @@ export default function NewSuitePage() {
                                 : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
                             }`}
                           >
-                            {style === "icon_only" ? "Icon only" : style === "with_name" ? "With name" : "Initials"}
+                            {style === "icon_only" ? t("suite.new.styleIconOnly") : style === "with_name" ? t("suite.new.styleWithName") : t("suite.new.styleInitials")}
                           </button>
                         ))}
                       </div>
@@ -931,7 +941,7 @@ export default function NewSuitePage() {
 
                 {/* Font upload per language */}
                 <div className="space-y-2">
-                  <p className="text-zinc-500 text-xs">Upload fonts per language:</p>
+                  <p className="text-zinc-500 text-xs">{t("suite.new.uploadFontsPerLang")}</p>
                   {(orderedLangs.length > 0 ? orderedLangs : ["all"]).map((code) => {
                     const langName = code === "ar" ? "العربية" : code === "he" ? "עברית" : code === "en" ? "English" : code === "fr" ? "Français" : code === "es" ? "Español" : code === "tr" ? "Türkçe" : "All";
                     const uploadedFonts = (brand?.fonts_by_language?.[code] || brand?.fonts_by_language?.["all"] || []);
@@ -942,7 +952,7 @@ export default function NewSuitePage() {
                           {uploadedFonts.map((font) => (
                             <span key={font.url} className="text-xs bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded">{font.name}</span>
                           ))}
-                          {uploadedFonts.length === 0 && <span className="text-zinc-600 text-xs">No font uploaded</span>}
+                          {uploadedFonts.length === 0 && <span className="text-zinc-600 text-xs">{t("suite.new.noFontUploaded")}</span>}
                         </div>
                         <label className="cursor-pointer text-xs text-indigo-400 hover:text-indigo-300 transition-colors shrink-0">
                           <input
@@ -954,7 +964,7 @@ export default function NewSuitePage() {
                               if (file) await uploadBrandAsset("font", file, code);
                             }}
                           />
-                          {uploadingAsset ? <Loader2 size={12} className="animate-spin inline" /> : "↑ Upload"}
+                          {uploadingAsset ? <Loader2 size={12} className="animate-spin inline" /> : t("suite.new.uploadFont")}
                         </label>
                       </div>
                     );

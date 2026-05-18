@@ -55,7 +55,7 @@ export const api = {
     }) => request<{ brand: Brand }>("/onboarding/extract-brand", { method: "POST", body: JSON.stringify(data) }),
     saveBrand: (data: { suite_id: string; brand: Brand }) =>
       request<{ ok: boolean }>("/onboarding/save-brand", { method: "POST", body: JSON.stringify(data) }),
-    generateStrategy: (data: { suite_id: string }) =>
+    generateStrategy: (data: { suite_id: string; user_language?: string }) =>
       request<{ strategy: MarketingStrategy }>("/onboarding/generate-strategy", {
         method: "POST",
         body: JSON.stringify(data),
@@ -65,7 +65,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
-    generateBrandAssets: (data: { suite_id: string; generate: string[]; logo_style?: string }) =>
+    generateBrandAssets: (data: { suite_id: string; generate: string[]; logo_style?: string; user_language?: string }) =>
       request<{ brand: Brand; generated: Record<string, unknown> }>(
         "/onboarding/generate-brand-assets",
         { method: "POST", body: JSON.stringify(data) }
