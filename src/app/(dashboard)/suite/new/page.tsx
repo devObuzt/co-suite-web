@@ -688,9 +688,18 @@ export default function NewSuitePage() {
                 ? customCountries.split(",").map((c) => c.trim()).filter(Boolean)
                 : locationScope === "Worldwide" ? [] : [locationScope];
               const cities = customCities.split(",").map((c) => c.trim()).filter(Boolean);
+              // Auto-build target_audience text from structured data
+              const locationText = locationScope === "Worldwide"
+                ? "Worldwide"
+                : [...countries, ...cities].join(", ") || locationScope;
+              const interestsText = selectedInterests.length > 0
+                ? `, interested in: ${selectedInterests.join(", ")}`
+                : "";
+              const targetAudience = `${locationText}${interestsText}`;
               await saveStep("e", {
                 audience_location: { scope: locationScope === "Worldwide" ? "world" : "custom", countries, cities },
                 audience_interests: selectedInterests,
+                target_audience: targetAudience,
               });
               setStep("step-f");
             }} className="bg-indigo-600 hover:bg-indigo-500 gap-2">
