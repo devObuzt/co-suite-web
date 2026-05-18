@@ -191,8 +191,30 @@ export default function NewSuitePage() {
       setSelectedNicheIdx(findNicheIndex(res.brand?.industry || ""));
       setOrderedLangs(res.brand?.audience_languages || []);
       setServiceItems([...(res.brand?.services || []), ...(res.brand?.products || [])].filter(Boolean));
-      setUspPoints(res.brand?.usp_points || (res.brand?.unique_value ? [res.brand.unique_value] : []));
-      setEspPoints(res.brand?.esp_points || (res.brand?.esp ? [res.brand.esp] : []));
+      // Pre-fill USP/ESP — translate to user's language if not English
+      const rawUsp = res.brand?.unique_value || "";
+      const rawEsp = res.brand?.esp || "";
+      const rawHelp = res.brand?.how_they_help || "";
+
+      if (lang !== "en" && (rawUsp || rawEsp || rawHelp)) {
+        setUspPoints(rawUsp ? [rawUsp] : []);
+        setEspPoints(rawEsp ? [rawEsp] : []);
+        try {
+          const translated = await api.onboarding.translateBrandFields({
+            unique_value: rawUsp,
+            esp: rawEsp,
+            how_they_help: rawHelp,
+            target_language: lang,
+          });
+          if (translated.unique_value) setUspPoints([translated.unique_value]);
+          if (translated.esp) setEspPoints([translated.esp]);
+        } catch {
+          // Keep originals on failure
+        }
+      } else {
+        setUspPoints(res.brand?.usp_points || (rawUsp ? [rawUsp] : []));
+        setEspPoints(res.brand?.esp_points || (rawEsp ? [rawEsp] : []));
+      }
       setLocalColors({
         primary: res.brand?.colors?.primary || "#4f46e5",
         secondary: res.brand?.colors?.secondary || "#818cf8",

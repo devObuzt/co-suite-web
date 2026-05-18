@@ -67,6 +67,16 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    translateBrandFields: (data: {
+      unique_value?: string;
+      esp?: string;
+      how_they_help?: string;
+      target_language: string;
+    }) =>
+      request<{ unique_value: string; esp: string; how_they_help: string }>(
+        "/onboarding/translate-brand-fields",
+        { method: "POST", body: JSON.stringify(data) }
+      ),
     generateBrandAssets: (data: { suite_id: string; generate: string[]; logo_style?: string; user_language?: string }) =>
       request<{ brand: Brand; generated: Record<string, unknown> }>(
         "/onboarding/generate-brand-assets",
