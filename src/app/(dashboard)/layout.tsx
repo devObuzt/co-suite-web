@@ -36,7 +36,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className="w-60 border-r border-zinc-800 flex flex-col p-4 shrink-0">
         <div className="text-lg font-bold text-white mb-8 px-2">co-Suite</div>
         <nav className="flex-1 space-y-1">
-          <SideLink href="/dashboard" icon={<LayoutDashboard size={16} />} label={t("nav.dashboard")} active={pathname === "/dashboard"} />
+          <SideLink href="/suites" icon={<LayoutDashboard size={16} />} label={t("nav.dashboard")} active={pathname === "/suites"} />
           <SideLink href="/suite/new" icon={<Plus size={16} />} label={t("nav.newSuite")} active={pathname === "/suite/new"} />
           <SideLink href="/settings" icon={<Settings size={16} />} label={t("nav.settings")} active={pathname === "/settings"} />
         </nav>
