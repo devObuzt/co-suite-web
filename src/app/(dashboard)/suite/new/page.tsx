@@ -124,7 +124,9 @@ export default function NewSuitePage() {
   const [uspPoints, setUspPoints] = useState<string[]>([]);
   const [espPoints, setEspPoints] = useState<string[]>([]);
   // Step G
-  const [generatingAssets, setGeneratingAssets] = useState(false);
+  const [generatingLogo, setGeneratingLogo] = useState(false);
+  const [generatingColors, setGeneratingColors] = useState(false);
+  const [generatingFonts, setGeneratingFonts] = useState(false);
   const [logoStyle, setLogoStyle] = useState<"icon_only" | "with_name" | "initials">("icon_only");
   const [uploadingAsset, setUploadingAsset] = useState(false);
   const [localColors, setLocalColors] = useState<{ primary: string; secondary: string; accent: string }>({
@@ -229,7 +231,9 @@ export default function NewSuitePage() {
   }
 
   async function generateAssets(types: string[]) {
-    setGeneratingAssets(true);
+    if (types.includes("logo")) setGeneratingLogo(true);
+    if (types.includes("colors")) setGeneratingColors(true);
+    if (types.includes("fonts")) setGeneratingFonts(true);
     try {
       const res = await api.onboarding.generateBrandAssets({
         suite_id: suiteId,
@@ -248,17 +252,24 @@ export default function NewSuitePage() {
     } catch {
       // ignore
     } finally {
-      setGeneratingAssets(false);
+      if (types.includes("logo")) setGeneratingLogo(false);
+      if (types.includes("colors")) setGeneratingColors(false);
+      if (types.includes("fonts")) setGeneratingFonts(false);
     }
   }
 
   async function uploadBrandAsset(assetType: "logo" | "font", file: File, language?: string) {
+    // Show local preview immediately for logos (before R2 upload completes)
+    if (assetType === "logo") {
+      const localUrl = URL.createObjectURL(file);
+      setBrand((prev) => ({ ...(prev || {}), logo_url: localUrl, logo_source: "uploaded" }));
+    }
     setUploadingAsset(true);
     try {
       const res = await api.onboarding.uploadBrandAsset(suiteId, assetType, file, language);
       setBrand(res.brand);
     } catch {
-      // ignore
+      // local preview stays even if upload fails
     } finally {
       setUploadingAsset(false);
     }
@@ -677,6 +688,7 @@ export default function NewSuitePage() {
               <div className="space-y-2">
                 <Label className="text-zinc-300">{t("suite.new.interests")}</Label>
                 <div className="flex flex-wrap gap-2">
+                  {/* Suggested interests */}
                   {(suggestions.interests[suggestions.niches[selectedNicheIdx]] || suggestions.interests["default"]).map((interest) => (
                     <button
                       key={interest}
@@ -688,8 +700,49 @@ export default function NewSuitePage() {
                           ? "bg-indigo-600 border-indigo-500 text-white"
                           : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
                       }`}
+                      dir="auto"
                     >{interest}</button>
                   ))}
+                  {/* Custom interests added by user */}
+                  {selectedInterests
+                    .filter((i) => !(suggestions.interests[suggestions.niches[selectedNicheIdx]] || suggestions.interests["default"]).includes(i))
+                    .map((interest) => (
+                      <button
+                        key={interest}
+                        onClick={() => setSelectedInterests((prev) => prev.filter((i) => i !== interest))}
+                        className="px-3 py-1.5 rounded-full text-sm border bg-indigo-600 border-indigo-500 text-white flex items-center gap-1"
+                        dir="auto"
+                      >{interest} <X size={11} /></button>
+                    ))
+                  }
+                </div>
+                {/* Add custom interest */}
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    placeholder="Add custom interest..."
+                    className="bg-zinc-800 border-zinc-700 text-white text-sm flex-1"
+                    dir="auto"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && e.currentTarget.value.trim()) {
+                        const val = e.currentTarget.value.trim();
+                        setSelectedInterests((prev) => prev.includes(val) ? prev : [...prev, val]);
+                        e.currentTarget.value = "";
+                        e.preventDefault();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="text-indigo-400 text-sm hover:text-indigo-300 px-2 flex items-center gap-1"
+                    onClick={(e) => {
+                      const input = (e.currentTarget.previousSibling as HTMLInputElement);
+                      const val = input?.value?.trim();
+                      if (val) {
+                        setSelectedInterests((prev) => prev.includes(val) ? prev : [...prev, val]);
+                        input.value = "";
+                      }
+                    }}
+                  ><Plus size={13} /> Add</button>
                 </div>
               </div>
             </CardContent>
@@ -884,10 +937,10 @@ export default function NewSuitePage() {
                       variant="outline"
                       size="sm"
                       onClick={() => generateAssets(["logo"])}
-                      disabled={generatingAssets}
+                      disabled={generatingLogo}
                       className="border-zinc-700 text-zinc-400 hover:bg-zinc-800 gap-2 w-full"
                     >
-                      {generatingAssets ? <Loader2 size={13} className="animate-spin" /> : null}
+                      {generatingLogo ? <Loader2 size={13} className="animate-spin" /> : null}
                       {t("suite.new.generateLogo")}
                     </Button>
                   </div>
@@ -920,10 +973,10 @@ export default function NewSuitePage() {
                   variant="outline"
                   size="sm"
                   onClick={() => generateAssets(["colors"])}
-                  disabled={generatingAssets}
+                  disabled={generatingColors}
                   className="border-zinc-700 text-zinc-400 hover:bg-zinc-800 gap-2"
                 >
-                  {generatingAssets ? <Loader2 size={13} className="animate-spin" /> : null}
+                  {generatingColors ? <Loader2 size={13} className="animate-spin" /> : null}
                   {t("suite.new.generateColors")}
                 </Button>
               </div>
@@ -977,10 +1030,10 @@ export default function NewSuitePage() {
                   variant="outline"
                   size="sm"
                   onClick={() => generateAssets(["fonts"])}
-                  disabled={generatingAssets}
+                  disabled={generatingFonts}
                   className="border-zinc-700 text-zinc-400 hover:bg-zinc-800 gap-2"
                 >
-                  {generatingAssets ? <Loader2 size={13} className="animate-spin" /> : null}
+                  {generatingFonts ? <Loader2 size={13} className="animate-spin" /> : null}
                   {t("suite.new.generateFonts")}
                 </Button>
               </div>
