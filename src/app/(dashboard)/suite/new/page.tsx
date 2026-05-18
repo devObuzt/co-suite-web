@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, Brand, MarketingStrategy } from "@/lib/api";
-import { useT } from "@/lib/i18n/LanguageContext";
+import { useT, useLanguage } from "@/lib/i18n/LanguageContext";
 import { LANGUAGES, LangCode } from "@/lib/i18n/translations";
+import { getSuggestions } from "@/lib/i18n/suggestions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,34 +31,6 @@ const PLATFORMS = [
   { id: "other",     label: "Other",     placeholder: "Any other relevant link",            hint: "Other link" },
 ];
 
-const COMMON_NICHES = [
-  "Digital Marketing Agency", "E-commerce", "Restaurant & Food",
-  "Fashion & Beauty", "Real Estate", "Health & Wellness",
-  "Education & Training", "Technology & Software", "Travel & Tourism",
-  "Photography & Media", "Legal Services", "Financial Services",
-  "Retail & Shopping", "Construction & Real Estate",
-];
-
-const USP_SUGGESTIONS = [
-  "Years of experience", "Competitive pricing", "Fast delivery",
-  "Local expertise", "Personalized service", "Quality guarantee",
-  "24/7 support", "Free consultation", "Proven results",
-];
-
-const ESP_SUGGESTIONS = [
-  "Feel confident", "Save time", "Feel professional",
-  "Peace of mind", "Feel proud of their brand", "In control",
-  "Satisfied with results", "Stand out from competitors",
-];
-
-const INDUSTRY_INTERESTS: Record<string, string[]> = {
-  "Digital Marketing Agency": ["Social media marketing", "Digital advertising", "Content creation", "SEO", "Branding"],
-  "Restaurant & Food": ["Food & dining", "Cooking", "Local cuisine", "Healthy eating", "Restaurants"],
-  "Fashion & Beauty": ["Fashion", "Beauty", "Lifestyle", "Shopping", "Style trends"],
-  "Real Estate": ["Real estate", "Home improvement", "Interior design", "Investment", "Property"],
-  "Health & Wellness": ["Health", "Fitness", "Nutrition", "Wellness", "Mental health"],
-  "default": ["Business", "Entrepreneurship", "Social media", "Innovation", "Technology"],
-};
 
 const LANG_TO_DIALECT: Record<string, string> = {
   "ar": "Palestinian Arabic", "he": "Hebrew", "en": "English",
@@ -66,27 +39,11 @@ const LANG_TO_DIALECT: Record<string, string> = {
 
 // ── Step indicator ────────────────────────────────────────────────────────────
 
-const STEPS: { key: Step; label: string }[] = [
-  { key: "name", label: "Name" },
-  { key: "links", label: "Links" },
-  { key: "extracting", label: "Analyzing" },
-  { key: "step-a", label: "Business" },
-  { key: "step-b", label: "Category" },
-  { key: "step-c", label: "Languages" },
-  { key: "step-d", label: "Services" },
-  { key: "step-e", label: "Audience" },
-  { key: "step-f", label: "Why Us" },
-  { key: "step-g", label: "Brand" },
-  { key: "strategy", label: "Strategy" },
-  { key: "preview", label: "Preview" },
-  { key: "done", label: "Done" },
-];
-
-function StepIndicator({ current }: { current: Step }) {
-  const idx = STEPS.findIndex((s) => s.key === current);
+function StepIndicator({ current, steps }: { current: Step; steps: { key: Step; label: string }[] }) {
+  const idx = steps.findIndex((s) => s.key === current);
   return (
     <div className="flex items-center gap-2 mb-8">
-      {STEPS.map((s, i) => (
+      {steps.map((s, i) => (
         <div key={s.key} className="flex items-center gap-2">
           <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${
             i < idx ? "bg-indigo-600 text-white" : i === idx ? "bg-indigo-500 text-white" : "bg-zinc-800 text-zinc-500"
@@ -94,7 +51,7 @@ function StepIndicator({ current }: { current: Step }) {
             {i < idx ? "✓" : i + 1}
           </div>
           <span className={`text-xs hidden sm:block ${i === idx ? "text-white" : "text-zinc-500"}`}>{s.label}</span>
-          {i < STEPS.length - 1 && <div className="w-5 h-px bg-zinc-700" />}
+          {i < steps.length - 1 && <div className="w-5 h-px bg-zinc-700" />}
         </div>
       ))}
     </div>
@@ -106,6 +63,25 @@ function StepIndicator({ current }: { current: Step }) {
 export default function NewSuitePage() {
   const router = useRouter();
   const t = useT();
+  const { lang } = useLanguage();
+  const suggestions = getSuggestions(lang);
+
+  const STEPS: { key: Step; label: string }[] = [
+    { key: "name", label: t("suite.new.stepName") },
+    { key: "links", label: t("suite.new.stepLinks") },
+    { key: "extracting", label: t("suite.new.stepAnalyzing") },
+    { key: "step-a", label: t("suite.new.stepBizName") },
+    { key: "step-b", label: t("suite.new.stepCategory") },
+    { key: "step-c", label: t("suite.new.stepLanguages") },
+    { key: "step-d", label: t("suite.new.stepServices") },
+    { key: "step-e", label: t("suite.new.stepAudience") },
+    { key: "step-f", label: t("suite.new.stepWhyUs") },
+    { key: "step-g", label: t("suite.new.stepBrand") },
+    { key: "strategy", label: t("suite.new.stepStrategy") },
+    { key: "preview", label: t("suite.new.stepPreview") },
+    { key: "done", label: t("suite.new.stepDone") },
+  ];
+
   const [step, setStep] = useState<Step>("name");
   const [suiteName, setSuiteName] = useState("");
   const [suiteId, setSuiteId] = useState("");
@@ -250,11 +226,11 @@ export default function NewSuitePage() {
   return (
     <div className="p-8 max-w-2xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Create a new suite</h1>
-        <p className="text-zinc-400 text-sm mt-1">We'll research your business and build your brand profile automatically</p>
+        <h1 className="text-2xl font-bold text-white">{t("suite.new.title")}</h1>
+        <p className="text-zinc-400 text-sm mt-1">{t("suite.new.subtitle")}</p>
       </div>
 
-      <StepIndicator current={step} />
+      <StepIndicator current={step} steps={STEPS} />
 
       {/* ── Step 1: Name ── */}
       {step === "name" && (
@@ -410,8 +386,8 @@ export default function NewSuitePage() {
         <div className="space-y-4">
           <Card className="bg-zinc-900 border-zinc-800 text-white">
             <CardHeader>
-              <CardTitle>Your business name</CardTitle>
-              <CardDescription className="text-zinc-400">Confirm or edit the name we found</CardDescription>
+              <CardTitle>{t("suite.new.stepATitle")}</CardTitle>
+              <CardDescription className="text-zinc-400">{t("suite.new.stepASubtitle")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Input
@@ -427,9 +403,9 @@ export default function NewSuitePage() {
               await saveStep("a", { name: bizName });
               setStep("step-b");
             }} className="bg-indigo-600 hover:bg-indigo-500 gap-2">
-              <ChevronRight size={15} /> Confirm name
+              <ChevronRight size={15} /> {t("suite.new.confirmName")}
             </Button>
-            <button onClick={() => setStep("step-b")} className="text-zinc-500 text-sm hover:text-zinc-300">Skip →</button>
+            <button onClick={() => setStep("step-b")} className="text-zinc-500 text-sm hover:text-zinc-300">→</button>
           </div>
         </div>
       )}
@@ -439,12 +415,12 @@ export default function NewSuitePage() {
         <div className="space-y-4">
           <Card className="bg-zinc-900 border-zinc-800 text-white">
             <CardHeader>
-              <CardTitle>Business category</CardTitle>
-              <CardDescription className="text-zinc-400">Select your niche or type your own</CardDescription>
+              <CardTitle>{t("suite.new.stepBTitle")}</CardTitle>
+              <CardDescription className="text-zinc-400">{t("suite.new.stepBSubtitle")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-2">
-                {[...new Set([selectedNiche, ...COMMON_NICHES].filter(Boolean))].map((n) => (
+                {[...new Set([selectedNiche, ...suggestions.niches].filter(Boolean))].map((n) => (
                   <button
                     key={n}
                     onClick={() => { setSelectedNiche(n); setShowNicheInput(false); }}
@@ -458,7 +434,7 @@ export default function NewSuitePage() {
                 <button
                   onClick={() => setShowNicheInput(true)}
                   className="px-3 py-1.5 rounded-full text-sm border border-dashed border-zinc-600 text-zinc-500 hover:border-zinc-400"
-                >+ Other</button>
+                >{t("suite.new.otherNiche")}</button>
               </div>
               {showNicheInput && (
                 <Input
@@ -477,9 +453,9 @@ export default function NewSuitePage() {
               if (niche) await saveStep("b", { niche, industry: niche });
               setStep("step-c");
             }} className="bg-indigo-600 hover:bg-indigo-500 gap-2">
-              <ChevronRight size={15} /> Confirm category
+              <ChevronRight size={15} /> {t("suite.new.confirmCategory")}
             </Button>
-            <button onClick={() => setStep("step-c")} className="text-zinc-500 text-sm hover:text-zinc-300">Skip →</button>
+            <button onClick={() => setStep("step-c")} className="text-zinc-500 text-sm hover:text-zinc-300">→</button>
           </div>
         </div>
       )}
@@ -489,9 +465,9 @@ export default function NewSuitePage() {
         <div className="space-y-4">
           <Card className="bg-zinc-900 border-zinc-800 text-white">
             <CardHeader>
-              <CardTitle>Audience languages</CardTitle>
+              <CardTitle>{t("suite.new.stepCTitle")}</CardTitle>
               <CardDescription className="text-zinc-400">
-                Click to add languages. Drag ↑↓ to set priority — first is the main language.
+                {t("suite.new.stepCSubtitle")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -514,7 +490,7 @@ export default function NewSuitePage() {
                       <div key={code} className="flex items-center gap-2 bg-zinc-800 rounded-lg px-3 py-2.5">
                         <span className="text-xs text-zinc-600 w-4 shrink-0">{idx + 1}</span>
                         <span className="text-white flex-1 text-sm" dir={lang?.dir}>{lang?.label}</span>
-                        {idx === 0 && <span className="text-xs text-indigo-400 bg-indigo-950 px-1.5 py-0.5 rounded">Main</span>}
+                        {idx === 0 && <span className="text-xs text-indigo-400 bg-indigo-950 px-1.5 py-0.5 rounded">{t("suite.new.langMain")}</span>}
                         <button
                           onClick={() => setOrderedLangs((prev) => {
                             const arr = [...prev];
@@ -554,9 +530,9 @@ export default function NewSuitePage() {
               }
               setStep("step-d");
             }} className="bg-indigo-600 hover:bg-indigo-500 gap-2">
-              <ChevronRight size={15} /> Confirm languages
+              <ChevronRight size={15} /> {t("suite.new.confirmLanguages")}
             </Button>
-            <button onClick={() => setStep("step-d")} className="text-zinc-500 text-sm hover:text-zinc-300">Skip →</button>
+            <button onClick={() => setStep("step-d")} className="text-zinc-500 text-sm hover:text-zinc-300">→</button>
           </div>
         </div>
       )}
@@ -566,8 +542,8 @@ export default function NewSuitePage() {
         <div className="space-y-4">
           <Card className="bg-zinc-900 border-zinc-800 text-white">
             <CardHeader>
-              <CardTitle>Products &amp; Services</CardTitle>
-              <CardDescription className="text-zinc-400">Review and edit what we found. Add or remove items.</CardDescription>
+              <CardTitle>{t("suite.new.stepDTitle")}</CardTitle>
+              <CardDescription className="text-zinc-400">{t("suite.new.stepDSubtitle")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {serviceItems.map((item, i) => (
@@ -590,7 +566,7 @@ export default function NewSuitePage() {
               <button
                 onClick={() => setServiceItems((prev) => [...prev, ""])}
                 className="flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 text-sm transition-colors"
-              ><Plus size={13} /> Add product / service</button>
+              ><Plus size={13} /> {t("suite.new.addService")}</button>
             </CardContent>
           </Card>
           <div className="flex gap-3">
@@ -599,9 +575,9 @@ export default function NewSuitePage() {
               if (services.length > 0) await saveStep("d", { services });
               setStep("step-e");
             }} className="bg-indigo-600 hover:bg-indigo-500 gap-2">
-              <ChevronRight size={15} /> Confirm services
+              <ChevronRight size={15} /> {t("suite.new.confirmServices")}
             </Button>
-            <button onClick={() => setStep("step-e")} className="text-zinc-500 text-sm hover:text-zinc-300">Skip →</button>
+            <button onClick={() => setStep("step-e")} className="text-zinc-500 text-sm hover:text-zinc-300">→</button>
           </div>
         </div>
       )}
@@ -611,12 +587,12 @@ export default function NewSuitePage() {
         <div className="space-y-4">
           <Card className="bg-zinc-900 border-zinc-800 text-white">
             <CardHeader>
-              <CardTitle>Target audience</CardTitle>
-              <CardDescription className="text-zinc-400">Where are your customers? What are their interests?</CardDescription>
+              <CardTitle>{t("suite.new.stepETitle")}</CardTitle>
+              <CardDescription className="text-zinc-400">{t("suite.new.stepESubtitle")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-2">
-                <Label className="text-zinc-300">Location</Label>
+                <Label className="text-zinc-300">{t("suite.new.location")}</Label>
                 <div className="flex flex-wrap gap-2">
                   {["Worldwide", "Middle East", "Europe", "North America", "Asia", "Custom"].map((scope) => (
                     <button
@@ -648,9 +624,9 @@ export default function NewSuitePage() {
                 )}
               </div>
               <div className="space-y-2">
-                <Label className="text-zinc-300">Interests &amp; habits</Label>
+                <Label className="text-zinc-300">{t("suite.new.interests")}</Label>
                 <div className="flex flex-wrap gap-2">
-                  {(INDUSTRY_INTERESTS[selectedNiche] || INDUSTRY_INTERESTS["default"]).map((interest) => (
+                  {(suggestions.interests[selectedNiche] || suggestions.interests["default"]).map((interest) => (
                     <button
                       key={interest}
                       onClick={() => setSelectedInterests((prev) =>
@@ -679,9 +655,9 @@ export default function NewSuitePage() {
               });
               setStep("step-f");
             }} className="bg-indigo-600 hover:bg-indigo-500 gap-2">
-              <ChevronRight size={15} /> Confirm audience
+              <ChevronRight size={15} /> {t("suite.new.confirmAudience")}
             </Button>
-            <button onClick={() => setStep("step-f")} className="text-zinc-500 text-sm hover:text-zinc-300">Skip →</button>
+            <button onClick={() => setStep("step-f")} className="text-zinc-500 text-sm hover:text-zinc-300">→</button>
           </div>
         </div>
       )}
@@ -691,14 +667,14 @@ export default function NewSuitePage() {
         <div className="space-y-4">
           <Card className="bg-zinc-900 border-zinc-800 text-white">
             <CardHeader>
-              <CardTitle>Why choose you?</CardTitle>
+              <CardTitle>{t("suite.new.stepFTitle")}</CardTitle>
               <CardDescription className="text-zinc-400" dir="auto">
-                لماذا يختارك العميل بشكل خاص ولا يختار منافس آخر؟
+                {t("suite.new.stepFSubtitle")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-2">
-                <Label className="text-zinc-300">Your advantages (USP)</Label>
+                <Label className="text-zinc-300">{t("suite.new.uspLabel")}</Label>
                 {uspPoints.map((point, i) => (
                   <div key={i} className="flex gap-2 items-center">
                     <Input
@@ -712,7 +688,7 @@ export default function NewSuitePage() {
                   </div>
                 ))}
                 <div className="flex flex-wrap gap-1.5 mt-1">
-                  {USP_SUGGESTIONS.filter((s) => !uspPoints.includes(s)).map((s) => (
+                  {suggestions.usp.filter((s) => !uspPoints.includes(s)).map((s) => (
                     <button key={s} onClick={() => setUspPoints((prev) => [...prev, s])}
                       className="text-xs px-2 py-1 border border-zinc-700 text-zinc-500 rounded-full hover:border-indigo-500 hover:text-indigo-400 transition-colors">
                       + {s}
@@ -721,11 +697,11 @@ export default function NewSuitePage() {
                 </div>
                 <button onClick={() => setUspPoints((prev) => [...prev, ""])}
                   className="flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 text-sm transition-colors mt-1">
-                  <Plus size={13} /> Add point
+                  <Plus size={13} /> {t("suite.new.addPoint")}
                 </button>
               </div>
               <div className="space-y-2">
-                <Label className="text-zinc-300">How the client feels after (ESP)</Label>
+                <Label className="text-zinc-300">{t("suite.new.espLabel")}</Label>
                 {espPoints.map((point, i) => (
                   <div key={i} className="flex gap-2 items-center">
                     <Input
@@ -739,7 +715,7 @@ export default function NewSuitePage() {
                   </div>
                 ))}
                 <div className="flex flex-wrap gap-1.5 mt-1">
-                  {ESP_SUGGESTIONS.filter((s) => !espPoints.includes(s)).map((s) => (
+                  {suggestions.esp.filter((s) => !espPoints.includes(s)).map((s) => (
                     <button key={s} onClick={() => setEspPoints((prev) => [...prev, s])}
                       className="text-xs px-2 py-1 border border-zinc-700 text-zinc-500 rounded-full hover:border-indigo-500 hover:text-indigo-400 transition-colors">
                       + {s}
@@ -748,7 +724,7 @@ export default function NewSuitePage() {
                 </div>
                 <button onClick={() => setEspPoints((prev) => [...prev, ""])}
                   className="flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 text-sm transition-colors mt-1">
-                  <Plus size={13} /> Add point
+                  <Plus size={13} /> {t("suite.new.addPoint")}
                 </button>
               </div>
             </CardContent>
@@ -766,9 +742,9 @@ export default function NewSuitePage() {
               });
               setStep("step-g");
             }} className="bg-indigo-600 hover:bg-indigo-500 gap-2">
-              <ChevronRight size={15} /> Confirm
+              <ChevronRight size={15} /> {t("suite.new.confirmWhyUs")}
             </Button>
-            <button onClick={() => setStep("step-g")} className="text-zinc-500 text-sm hover:text-zinc-300">Skip →</button>
+            <button onClick={() => setStep("step-g")} className="text-zinc-500 text-sm hover:text-zinc-300">→</button>
           </div>
         </div>
       )}
@@ -778,20 +754,20 @@ export default function NewSuitePage() {
         <div className="space-y-4">
           <Card className="bg-zinc-900 border-zinc-800 text-white">
             <CardHeader>
-              <CardTitle>Your brand</CardTitle>
+              <CardTitle>{t("suite.new.stepGTitle")}</CardTitle>
               <CardDescription className="text-zinc-400">
-                Review what we found. Generate missing elements with AI.
+                {t("suite.new.stepGSubtitle")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               {/* Logo */}
               <div className="space-y-2">
-                <Label className="text-zinc-300">Logo</Label>
+                <Label className="text-zinc-300">{t("suite.new.logoLabel")}</Label>
                 {brand?.logo_url ? (
                   <img src={brand.logo_url} alt="logo" className="h-24 object-contain bg-zinc-800 rounded-lg p-3" />
                 ) : (
                   <div className="h-24 bg-zinc-800 rounded-lg flex items-center justify-center text-zinc-600 text-sm border border-dashed border-zinc-700">
-                    No logo found
+                    {t("suite.new.noLogoFound")}
                   </div>
                 )}
                 <Button
@@ -802,12 +778,12 @@ export default function NewSuitePage() {
                   className="border-zinc-700 text-zinc-400 hover:bg-zinc-800 gap-2"
                 >
                   {generatingAssets ? <Loader2 size={13} className="animate-spin" /> : null}
-                  Generate logo with AI
+                  {t("suite.new.generateLogo")}
                 </Button>
               </div>
               {/* Colors */}
               <div className="space-y-2">
-                <Label className="text-zinc-300">Brand colors</Label>
+                <Label className="text-zinc-300">{t("suite.new.colorsLabel")}</Label>
                 <div className="flex gap-4">
                   {(["primary", "secondary", "accent"] as const).map((key) => (
                     <div key={key} className="flex flex-col items-center gap-1">
@@ -828,12 +804,12 @@ export default function NewSuitePage() {
                   className="border-zinc-700 text-zinc-400 hover:bg-zinc-800 gap-2"
                 >
                   {generatingAssets ? <Loader2 size={13} className="animate-spin" /> : null}
-                  Generate colors with AI
+                  {t("suite.new.generateColors")}
                 </Button>
               </div>
               {/* Fonts */}
               <div className="space-y-2">
-                <Label className="text-zinc-300">Fonts</Label>
+                <Label className="text-zinc-300">{t("suite.new.fontsLabel")}</Label>
                 {(brand?.font_suggestions || []).length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {(brand?.font_suggestions || []).map((f) => (
@@ -841,7 +817,7 @@ export default function NewSuitePage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-zinc-500 text-sm">No fonts detected</p>
+                  <p className="text-zinc-500 text-sm">{t("suite.new.noFontsFound")}</p>
                 )}
                 <Button
                   variant="outline"
@@ -851,7 +827,7 @@ export default function NewSuitePage() {
                   className="border-zinc-700 text-zinc-400 hover:bg-zinc-800 gap-2"
                 >
                   {generatingAssets ? <Loader2 size={13} className="animate-spin" /> : null}
-                  Suggest fonts with AI
+                  {t("suite.new.generateFonts")}
                 </Button>
               </div>
             </CardContent>
@@ -864,12 +840,12 @@ export default function NewSuitePage() {
             }}
             className="bg-indigo-600 hover:bg-indigo-500 gap-2 w-full"
           >
-            <ChevronRight size={15} /> Build my marketing strategy
+            <ChevronRight size={15} /> {t("suite.new.buildStrategy2")}
           </Button>
           <button onClick={async () => {
             setStep("strategy");
             await runGenerateStrategy();
-          }} className="text-zinc-500 text-sm hover:text-zinc-300 w-full text-center">Skip brand →</button>
+          }} className="text-zinc-500 text-sm hover:text-zinc-300 w-full text-center">{t("suite.new.skipBrand")}</button>
         </div>
       )}
 
