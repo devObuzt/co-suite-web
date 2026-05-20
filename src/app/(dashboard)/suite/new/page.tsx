@@ -34,7 +34,7 @@ const PLATFORMS = [
 
 const LANG_TO_DIALECT: Record<string, string> = {
   "ar": "Palestinian Arabic", "he": "Hebrew", "en": "English",
-  "fr": "French", "es": "Spanish", "tr": "Turkish",
+  "ru": "Russian", "fr": "French", "es": "Spanish", "tr": "Turkish", "zh": "Chinese",
 };
 
 // ── Step indicator ────────────────────────────────────────────────────────────
@@ -183,6 +183,7 @@ export default function NewSuitePage() {
         suite_id: suiteId,
         urls,
         business_name: businessName || suiteName,
+        user_language: lang,
       });
       clearTimeout(t1);
       clearTimeout(t2);

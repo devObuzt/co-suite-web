@@ -54,6 +54,8 @@ export const api = {
       business_name?: string;
       industry?: string;
       description?: string;
+      user_language?: string;
+      ai_provider?: "anthropic" | "openai";
     }) => request<{ brand: Brand }>("/onboarding/extract-brand", { method: "POST", body: JSON.stringify(data) }),
     saveBrand: (data: { suite_id: string; brand: Brand }) =>
       request<{ ok: boolean }>("/onboarding/save-brand", { method: "POST", body: JSON.stringify(data) }),

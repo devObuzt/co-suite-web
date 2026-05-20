@@ -1,15 +1,17 @@
 export const LANGUAGES = [
-  { code: "en", label: "English", dir: "ltr" as const },
-  { code: "ar", label: "العربية", dir: "rtl" as const },
+  { code: "en", label: "English", dir: "ltr" as const, priority: "primary" as const },
   { code: "he", label: "עברית", dir: "rtl" as const },
+  { code: "ar", label: "العربية", dir: "rtl" as const },
+  { code: "ru", label: "Русский", dir: "ltr" as const },
   { code: "fr", label: "Français", dir: "ltr" as const },
   { code: "es", label: "Español", dir: "ltr" as const },
   { code: "tr", label: "Türkçe", dir: "ltr" as const },
+  { code: "zh", label: "中文", dir: "ltr" as const },
 ];
 
-export type LangCode = "en" | "ar" | "he" | "fr" | "es" | "tr";
+export type LangCode = "en" | "ar" | "he" | "ru" | "fr" | "es" | "tr" | "zh";
 
-export const T: Record<LangCode, Record<string, string>> = {
+export const T: Partial<Record<LangCode, Record<string, string>>> & { en: Record<string, string> } = {
   en: {
     "nav.dashboard": "Dashboard",
     "nav.newSuite": "New Suite",
@@ -125,6 +127,8 @@ export const T: Record<LangCode, Record<string, string>> = {
     "langPicker.title": "Choose your language",
     "langPicker.subtitle": "You can change this anytime in settings",
     "langPicker.confirm": "Continue",
+    "langPicker.more": "More languages",
+    "langPicker.less": "Show fewer",
   },
   ar: {
     "nav.dashboard": "لوحة التحكم",

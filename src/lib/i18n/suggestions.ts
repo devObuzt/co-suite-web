@@ -7,7 +7,7 @@ export interface SuggestionSets {
   interests: Record<string, string[]>;
 }
 
-export const SUGGESTIONS: Record<LangCode, SuggestionSets> = {
+export const SUGGESTIONS: Partial<Record<LangCode, SuggestionSets>> & { en: SuggestionSets } = {
   en: {
     niches: [
       "Digital Marketing Agency", "E-commerce", "Restaurant & Food",
