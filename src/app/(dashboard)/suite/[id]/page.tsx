@@ -2,7 +2,7 @@
 import { use, useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n/LanguageContext";
 import Link from "next/link";
-import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd, MetaCampaign } from "@/lib/api";
+import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd, MetaCampaign, GoogleAdsCampaign } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -258,6 +258,7 @@ function ContentTab({ suiteId }: { suiteId: string }) {
 
       <MetaAdsInspirationSection suiteId={suiteId} />
       <MetaCampaignsSection suiteId={suiteId} />
+      <GoogleAdsCampaignsSection suiteId={suiteId} />
     </div>
   );
 }
@@ -530,6 +531,130 @@ function MetaCampaignsSection({ suiteId }: { suiteId: string }) {
   );
 }
 
+// ─── Google Ads Campaigns ────────────────────────────────────────────────────
+
+function GoogleAdsCampaignsSection({ suiteId }: { suiteId: string }) {
+  const [campaigns, setCampaigns] = useState<GoogleAdsCampaign[]>([]);
+  const [warning, setWarning] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    setWarning("");
+    try {
+      const res = await api.connections.googleCampaigns(suiteId);
+      setCampaigns(res.campaigns || []);
+      setWarning(res.warning || "");
+      setLoaded(true);
+    } catch (e: unknown) {
+      setWarning(e instanceof Error ? e.message : "Failed to fetch Google Ads campaigns");
+      setLoaded(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+            <BarChart3 size={14} className="text-amber-400" /> Active Google Ads Campaigns
+          </h3>
+          <p className="text-xs text-zinc-500 mt-1">Read-only campaigns, ad groups, ads, and last 30 days numbers.</p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={load}
+          disabled={loading}
+          className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 gap-1.5 h-8 text-xs"
+        >
+          {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          Fetch Google campaigns
+        </Button>
+      </div>
+
+      {warning && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" dir="auto">
+          {warning}
+        </div>
+      )}
+
+      {loaded && campaigns.length === 0 && !warning && (
+        <p className="rounded-lg border border-dashed border-zinc-800 p-4 text-sm text-zinc-500">
+          No active Google Ads campaigns found.
+        </p>
+      )}
+
+      {campaigns.length > 0 && (
+        <div className="space-y-3">
+          {campaigns.map((campaign) => (
+            <div key={campaign.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-zinc-100" dir="auto">{campaign.name}</p>
+                  <p className="mt-0.5 text-[11px] text-zinc-600">{campaign.channel_type || "Google Ads"}</p>
+                </div>
+                <Badge variant="outline" className="shrink-0 border-amber-900 bg-amber-950 text-xs text-amber-300">
+                  {campaign.status || "ENABLED"}
+                </Badge>
+              </div>
+              <GoogleMetricStrip metrics={campaign.metrics} />
+              {(campaign.ad_groups || []).length > 0 && (
+                <div className="space-y-2">
+                  {campaign.ad_groups.map((group) => (
+                    <div key={group.id} className="rounded-lg border border-zinc-800 bg-black/30 p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold text-zinc-200" dir="auto">{group.name}</p>
+                          <p className="mt-0.5 text-[11px] text-zinc-600">Ad group{group.type ? ` · ${group.type}` : ""}</p>
+                        </div>
+                        <Badge variant="outline" className="shrink-0 border-zinc-700 text-[10px] text-zinc-400">
+                          {group.status || "ENABLED"}
+                        </Badge>
+                      </div>
+                      <GoogleMetricStrip metrics={group.metrics} compact />
+                      {(group.ads || []).length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          {group.ads.map((ad) => (
+                            <div key={ad.id} className="rounded-md border border-zinc-800 bg-zinc-950 px-2.5 py-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="min-w-0 truncate text-xs text-zinc-300" dir="auto">{ad.name}</p>
+                                <Badge variant="outline" className="shrink-0 border-zinc-800 text-[10px] text-zinc-500">
+                                  {ad.status || "ENABLED"}
+                                </Badge>
+                              </div>
+                              <GoogleMetricStrip metrics={ad.metrics} compact />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GoogleMetricStrip({ metrics, compact = false }: { metrics?: GoogleAdsCampaign["metrics"]; compact?: boolean }) {
+  const data = metrics || { cost: 0, impressions: 0, clicks: 0, conversions: 0, ctr: 0, average_cpc: 0 };
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <MetaMetric label="Cost" value={data.cost.toLocaleString()} />
+      <MetaMetric label={compact ? "Impr." : "Impressions"} value={data.impressions.toLocaleString()} />
+      <MetaMetric label="Clicks" value={data.clicks.toLocaleString()} />
+      <MetaMetric label="Conv." value={data.conversions.toLocaleString()} />
+    </div>
+  );
+}
+
 // ─── Post Card ───────────────────────────────────────────────────────────────
 
 function PostCard({
@@ -728,6 +853,16 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
     }
   }
 
+  async function connectGoogle() {
+    setConnecting(true);
+    try {
+      const { url } = await api.connections.googleAuthUrl(suiteId);
+      window.location.href = url;
+    } catch {
+      setConnecting(false);
+    }
+  }
+
   async function disconnect(platform: string) {
     await api.connections.disconnect(suiteId, platform);
     const updated = await api.connections.get(suiteId);
@@ -738,6 +873,7 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
   const ig = connections.instagram;
   const metaAds = connections.meta_ads;
   const metaConnected = !!fb?.connected;
+  const googleAds = connections.google_ads;
 
   return (
     <div>
@@ -786,12 +922,34 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
           )}
         </div>
 
-        {/* Website (future) */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-3 opacity-50">
+        {/* Google Ads */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-3">
           <div className="flex items-center gap-2 text-zinc-300 text-sm font-medium">
-            <Globe size={15} /> Website
+            <BarChart3 size={15} className="text-amber-400" /> Google Ads
           </div>
-          <p className="text-zinc-500 text-xs">WordPress integration coming soon</p>
+          {googleAds?.connected ? (
+            <>
+              <p className="text-zinc-400 text-xs">{googleAds.customer_name || googleAds.customer_id}</p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => disconnect("google_ads")}
+                className="w-full border-zinc-700 text-zinc-400 hover:text-red-400 hover:border-red-900 gap-1 text-xs h-7"
+              >
+                <Link2Off size={11} /> Disconnect
+              </Button>
+            </>
+          ) : (
+            <Button
+              size="sm"
+              onClick={connectGoogle}
+              disabled={connecting}
+              className="w-full bg-amber-700 hover:bg-amber-600 gap-1 text-xs h-7"
+            >
+              {connecting ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
+              Connect Google Ads
+            </Button>
+          )}
         </div>
 
         {/* TikTok (future) */}

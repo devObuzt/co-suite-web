@@ -139,8 +139,14 @@ export const api = {
   connections: {
     get: (suiteId: string) => request<Connections>(`/connections/${suiteId}`),
     metaAuthUrl: (suiteId: string) => request<{ url: string }>(`/connections/${suiteId}/meta/auth-url`),
+    googleAuthUrl: (suiteId: string) => request<{ url: string }>(`/connections/${suiteId}/google/auth-url`),
     metaCallback: (suiteId: string, code: string) =>
       request<{ pages: MetaPage[]; ad_accounts: MetaAdAccount[] }>("/connections/meta/callback", {
+        method: "POST",
+        body: JSON.stringify({ suite_id: suiteId, code }),
+      }),
+    googleCallback: (suiteId: string, code: string) =>
+      request<{ customers: GoogleAdsCustomer[] }>("/connections/google/callback", {
         method: "POST",
         body: JSON.stringify({ suite_id: suiteId, code }),
       }),
@@ -149,10 +155,14 @@ export const api = {
       page_access_token: string; ig_user_id?: string; ig_username?: string;
       ad_account_id?: string; ad_account_name?: string; ad_account_currency?: string;
     }) => request<{ ok: boolean }>("/connections/meta/select-page", { method: "POST", body: JSON.stringify(data) }),
+    googleSelectCustomer: (data: { suite_id: string; customer_id: string; customer_name?: string }) =>
+      request<{ ok: boolean }>("/connections/google/select-customer", { method: "POST", body: JSON.stringify(data) }),
     disconnect: (suiteId: string, platform: string) =>
       request<{ ok: boolean }>(`/connections/${suiteId}/${platform}`, { method: "DELETE" }),
     campaigns: (suiteId: string) =>
       request<{ campaigns: MetaCampaign[]; warning?: string }>(`/connections/${suiteId}/meta/campaigns`),
+    googleCampaigns: (suiteId: string) =>
+      request<{ campaigns: GoogleAdsCampaign[]; warning?: string }>(`/connections/${suiteId}/google/campaigns`),
   },
 };
 
@@ -224,7 +234,50 @@ export interface Connections {
   facebook?: { connected: boolean; page_id: string; page_name: string };
   instagram?: { connected: boolean; ig_user_id: string; username: string };
   meta_ads?: { connected: boolean; ad_account_id: string; ad_account_name?: string; currency?: string };
+  google_ads?: { connected: boolean; customer_id: string; customer_name?: string };
   tiktok?: { connected: boolean; username: string };
+}
+
+export interface GoogleAdsCustomer {
+  id: string;
+  resource_name: string;
+}
+
+export interface GoogleAdsMetrics {
+  impressions: number;
+  clicks: number;
+  cost: number;
+  conversions: number;
+  ctr: number;
+  average_cpc: number;
+}
+
+export interface GoogleAdsAd {
+  id: string;
+  name: string;
+  status?: string;
+  type?: string;
+  metrics: GoogleAdsMetrics;
+}
+
+export interface GoogleAdsAdGroup {
+  id: string;
+  name: string;
+  status?: string;
+  type?: string;
+  metrics: GoogleAdsMetrics;
+  ads: GoogleAdsAd[];
+}
+
+export interface GoogleAdsCampaign {
+  id: string;
+  name: string;
+  status?: string;
+  channel_type?: string;
+  start_date?: string;
+  end_date?: string;
+  metrics: GoogleAdsMetrics;
+  ad_groups: GoogleAdsAdGroup[];
 }
 
 export interface MetaPage {
