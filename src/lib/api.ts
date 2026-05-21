@@ -154,6 +154,7 @@ export interface InsightPoint { date: string; value: number }
 export interface AnalyticsData {
   days: number;
   error?: string;
+  errors?: string[];
   facebook?: {
     name?: string;
     fans?: number;
@@ -161,6 +162,7 @@ export interface AnalyticsData {
     insights?: {
       page_impressions?: InsightPoint[];
       page_reach?: InsightPoint[];
+      views?: InsightPoint[];
       page_engaged_users?: InsightPoint[];
       page_fan_adds?: InsightPoint[];
     };
@@ -176,6 +178,7 @@ export interface AnalyticsData {
     profile_picture?: string;
     insights?: {
       impressions?: InsightPoint[];
+      views?: InsightPoint[];
       reach?: InsightPoint[];
       profile_views?: InsightPoint[];
       follower_count?: InsightPoint[];

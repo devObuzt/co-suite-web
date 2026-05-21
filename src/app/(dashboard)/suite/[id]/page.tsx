@@ -551,7 +551,7 @@ function AnalyticsTab({ suiteId }: { suiteId: string }) {
   const reachSeries: InsightPoint[] =
     ig.insights?.reach || fb.insights?.page_reach || [];
   const impressionSeries: InsightPoint[] =
-    ig.insights?.impressions || fb.insights?.page_impressions || [];
+    ig.insights?.views || ig.insights?.impressions || fb.insights?.views || fb.insights?.page_impressions || [];
 
   const chartData = reachSeries.map((pt, i) => ({
     date: pt.date.slice(5),   // MM-DD
@@ -561,6 +561,17 @@ function AnalyticsTab({ suiteId }: { suiteId: string }) {
 
   return (
     <div className="space-y-6">
+      {data.errors && data.errors.length > 0 && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+          <div className="font-medium mb-1">Meta analytics needs attention</div>
+          <div className="space-y-1 text-amber-100/80">
+            {data.errors.slice(0, 3).map((err, idx) => (
+              <p key={idx} className="break-words">{err}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Period selector */}
       <div className="flex items-center gap-2">
         {[7, 28, 90].map((d) => (
@@ -588,7 +599,7 @@ function AnalyticsTab({ suiteId }: { suiteId: string }) {
         />
         <StatCard
           label="Impressions"
-          value={sum(fb.insights?.page_impressions) + sum(ig.insights?.impressions)}
+          value={sum(fb.insights?.views || fb.insights?.page_impressions) + sum(ig.insights?.views || ig.insights?.impressions)}
           icon="📊"
           sub={`last ${days}d`}
         />
