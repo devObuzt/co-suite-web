@@ -838,6 +838,7 @@ function PostCard({
 function ConnectionsPanel({ suiteId }: { suiteId: string }) {
   const [connections, setConnections] = useState<Connections>({});
   const [connecting, setConnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState("");
 
   useEffect(() => {
     api.connections.get(suiteId).then(setConnections).catch(() => {});
@@ -845,20 +846,24 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
 
   async function connectMeta() {
     setConnecting(true);
+    setConnectionError("");
     try {
       const { url } = await api.connections.metaAuthUrl(suiteId);
       window.location.href = url;
-    } catch {
+    } catch (e: unknown) {
+      setConnectionError(e instanceof Error ? e.message : "Failed to start Meta connection");
       setConnecting(false);
     }
   }
 
   async function connectGoogle() {
     setConnecting(true);
+    setConnectionError("");
     try {
       const { url } = await api.connections.googleAuthUrl(suiteId);
       window.location.href = url;
-    } catch {
+    } catch (e: unknown) {
+      setConnectionError(e instanceof Error ? e.message : "Failed to start Google Ads connection");
       setConnecting(false);
     }
   }
@@ -878,6 +883,11 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
   return (
     <div>
       <h2 className="text-sm font-medium text-zinc-400 mb-3">Connections</h2>
+      {connectionError && (
+        <div className="mb-3 rounded-lg border border-red-900/70 bg-red-950/50 px-3 py-2 text-xs text-red-200">
+          {connectionError}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {/* Meta (Facebook + Instagram) */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-3">
