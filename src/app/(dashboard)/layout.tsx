@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, Settings, LogOut, Plus } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { BrandMark } from "@/components/BrandMark";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
@@ -35,7 +36,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen bg-background text-foreground flex">
       {/* Sidebar */}
       <aside className="hidden md:flex w-60 border-r border-border bg-card/40 flex-col p-4 shrink-0">
-        <div className="text-lg font-bold text-foreground mb-8 px-2">co-Suite</div>
+        <div className="mb-8 px-2"><BrandMark size="sm" /></div>
         <nav className="flex-1 space-y-1">
           <SideLink href="/suites" icon={<LayoutDashboard size={16} />} label={t("nav.dashboard")} active={pathname === "/suites"} />
           <SideLink href="/suite/new" icon={<Plus size={16} />} label={t("nav.newSuite")} active={pathname === "/suite/new"} />
@@ -62,7 +63,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="flex-1 min-w-0 overflow-auto">
         <div className="md:hidden sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur px-4 py-3">
           <div className="flex items-center justify-between">
-            <Link href="/suites" className="text-foreground font-semibold">co-Suite</Link>
+            <Link href="/suites" className="text-foreground font-semibold"><BrandMark size="sm" /></Link>
             <div className="flex items-center gap-1">
               <ThemeSwitcher compact />
               <IconLink href="/suites" icon={<LayoutDashboard size={17} />} active={pathname === "/suites"} />

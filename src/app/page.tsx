@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { BrandMark } from "@/components/BrandMark";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { useLanguage, useT } from "@/lib/i18n/LanguageContext";
@@ -19,7 +20,7 @@ export default function LandingPage() {
     <main className="min-h-screen bg-background text-foreground flex flex-col" dir={dir}>
       {/* Nav */}
       <nav className="flex items-center justify-between gap-3 px-4 py-4 border-b border-border sm:px-8">
-        <span className="text-xl font-bold tracking-tight text-foreground">co-Suite</span>
+        <BrandMark />
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="hidden sm:block"><LanguageSwitcher /></div>
           <ThemeSwitcher compact />

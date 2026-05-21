@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandMark } from "@/components/BrandMark";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function SignupPage() {
@@ -38,7 +39,7 @@ export default function SignupPage() {
   return (
     <Card className="bg-zinc-900 border-zinc-800 text-white">
       <CardHeader className="space-y-1">
-        <div className="text-2xl font-bold tracking-tight mb-1">co-Suite</div>
+        <div className="mb-2"><BrandMark size="lg" /></div>
         <CardTitle className="text-xl">{t("auth.signUp")}</CardTitle>
         <CardDescription className="text-zinc-400">{t("auth.signUpSubtitle")}</CardDescription>
       </CardHeader>
