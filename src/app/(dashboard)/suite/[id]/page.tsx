@@ -554,9 +554,9 @@ function AnalyticsTab({ suiteId }: { suiteId: string }) {
 
   // Build unified reach chart from whichever platform has data
   const reachSeries: InsightPoint[] =
-    ig.insights?.reach || fb.insights?.page_reach || [];
+    ig.insights?.reach || fb.insights?.page_impressions_unique || fb.insights?.page_reach || [];
   const impressionSeries: InsightPoint[] =
-    ig.insights?.views || ig.insights?.impressions || fb.insights?.views || fb.insights?.page_impressions || [];
+    ig.insights?.views || ig.insights?.impressions || fb.insights?.page_impressions || [];
 
   const chartData = reachSeries.map((pt, i) => ({
     date: pt.date.slice(5),   // MM-DD
@@ -598,13 +598,13 @@ function AnalyticsTab({ suiteId }: { suiteId: string }) {
         <StatCard label="IG Followers" value={ig.followers ?? 0} icon="📷" icon2={ig.username ? `@${ig.username}` : undefined} />
         <StatCard
           label="Total Reach"
-          value={sum(fb.insights?.page_reach) + sum(ig.insights?.reach)}
+          value={sum(fb.insights?.page_impressions_unique || fb.insights?.page_reach) + sum(ig.insights?.reach)}
           icon="👁"
           sub={`last ${days}d`}
         />
         <StatCard
           label="Impressions"
-          value={sum(fb.insights?.views || fb.insights?.page_impressions) + sum(ig.insights?.views || ig.insights?.impressions)}
+          value={sum(fb.insights?.page_impressions) + sum(ig.insights?.views || ig.insights?.impressions)}
           icon="📊"
           sub={`last ${days}d`}
         />

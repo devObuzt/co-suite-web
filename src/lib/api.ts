@@ -161,8 +161,10 @@ export interface AnalyticsData {
     followers?: number;
     insights?: {
       page_impressions?: InsightPoint[];
+      page_impressions_unique?: InsightPoint[];
       page_reach?: InsightPoint[];
       views?: InsightPoint[];
+      page_post_engagements?: InsightPoint[];
       page_engaged_users?: InsightPoint[];
       page_fan_adds?: InsightPoint[];
     };
