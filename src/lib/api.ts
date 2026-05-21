@@ -140,13 +140,14 @@ export const api = {
     get: (suiteId: string) => request<Connections>(`/connections/${suiteId}`),
     metaAuthUrl: (suiteId: string) => request<{ url: string }>(`/connections/${suiteId}/meta/auth-url`),
     metaCallback: (suiteId: string, code: string) =>
-      request<{ pages: MetaPage[] }>("/connections/meta/callback", {
+      request<{ pages: MetaPage[]; ad_accounts: MetaAdAccount[] }>("/connections/meta/callback", {
         method: "POST",
         body: JSON.stringify({ suite_id: suiteId, code }),
       }),
     metaSelectPage: (data: {
       suite_id: string; page_id: string; page_name: string;
       page_access_token: string; ig_user_id?: string; ig_username?: string;
+      ad_account_id?: string; ad_account_name?: string; ad_account_currency?: string;
     }) => request<{ ok: boolean }>("/connections/meta/select-page", { method: "POST", body: JSON.stringify(data) }),
     disconnect: (suiteId: string, platform: string) =>
       request<{ ok: boolean }>(`/connections/${suiteId}/${platform}`, { method: "DELETE" }),
@@ -220,6 +221,7 @@ export interface UsageEvent {
 export interface Connections {
   facebook?: { connected: boolean; page_id: string; page_name: string };
   instagram?: { connected: boolean; ig_user_id: string; username: string };
+  meta_ads?: { connected: boolean; ad_account_id: string; ad_account_name?: string; currency?: string };
   tiktok?: { connected: boolean; username: string };
 }
 
@@ -228,6 +230,16 @@ export interface MetaPage {
   name: string;
   access_token: string;
   instagram_business_account?: { id: string; name: string; username: string; profile_picture_url?: string };
+}
+
+export interface MetaAdAccount {
+  id: string;
+  account_id?: string;
+  name?: string;
+  account_status?: number;
+  currency?: string;
+  timezone_name?: string;
+  business?: { name?: string };
 }
 
 export interface Suite {

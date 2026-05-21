@@ -563,6 +563,7 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
 
   const fb = connections.facebook;
   const ig = connections.instagram;
+  const metaAds = connections.meta_ads;
   const metaConnected = !!fb?.connected;
 
   return (
@@ -583,6 +584,11 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
               {ig?.connected && (
                 <p className="text-zinc-400 text-xs flex items-center gap-1">
                   <AtSign size={11} /> @{ig.username}
+                </p>
+              )}
+              {metaAds?.connected && (
+                <p className="text-zinc-400 text-xs flex items-center gap-1">
+                  <BarChart3 size={11} /> {metaAds.ad_account_name || metaAds.ad_account_id}
                 </p>
               )}
               <Button
