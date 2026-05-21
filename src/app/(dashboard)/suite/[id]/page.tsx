@@ -2,7 +2,7 @@
 import { use, useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n/LanguageContext";
 import Link from "next/link";
-import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd } from "@/lib/api";
+import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd, MetaCampaign } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -216,6 +216,7 @@ function ContentTab({ suiteId }: { suiteId: string }) {
       )}
 
       <MetaAdsInspirationSection suiteId={suiteId} />
+      <MetaCampaignsSection suiteId={suiteId} />
 
       {/* Post grid */}
       {filtered.length === 0 && !generating ? (
@@ -350,6 +351,85 @@ function MetaAdsInspirationSection({ suiteId }: { suiteId: string }) {
                 </div>
               )}
             </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Connected Meta Campaigns ────────────────────────────────────────────────
+
+function MetaCampaignsSection({ suiteId }: { suiteId: string }) {
+  const [campaigns, setCampaigns] = useState<MetaCampaign[]>([]);
+  const [warning, setWarning] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    setWarning("");
+    try {
+      const res = await api.connections.campaigns(suiteId);
+      setCampaigns(res.campaigns || []);
+      setWarning(res.warning || "");
+      setLoaded(true);
+    } catch (e: unknown) {
+      setWarning(e instanceof Error ? e.message : "Failed to fetch campaigns");
+      setLoaded(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+            <BarChart3 size={14} className="text-emerald-400" /> Connected Meta Campaigns
+          </h3>
+          <p className="text-xs text-zinc-500 mt-1">Read-only check from the selected ad account.</p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={load}
+          disabled={loading}
+          className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 gap-1.5 h-8 text-xs"
+        >
+          {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          Fetch campaigns
+        </Button>
+      </div>
+
+      {warning && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" dir="auto">
+          {warning}
+        </div>
+      )}
+
+      {loaded && campaigns.length === 0 && !warning && (
+        <p className="rounded-lg border border-dashed border-zinc-800 p-4 text-sm text-zinc-500">
+          No campaigns found in the connected ad account.
+        </p>
+      )}
+
+      {campaigns.length > 0 && (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {campaigns.map((campaign) => (
+            <div key={campaign.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <p className="min-w-0 truncate text-sm font-medium text-zinc-100" dir="auto">{campaign.name}</p>
+                <Badge variant="outline" className="shrink-0 border-zinc-700 text-xs text-zinc-400">
+                  {campaign.effective_status || campaign.status || "UNKNOWN"}
+                </Badge>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1 text-[11px] text-zinc-500">
+                {campaign.objective && <span className="rounded bg-zinc-800 px-1.5 py-0.5">{campaign.objective}</span>}
+                {campaign.buying_type && <span className="rounded bg-zinc-800 px-1.5 py-0.5">{campaign.buying_type}</span>}
+              </div>
+            </div>
           ))}
         </div>
       )}

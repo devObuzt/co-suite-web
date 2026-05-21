@@ -151,6 +151,8 @@ export const api = {
     }) => request<{ ok: boolean }>("/connections/meta/select-page", { method: "POST", body: JSON.stringify(data) }),
     disconnect: (suiteId: string, platform: string) =>
       request<{ ok: boolean }>(`/connections/${suiteId}/${platform}`, { method: "DELETE" }),
+    campaigns: (suiteId: string) =>
+      request<{ campaigns: MetaCampaign[]; warning?: string }>(`/connections/${suiteId}/meta/campaigns`),
   },
 };
 
@@ -240,6 +242,17 @@ export interface MetaAdAccount {
   currency?: string;
   timezone_name?: string;
   business?: { name?: string };
+}
+
+export interface MetaCampaign {
+  id: string;
+  name: string;
+  status?: string;
+  effective_status?: string;
+  objective?: string;
+  buying_type?: string;
+  created_time?: string;
+  updated_time?: string;
 }
 
 export interface Suite {
