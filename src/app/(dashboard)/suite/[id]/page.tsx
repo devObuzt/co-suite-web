@@ -673,10 +673,10 @@ function PostCard({
   const isPending = post.status === "pending";
   const isApproved = post.status === "approved";
   const isPublished = post.status === "published";
-  const firstImage = post.media_urls?.[0];
-  const [imageFailed, setImageFailed] = useState(false);
-
   const fmt = post.format;
+  const firstMedia = post.media_urls?.[0];
+  const firstMediaUrl = firstMedia ? mediaUrl(firstMedia) : "";
+  const [mediaFailed, setMediaFailed] = useState(false);
   const FormatIcon = fmt === "carousel" ? LayoutList : fmt === "video" ? Video : ImageIcon;
 
   async function act(fn: () => Promise<void>) {
@@ -700,20 +700,31 @@ function PostCard({
 
   return (
     <Card className="bg-zinc-900 border-zinc-800 flex flex-col overflow-hidden">
-      {/* Image preview */}
+      {/* Media preview */}
       <div className="relative bg-zinc-800 aspect-square w-full overflow-hidden">
-        {firstImage && !imageFailed ? (
+        {firstMedia && !mediaFailed && fmt === "video" ? (
+          <video
+            src={firstMediaUrl}
+            controls
+            playsInline
+            preload="metadata"
+            className="h-full w-full object-cover bg-zinc-950"
+            onError={() => setMediaFailed(true)}
+          />
+        ) : firstMedia && !mediaFailed ? (
           <img
-            src={mediaUrl(firstImage)}
+            src={firstMediaUrl}
             alt={post.topic || "post"}
             className="h-full w-full object-cover"
-            onError={() => setImageFailed(true)}
+            onError={() => setMediaFailed(true)}
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
             <FormatIcon size={32} className="text-zinc-600" />
-            {firstImage && (
-              <span className="text-xs text-zinc-500">Image unavailable. Regenerate this post.</span>
+            {firstMedia && (
+              <span className="text-xs text-zinc-500">
+                {fmt === "video" ? "Video unavailable. Regenerate this post." : "Image unavailable. Regenerate this post."}
+              </span>
             )}
           </div>
         )}
