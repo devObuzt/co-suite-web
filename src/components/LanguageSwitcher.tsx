@@ -4,10 +4,11 @@ import { Globe } from "lucide-react";
 import { LANGUAGES, LangCode } from "@/lib/i18n/translations";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
-export function LanguageSwitcher() {
+export function LanguageSwitcher({ placement = "bottom" }: { placement?: "top" | "bottom" }) {
   const { lang, setLang } = useLanguage();
   const [open, setOpen] = useState(false);
   const current = LANGUAGES.find((l) => l.code === lang);
+  const menuPlacement = placement === "top" ? "bottom-full mb-1" : "top-full mt-1";
 
   return (
     <div className="relative">
@@ -19,7 +20,7 @@ export function LanguageSwitcher() {
         <span>{current?.label ?? "English"}</span>
       </button>
       {open && (
-        <div className="absolute bottom-full left-0 mb-1 w-44 bg-popover text-popover-foreground border border-border rounded-xl shadow-xl overflow-hidden z-20">
+        <div className={`absolute ${menuPlacement} left-0 w-44 bg-popover text-popover-foreground border border-border rounded-xl shadow-xl overflow-hidden z-50`}>
           {LANGUAGES.map((l) => (
             <button
               key={l.code}

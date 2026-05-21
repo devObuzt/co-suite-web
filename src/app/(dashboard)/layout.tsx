@@ -44,7 +44,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
         <div className="border-t border-border pt-4 mt-4">
           <div className="text-sm text-muted-foreground px-2 mb-2 truncate">{user.email}</div>
-          <LanguageSwitcher />
+          <LanguageSwitcher placement="top" />
           <div className="px-0 mt-2">
             <ThemeSwitcher />
           </div>
