@@ -76,6 +76,22 @@ export default function LandingPage() {
           </div>
         ))}
       </section>
+
+      <footer className="border-t border-border px-6 py-8 sm:px-8">
+        <div className="mx-auto flex max-w-6xl flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-muted-foreground">
+            © {new Date().getFullYear()} co-Suite. AI marketing tools for business teams.
+          </div>
+          <nav className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
+            <Link href="/legal/privacy" className="hover:text-foreground">Privacy</Link>
+            <Link href="/legal/terms" className="hover:text-foreground">Terms</Link>
+            <Link href="/legal/accessibility" className="hover:text-foreground">Accessibility</Link>
+            <Link href="/legal/billing" className="hover:text-foreground">Billing</Link>
+            <Link href="/legal/ai-policy" className="hover:text-foreground">AI Policy</Link>
+            <Link href="/legal/cookies" className="hover:text-foreground">Cookies</Link>
+          </nav>
+        </div>
+      </footer>
     </main>
   );
 }
