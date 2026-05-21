@@ -556,7 +556,7 @@ function AnalyticsTab({ suiteId }: { suiteId: string }) {
   const reachSeries: InsightPoint[] =
     ig.insights?.reach || fb.insights?.page_impressions_unique || fb.insights?.page_reach || [];
   const impressionSeries: InsightPoint[] =
-    ig.insights?.views || ig.insights?.impressions || fb.insights?.page_impressions || [];
+    ig.insights?.views || ig.insights?.impressions || fb.insights?.page_post_engagements || [];
 
   const chartData = reachSeries.map((pt, i) => ({
     date: pt.date.slice(5),   // MM-DD
@@ -603,8 +603,8 @@ function AnalyticsTab({ suiteId }: { suiteId: string }) {
           sub={`last ${days}d`}
         />
         <StatCard
-          label="Impressions"
-          value={sum(fb.insights?.page_impressions) + sum(ig.insights?.views || ig.insights?.impressions)}
+          label="Views / Engagement"
+          value={sum(fb.insights?.page_post_engagements) + sum(ig.insights?.views || ig.insights?.impressions)}
           icon="📊"
           sub={`last ${days}d`}
         />
@@ -613,7 +613,7 @@ function AnalyticsTab({ suiteId }: { suiteId: string }) {
       {/* Reach / Impressions chart */}
       {chartData.length > 0 && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-          <h3 className="text-sm text-zinc-400 mb-4">Reach &amp; Impressions — last {days} days</h3>
+          <h3 className="text-sm text-zinc-400 mb-4">Reach &amp; views/engagement — last {days} days</h3>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
@@ -625,7 +625,7 @@ function AnalyticsTab({ suiteId }: { suiteId: string }) {
                 itemStyle={{ color: "#e4e4e7" }}
               />
               <Line type="monotone" dataKey="reach" stroke="#6366f1" strokeWidth={2} dot={false} name="Reach" />
-              <Line type="monotone" dataKey="impressions" stroke="#818cf8" strokeWidth={1.5} dot={false} name="Impressions" strokeDasharray="4 2" />
+              <Line type="monotone" dataKey="impressions" stroke="#818cf8" strokeWidth={1.5} dot={false} name="Views / engagement" strokeDasharray="4 2" />
             </LineChart>
           </ResponsiveContainer>
         </div>
