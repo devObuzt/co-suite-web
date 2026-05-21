@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Cairo, Noto_Sans_Hebrew } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n/LanguageContext";
+import { ThemeProvider } from "@/lib/theme/ThemeContext";
 import { FirstTimeLanguagePicker } from "@/components/FirstTimeLanguagePicker";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -25,12 +26,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${cairo.variable} ${notoHebrew.variable} h-full antialiased`}>
+    <html lang="en" className={`${inter.variable} ${cairo.variable} ${notoHebrew.variable} h-full antialiased dark`}>
       <body className="min-h-full bg-background text-foreground">
-        <LanguageProvider>
-          <FirstTimeLanguagePicker />
-          {children}
-        </LanguageProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <FirstTimeLanguagePicker />
+            {children}
+          </LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
