@@ -45,6 +45,10 @@ export const api = {
     get: (id: string) => request<Suite>(`/suites/${id}`),
     marketResearch: (suiteId: string) =>
       request<{ results: MarketResult[] }>(`/suites/${suiteId}/market-research`),
+    metaAds: (suiteId: string) =>
+      request<{ ads: MetaAd[]; library_url: string; query?: string; countries?: string[]; warning?: string }>(
+        `/suites/${suiteId}/meta-ads`
+      ),
   },
 
   onboarding: {
@@ -335,4 +339,16 @@ export interface MarketResult {
   url: string;
   snippet: string;
   platform: "instagram" | "tiktok" | "facebook" | "web";
+}
+
+export interface MetaAd {
+  id: string;
+  page_id?: string;
+  page_name?: string;
+  body?: string;
+  title?: string;
+  description?: string;
+  snapshot_url?: string;
+  start_time?: string;
+  platforms?: string[];
 }

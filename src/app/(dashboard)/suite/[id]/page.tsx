@@ -2,7 +2,7 @@
 import { use, useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n/LanguageContext";
 import Link from "next/link";
-import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry } from "@/lib/api";
+import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -215,6 +215,8 @@ function ContentTab({ suiteId }: { suiteId: string }) {
         </div>
       )}
 
+      <MetaAdsInspirationSection suiteId={suiteId} />
+
       {/* Post grid */}
       {filtered.length === 0 && !generating ? (
         <div className="border border-dashed border-zinc-800 rounded-xl p-12 text-center">
@@ -235,6 +237,119 @@ function ContentTab({ suiteId }: { suiteId: string }) {
               onRegenerate={() => handleRegenerate(post.id)}
               onPublish={load}
             />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Meta Ads Inspiration ────────────────────────────────────────────────────
+
+function MetaAdsInspirationSection({ suiteId }: { suiteId: string }) {
+  const [ads, setAds] = useState<MetaAd[]>([]);
+  const [libraryUrl, setLibraryUrl] = useState("");
+  const [warning, setWarning] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    setWarning("");
+    try {
+      const res = await api.suites.metaAds(suiteId);
+      setAds(res.ads || []);
+      setLibraryUrl(res.library_url);
+      setWarning(res.warning || "");
+      setLoaded(true);
+    } catch (e: unknown) {
+      setWarning(e instanceof Error ? e.message : "Failed to fetch Meta ads");
+      setLoaded(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+            <Globe size={14} className="text-blue-400" /> Meta Ads Inspiration
+          </h3>
+          <p className="text-xs text-zinc-500 mt-1">Active ads from Meta Ad Library for this business context.</p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={load}
+          disabled={loading}
+          className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 gap-1.5 h-8 text-xs"
+        >
+          {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          Fetch Meta ads
+        </Button>
+      </div>
+
+      {warning && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" dir="auto">
+          {warning}
+        </div>
+      )}
+
+      {loaded && ads.length === 0 && (
+        <div className="flex flex-col gap-3 rounded-lg border border-dashed border-zinc-800 p-4 text-sm text-zinc-400 sm:flex-row sm:items-center sm:justify-between">
+          <span>No ads returned from the API. You can still inspect the prepared Ad Library search.</span>
+          {libraryUrl && (
+            <a
+              href={libraryUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium text-indigo-300 hover:text-indigo-200"
+            >
+              Open Ad Library
+            </a>
+          )}
+        </div>
+      )}
+
+      {ads.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {ads.map((ad) => (
+            <a
+              key={ad.id}
+              href={ad.snapshot_url || libraryUrl || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex min-h-44 flex-col rounded-lg border border-zinc-800 bg-zinc-950 p-3 transition-colors hover:border-zinc-600"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-zinc-100" dir="auto">{ad.page_name || "Meta ad"}</p>
+                  {ad.start_time && (
+                    <p className="mt-0.5 text-xs text-zinc-600">
+                      Since {new Date(ad.start_time).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                    </p>
+                  )}
+                </div>
+                <Badge variant="outline" className="shrink-0 border-blue-900 bg-blue-950 text-xs text-blue-300">
+                  Ad
+                </Badge>
+              </div>
+              {ad.title && <p className="mt-3 text-sm font-medium text-zinc-200" dir="auto">{ad.title}</p>}
+              <p className="mt-2 line-clamp-4 text-sm leading-relaxed text-zinc-400" dir="auto">
+                {ad.body || ad.description || "Open in Meta Ad Library to inspect this ad."}
+              </p>
+              {ad.platforms && ad.platforms.length > 0 && (
+                <div className="mt-auto flex flex-wrap gap-1 pt-3">
+                  {ad.platforms.slice(0, 3).map((p) => (
+                    <span key={p} className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-400">
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </a>
           ))}
         </div>
       )}
