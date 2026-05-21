@@ -33,7 +33,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-zinc-950 flex">
       {/* Sidebar */}
-      <aside className="w-60 border-r border-zinc-800 flex flex-col p-4 shrink-0">
+      <aside className="hidden md:flex w-60 border-r border-zinc-800 flex-col p-4 shrink-0">
         <div className="text-lg font-bold text-white mb-8 px-2">co-Suite</div>
         <nav className="flex-1 space-y-1">
           <SideLink href="/suites" icon={<LayoutDashboard size={16} />} label={t("nav.dashboard")} active={pathname === "/suites"} />
@@ -55,7 +55,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">{children}</main>
+      <main className="flex-1 min-w-0 overflow-auto">
+        <div className="md:hidden sticky top-0 z-30 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur px-4 py-3">
+          <div className="flex items-center justify-between">
+            <Link href="/suites" className="text-white font-semibold">co-Suite</Link>
+            <div className="flex items-center gap-1">
+              <IconLink href="/suites" icon={<LayoutDashboard size={17} />} active={pathname === "/suites"} />
+              <IconLink href="/suite/new" icon={<Plus size={17} />} active={pathname === "/suite/new"} />
+              <IconLink href="/settings" icon={<Settings size={17} />} active={pathname === "/settings"} />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => { logout(); router.push("/login"); }}
+                className="h-9 w-9 text-zinc-400 hover:text-white"
+                aria-label={t("nav.signOut")}
+              >
+                <LogOut size={16} />
+              </Button>
+            </div>
+          </div>
+        </div>
+        {children}
+      </main>
     </div>
   );
 }
@@ -70,6 +91,19 @@ function SideLink({ href, icon, label, active }: { href: string; icon: React.Rea
     >
       {icon}
       {label}
+    </Link>
+  );
+}
+
+function IconLink({ href, icon, active }: { href: string; icon: React.ReactNode; active: boolean }) {
+  return (
+    <Link
+      href={href}
+      className={`grid h-9 w-9 place-items-center rounded-md transition-colors ${
+        active ? "bg-indigo-950 text-indigo-300" : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
+      }`}
+    >
+      {icon}
     </Link>
   );
 }

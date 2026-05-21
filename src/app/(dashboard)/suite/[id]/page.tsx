@@ -1,7 +1,6 @@
 "use client";
 import { use, useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n/LanguageContext";
-import Image from "next/image";
 import Link from "next/link";
 import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,9 +33,9 @@ export default function SuiteDashboardPage({ params }: { params: Promise<{ id: s
   const primaryColor = brand?.colors?.primary || "#4f46e5";
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-8">
+    <div className="px-4 py-5 md:p-8 max-w-5xl mx-auto space-y-6 md:space-y-8">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-4">
           <div
             className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-xl"
@@ -74,8 +73,8 @@ export default function SuiteDashboardPage({ params }: { params: Promise<{ id: s
       <CompetitorsSection suiteId={id} strategy={suite?.strategy ?? null} />
 
       {/* Tabs */}
-      <Tabs defaultValue="content" className="w-full">
-        <TabsList className="bg-zinc-900 border border-zinc-800">
+      <Tabs defaultValue="content" className="w-full min-w-0">
+        <TabsList className="w-full max-w-full justify-start overflow-x-auto bg-zinc-900 border border-zinc-800">
           <TabsTrigger value="content" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white text-zinc-400">
             <Zap size={14} className="mr-1.5" /> {t("tab.content")}
           </TabsTrigger>
@@ -161,7 +160,10 @@ function ContentTab({ suiteId }: { suiteId: string }) {
 
   async function handleApprove(postId: string) {
     await api.content.approve(suiteId, postId);
-    await load();
+    setPosts((current) => current.map((post) => (
+      post.id === postId ? { ...post, status: "approved" } : post
+    )));
+    setFilter("approved");
   }
 
   async function handleReject(postId: string) {
@@ -181,13 +183,22 @@ function ContentTab({ suiteId }: { suiteId: string }) {
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1 bg-zinc-900 border border-zinc-800 p-1 rounded-lg">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Button
+          onClick={handleGenerate}
+          disabled={generating}
+          className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 gap-2"
+        >
+          {generating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+          {generating ? "Generating…" : "Generate 3 posts"}
+        </Button>
+
+        <div className="flex max-w-full gap-1 overflow-x-auto bg-zinc-900 border border-zinc-800 p-1 rounded-lg">
           {(["pending", "approved", "published", "rejected"] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded text-xs font-medium capitalize transition-colors ${
+              className={`shrink-0 px-3 py-1.5 rounded text-xs font-medium capitalize transition-colors ${
                 filter === f ? "bg-zinc-700 text-white" : "text-zinc-500 hover:text-zinc-300"
               }`}
             >
@@ -195,15 +206,6 @@ function ContentTab({ suiteId }: { suiteId: string }) {
             </button>
           ))}
         </div>
-
-        <Button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="bg-indigo-600 hover:bg-indigo-500 gap-2"
-        >
-          {generating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-          {generating ? "Generating…" : "Generate 3 posts"}
-        </Button>
       </div>
 
       {generating && (
@@ -222,7 +224,7 @@ function ContentTab({ suiteId }: { suiteId: string }) {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((post) => (
             <PostCard
               key={post.id}
@@ -259,6 +261,7 @@ function PostCard({
   const isApproved = post.status === "approved";
   const isPublished = post.status === "published";
   const firstImage = post.media_urls?.[0];
+  const [imageFailed, setImageFailed] = useState(false);
 
   const fmt = post.format;
   const FormatIcon = fmt === "carousel" ? LayoutList : fmt === "video" ? Video : ImageIcon;
@@ -286,17 +289,19 @@ function PostCard({
     <Card className="bg-zinc-900 border-zinc-800 flex flex-col overflow-hidden">
       {/* Image preview */}
       <div className="relative bg-zinc-800 aspect-square w-full overflow-hidden">
-        {firstImage ? (
-          <Image
-            src={`${API_MEDIA}${firstImage}`}
+        {firstImage && !imageFailed ? (
+          <img
+            src={mediaUrl(firstImage)}
             alt={post.topic || "post"}
-            fill
-            className="object-cover"
-            unoptimized
+            className="h-full w-full object-cover"
+            onError={() => setImageFailed(true)}
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
             <FormatIcon size={32} className="text-zinc-600" />
+            {firstImage && (
+              <span className="text-xs text-zinc-500">Image unavailable. Regenerate this post.</span>
+            )}
           </div>
         )}
         <div className="absolute top-2 left-2">
@@ -692,6 +697,11 @@ function StatCard({ label, value, icon, icon2, sub }: {
 
 function sum(series?: InsightPoint[]): number {
   return (series || []).reduce((acc, pt) => acc + pt.value, 0);
+}
+
+function mediaUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${API_MEDIA}${url}`;
 }
 
 // ─── Competitors & Market Research ─────────────────────────────────────────
