@@ -253,6 +253,54 @@ export interface MetaCampaign {
   buying_type?: string;
   created_time?: string;
   updated_time?: string;
+  insights?: MetaInsightsEdge;
+  adsets?: { data: MetaAdSet[] };
+}
+
+export interface MetaAdSet {
+  id: string;
+  name: string;
+  status?: string;
+  effective_status?: string;
+  daily_budget?: string;
+  lifetime_budget?: string;
+  bid_strategy?: string;
+  optimization_goal?: string;
+  created_time?: string;
+  updated_time?: string;
+  insights?: MetaInsightsEdge;
+  ads?: { data: MetaAccountAd[] };
+}
+
+export interface MetaAccountAd {
+  id: string;
+  name: string;
+  status?: string;
+  effective_status?: string;
+  created_time?: string;
+  updated_time?: string;
+  creative?: {
+    id?: string;
+    name?: string;
+    effective_object_story_id?: string;
+    object_story_spec?: Record<string, unknown>;
+  };
+  insights?: MetaInsightsEdge;
+}
+
+export interface MetaInsightsEdge {
+  data?: MetaInsightSummary[];
+}
+
+export interface MetaInsightSummary {
+  impressions?: string;
+  reach?: string;
+  clicks?: string;
+  spend?: string;
+  cpm?: string;
+  cpc?: string;
+  ctr?: string;
+  actions?: Array<{ action_type?: string; value?: string }>;
 }
 
 export interface Suite {

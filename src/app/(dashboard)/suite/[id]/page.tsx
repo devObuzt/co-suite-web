@@ -126,6 +126,7 @@ function ContentTab({ suiteId }: { suiteId: string }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [generating, setGenerating] = useState(false);
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "published">("pending");
+  const [showAllPosts, setShowAllPosts] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = async () => {
@@ -135,6 +136,7 @@ function ContentTab({ suiteId }: { suiteId: string }) {
 
   useEffect(() => {
     load();
+    setShowAllPosts(false);
   }, [suiteId, filter]);
 
   // Poll every 4 s while generating
@@ -179,6 +181,8 @@ function ContentTab({ suiteId }: { suiteId: string }) {
   }
 
   const filtered = posts.filter((p) => p.status === filter);
+  const visiblePosts = showAllPosts ? filtered : filtered.slice(0, 3);
+  const hiddenPostCount = Math.max(0, filtered.length - visiblePosts.length);
 
   return (
     <div className="space-y-4">
@@ -215,9 +219,6 @@ function ContentTab({ suiteId }: { suiteId: string }) {
         </div>
       )}
 
-      <MetaAdsInspirationSection suiteId={suiteId} />
-      <MetaCampaignsSection suiteId={suiteId} />
-
       {/* Post grid */}
       {filtered.length === 0 && !generating ? (
         <div className="border border-dashed border-zinc-800 rounded-xl p-12 text-center">
@@ -227,20 +228,36 @@ function ContentTab({ suiteId }: { suiteId: string }) {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((post) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              suiteId={suiteId}
-              onApprove={() => handleApprove(post.id)}
-              onReject={() => handleReject(post.id)}
-              onRegenerate={() => handleRegenerate(post.id)}
-              onPublish={load}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {visiblePosts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                suiteId={suiteId}
+                onApprove={() => handleApprove(post.id)}
+                onReject={() => handleReject(post.id)}
+                onRegenerate={() => handleRegenerate(post.id)}
+                onPublish={load}
+              />
+            ))}
+          </div>
+          {hiddenPostCount > 0 && (
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                onClick={() => setShowAllPosts(true)}
+                className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              >
+                Show more ({hiddenPostCount})
+              </Button>
+            </div>
+          )}
+        </>
       )}
+
+      <MetaAdsInspirationSection suiteId={suiteId} />
+      <MetaCampaignsSection suiteId={suiteId} />
     </div>
   );
 }
@@ -360,6 +377,41 @@ function MetaAdsInspirationSection({ suiteId }: { suiteId: string }) {
 
 // ─── Connected Meta Campaigns ────────────────────────────────────────────────
 
+function metaInsights(edge?: MetaCampaign["insights"]) {
+  return edge?.data?.[0] || {};
+}
+
+function metaNumber(value?: string) {
+  const num = Number(value || 0);
+  return Number.isFinite(num) ? num.toLocaleString() : "0";
+}
+
+function metaMoney(value?: string) {
+  const num = Number(value || 0);
+  return Number.isFinite(num) ? num.toFixed(2) : "0.00";
+}
+
+function MetaMetricStrip({ insights }: { insights?: MetaCampaign["insights"] }) {
+  const data = metaInsights(insights);
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <MetaMetric label="Spend" value={metaMoney(data.spend)} />
+      <MetaMetric label="Reach" value={metaNumber(data.reach)} />
+      <MetaMetric label="Impressions" value={metaNumber(data.impressions)} />
+      <MetaMetric label="Clicks" value={metaNumber(data.clicks)} />
+    </div>
+  );
+}
+
+function MetaMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-zinc-800 bg-zinc-900/80 px-2.5 py-2">
+      <p className="text-[10px] uppercase tracking-wide text-zinc-600">{label}</p>
+      <p className="mt-0.5 text-sm font-semibold text-zinc-100">{value}</p>
+    </div>
+  );
+}
+
 function MetaCampaignsSection({ suiteId }: { suiteId: string }) {
   const [campaigns, setCampaigns] = useState<MetaCampaign[]>([]);
   const [warning, setWarning] = useState("");
@@ -387,9 +439,9 @@ function MetaCampaignsSection({ suiteId }: { suiteId: string }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-            <BarChart3 size={14} className="text-emerald-400" /> Connected Meta Campaigns
+            <BarChart3 size={14} className="text-emerald-400" /> Active Meta Campaigns
           </h3>
-          <p className="text-xs text-zinc-500 mt-1">Read-only check from the selected ad account.</p>
+          <p className="text-xs text-zinc-500 mt-1">Live campaigns only, with ad sets, ads, and current numbers.</p>
         </div>
         <Button
           size="sm"
@@ -411,24 +463,65 @@ function MetaCampaignsSection({ suiteId }: { suiteId: string }) {
 
       {loaded && campaigns.length === 0 && !warning && (
         <p className="rounded-lg border border-dashed border-zinc-800 p-4 text-sm text-zinc-500">
-          No campaigns found in the connected ad account.
+          No active campaigns found in the connected ad account.
         </p>
       )}
 
       {campaigns.length > 0 && (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="space-y-3">
           {campaigns.map((campaign) => (
-            <div key={campaign.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+            <div key={campaign.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <p className="min-w-0 truncate text-sm font-medium text-zinc-100" dir="auto">{campaign.name}</p>
-                <Badge variant="outline" className="shrink-0 border-zinc-700 text-xs text-zinc-400">
+                <Badge variant="outline" className="shrink-0 border-emerald-900 bg-emerald-950 text-xs text-emerald-300">
                   {campaign.effective_status || campaign.status || "UNKNOWN"}
                 </Badge>
               </div>
+              <MetaMetricStrip insights={campaign.insights} />
               <div className="mt-2 flex flex-wrap gap-1 text-[11px] text-zinc-500">
                 {campaign.objective && <span className="rounded bg-zinc-800 px-1.5 py-0.5">{campaign.objective}</span>}
                 {campaign.buying_type && <span className="rounded bg-zinc-800 px-1.5 py-0.5">{campaign.buying_type}</span>}
               </div>
+              {(campaign.adsets?.data || []).length > 0 && (
+                <div className="space-y-2">
+                  {(campaign.adsets?.data || []).map((adset) => (
+                    <div key={adset.id} className="rounded-lg border border-zinc-800 bg-black/30 p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold text-zinc-200" dir="auto">{adset.name}</p>
+                          <p className="mt-0.5 text-[11px] text-zinc-600">
+                            Ad set{adset.optimization_goal ? ` · ${adset.optimization_goal}` : ""}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="shrink-0 border-zinc-700 text-[10px] text-zinc-400">
+                          {adset.effective_status || adset.status || "UNKNOWN"}
+                        </Badge>
+                      </div>
+                      <MetaMetricStrip insights={adset.insights} />
+                      {(adset.ads?.data || []).length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          {(adset.ads?.data || []).map((ad) => (
+                            <div key={ad.id} className="rounded-md border border-zinc-800 bg-zinc-950 px-2.5 py-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="min-w-0 truncate text-xs text-zinc-300" dir="auto">{ad.name}</p>
+                                <Badge variant="outline" className="shrink-0 border-zinc-800 text-[10px] text-zinc-500">
+                                  {ad.effective_status || ad.status || "UNKNOWN"}
+                                </Badge>
+                              </div>
+                              <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                                <MetaMetric label="Spend" value={metaMoney(metaInsights(ad.insights).spend)} />
+                                <MetaMetric label="Reach" value={metaNumber(metaInsights(ad.insights).reach)} />
+                                <MetaMetric label="Impr." value={metaNumber(metaInsights(ad.insights).impressions)} />
+                                <MetaMetric label="Clicks" value={metaNumber(metaInsights(ad.insights).clicks)} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
