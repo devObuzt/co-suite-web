@@ -1,7 +1,7 @@
 "use client";
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd, MetaCampaign, GoogleAdsCampaign } from "@/lib/api";
+import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd, MetaCampaign, GoogleAdsCampaign, GenerateContentRequest } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import {
   Zap, BarChart3, Calendar, Settings, Globe, AtSign, Share2,
   Loader2, CheckCircle2, XCircle, RefreshCw, Hash, ImageIcon, LayoutList, Video,
   Link2, Link2Off, CreditCard, Target, ChevronDown, Layers, Wand2, SlidersHorizontal,
-  Clock3, Megaphone, Sparkles,
+  Clock3, Megaphone, Sparkles, Copy, Download, Pencil,
 } from "lucide-react";
 
 const API_MEDIA = process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") || "http://localhost:8000";
@@ -114,10 +114,10 @@ function ContentTab({ suiteId }: { suiteId: string }) {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [generating, filter]);
 
-  async function handleGenerate() {
+  async function handleGenerate(request: GenerateContentRequest) {
     setGenerating(true);
     try {
-      await api.content.generate(suiteId);
+      await api.content.generate(suiteId, request);
       // poll will pick up new posts; stop after 90s
       setTimeout(() => setGenerating(false), 90_000);
     } catch {
@@ -138,8 +138,8 @@ function ContentTab({ suiteId }: { suiteId: string }) {
     await load();
   }
 
-  async function handleRegenerate(postId: string) {
-    await api.content.regenerate(suiteId, postId);
+  async function handleRegenerate(postId: string, feedback?: string) {
+    await api.content.regenerate(suiteId, postId, feedback);
     setPosts((p) => p.filter((x) => x.id !== postId));
     setGenerating(true);
     setTimeout(() => setGenerating(false), 90_000);
@@ -151,7 +151,7 @@ function ContentTab({ suiteId }: { suiteId: string }) {
 
   return (
     <section className="space-y-4">
-      <CreateCommandCenter onGenerate={handleGenerate} generating={generating} />
+      <CreateCommandCenter suiteId={suiteId} onGenerate={handleGenerate} generating={generating} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -198,7 +198,7 @@ function ContentTab({ suiteId }: { suiteId: string }) {
                 suiteId={suiteId}
                 onApprove={() => handleApprove(post.id)}
                 onReject={() => handleReject(post.id)}
-                onRegenerate={() => handleRegenerate(post.id)}
+                onRegenerate={(feedback) => handleRegenerate(post.id, feedback)}
                 onPublish={load}
               />
             ))}
@@ -224,10 +224,12 @@ function ContentTab({ suiteId }: { suiteId: string }) {
 type CreateMode = "quick" | "set" | "loop" | "campaign";
 
 function CreateCommandCenter({
+  suiteId,
   onGenerate,
   generating,
 }: {
-  onGenerate: () => Promise<void>;
+  suiteId: string;
+  onGenerate: (request: GenerateContentRequest) => Promise<void>;
   generating: boolean;
 }) {
   const [mode, setMode] = useState<CreateMode>("set");
@@ -235,6 +237,9 @@ function CreateCommandCenter({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [contentType, setContentType] = useState<"mixed" | "image" | "video" | "carousel">("mixed");
   const [aspectRatio, setAspectRatio] = useState("Auto");
+  const [prompt, setPrompt] = useState("");
+  const [destination, setDestination] = useState("social");
+  const [modelTier, setModelTier] = useState("auto");
 
   const modes: {
     id: CreateMode;
@@ -283,7 +288,10 @@ function CreateCommandCenter({
             <button
               key={item.id}
               type="button"
-              onClick={() => setMode(item.id)}
+              onClick={() => {
+                setMode(item.id);
+                if (item.id === "loop") window.location.href = `/suite/${suiteId}/loops`;
+              }}
               className={`min-h-32 rounded-xl border p-3 text-left transition-colors ${
                 active
                   ? "border-indigo-500 bg-indigo-500/10"
@@ -310,6 +318,8 @@ function CreateCommandCenter({
       <div className="mt-4 rounded-xl border border-zinc-800 bg-black/30 p-3">
         <textarea
           rows={3}
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
           className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-indigo-700"
           placeholder={mode === "loop" ? "Describe the posting rhythm you want..." : mode === "campaign" ? "Describe the campaign offer, objective, and audience..." : "What should we create?"}
           dir="auto"
@@ -332,7 +342,16 @@ function CreateCommandCenter({
             ))}
           </div>
           <Button
-            onClick={onGenerate}
+            onClick={() => onGenerate({
+              mode,
+              prompt,
+              content_type: contentType,
+              aspect_ratio: aspectRatio,
+              destination,
+              model_tier: modelTier,
+              use_brand: useBrand,
+              count: mode === "quick" ? 1 : 3,
+            })}
             disabled={generating}
             className="w-full bg-indigo-600 hover:bg-indigo-500 gap-2 sm:w-auto"
           >
@@ -368,18 +387,26 @@ function CreateCommandCenter({
             </label>
             <label className="space-y-1">
               <span className="text-[11px] uppercase tracking-wide text-zinc-600">Destination</span>
-              <select className="h-9 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-2 text-xs text-zinc-300 outline-none">
-                <option>Social media</option>
-                <option>Ads</option>
-                <option>Both</option>
+              <select
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+                className="h-9 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-2 text-xs text-zinc-300 outline-none"
+              >
+                <option value="social">Social media</option>
+                <option value="ads">Ads</option>
+                <option value="both">Both</option>
               </select>
             </label>
             <label className="space-y-1">
               <span className="text-[11px] uppercase tracking-wide text-zinc-600">Model</span>
-              <select className="h-9 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-2 text-xs text-zinc-300 outline-none">
-                <option>Auto</option>
-                <option>Fast draft</option>
-                <option>Highest quality</option>
+              <select
+                value={modelTier}
+                onChange={(e) => setModelTier(e.target.value)}
+                className="h-9 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-2 text-xs text-zinc-300 outline-none"
+              >
+                <option value="auto">Auto</option>
+                <option value="fast">Fast draft</option>
+                <option value="quality">Highest quality</option>
               </select>
             </label>
           </div>
@@ -840,10 +867,17 @@ function PostCard({
   suiteId: string;
   onApprove: () => Promise<void>;
   onReject: () => Promise<void>;
-  onRegenerate: () => Promise<void>;
+  onRegenerate: (feedback?: string) => Promise<void>;
   onPublish: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftCaption, setDraftCaption] = useState(post.caption || "");
+  const [draftTags, setDraftTags] = useState((post.hashtags || []).join(" "));
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [publishAt, setPublishAt] = useState("");
   const [publishResult, setPublishResult] = useState<Record<string, string> | null>(null);
   const [publishWarning, setPublishWarning] = useState("");
   const isPending = post.status === "pending";
@@ -869,6 +903,46 @@ function PostCard({
       await onPublish();
     } catch (e: unknown) {
       setPublishWarning(e instanceof Error ? e.message : "Publish failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSaveEdit() {
+    setBusy(true);
+    try {
+      await api.content.update(suiteId, post.id, {
+        caption: draftCaption,
+        hashtags: draftTags.split(/\s+/).filter(Boolean).map((tag) => tag.startsWith("#") ? tag : `#${tag}`),
+      });
+      setEditing(false);
+      await onPublish();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSchedule() {
+    if (!publishAt) return;
+    setBusy(true);
+    try {
+      await api.content.schedule(suiteId, post.id, new Date(publishAt).toISOString());
+      setScheduleOpen(false);
+      await onPublish();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyCaption() {
+    await navigator.clipboard.writeText([post.caption, ...(post.hashtags || [])].filter(Boolean).join("\n\n"));
+  }
+
+  async function markUsed() {
+    setBusy(true);
+    try {
+      await api.content.markUsed(suiteId, post.id);
+      await onPublish();
     } finally {
       setBusy(false);
     }
@@ -918,9 +992,31 @@ function PostCard({
 
       <CardContent className="flex-1 flex flex-col p-4 gap-3">
         {/* Caption */}
-        <p className="text-zinc-200 text-sm leading-relaxed line-clamp-4" dir="auto">
-          {post.caption || post.topic}
-        </p>
+        {editing ? (
+          <div className="space-y-2">
+            <textarea
+              value={draftCaption}
+              onChange={(e) => setDraftCaption(e.target.value)}
+              rows={5}
+              className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none"
+              dir="auto"
+            />
+            <input
+              value={draftTags}
+              onChange={(e) => setDraftTags(e.target.value)}
+              className="h-9 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-xs text-indigo-300 outline-none"
+              dir="auto"
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSaveEdit} disabled={busy} className="h-8 bg-emerald-700 text-xs">Save</Button>
+              <Button size="sm" variant="outline" onClick={() => setEditing(false)} className="h-8 border-zinc-700 text-xs text-zinc-300">Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-zinc-200 text-sm leading-relaxed line-clamp-4" dir="auto">
+            {post.caption || post.topic}
+          </p>
+        )}
 
         {/* Hashtags */}
         {post.hashtags && post.hashtags.length > 0 && (
@@ -941,7 +1037,7 @@ function PostCard({
 
         {/* Actions */}
         {isPending && (
-          <div className="flex gap-2 mt-auto pt-1">
+          <div className="flex flex-wrap gap-2 mt-auto pt-1">
             <Button
               size="sm"
               onClick={() => act(onApprove)}
@@ -962,12 +1058,30 @@ function PostCard({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => act(onRegenerate)}
+              onClick={() => setFeedbackOpen((value) => !value)}
               disabled={busy}
               className="border-zinc-700 text-zinc-400 hover:text-zinc-200 gap-1 text-xs h-8 px-2"
               title="Regenerate"
             >
               {busy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)} className="border-zinc-700 text-zinc-400 hover:text-zinc-200 gap-1 text-xs h-8 px-2">
+              <Pencil size={12} />
+            </Button>
+          </div>
+        )}
+        {feedbackOpen && (
+          <div className="space-y-2 rounded-lg border border-zinc-800 bg-zinc-950 p-2">
+            <textarea
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              rows={3}
+              placeholder="What should change? We'll regenerate and remember this rule."
+              className="w-full resize-none rounded border border-zinc-800 bg-black px-2 py-1.5 text-xs text-zinc-200 outline-none"
+              dir="auto"
+            />
+            <Button size="sm" disabled={busy} onClick={() => act(() => onRegenerate(feedback))} className="h-8 w-full bg-indigo-600 text-xs">
+              Regenerate with feedback
             </Button>
           </div>
         )}
@@ -979,7 +1093,7 @@ function PostCard({
 
         {/* Approved — show Publish button */}
         {isApproved && (
-          <div className="flex gap-2 mt-auto pt-1">
+          <div className="flex flex-wrap gap-2 mt-auto pt-1">
             <Button
               size="sm"
               onClick={handlePublish}
@@ -992,6 +1106,15 @@ function PostCard({
             <Button
               size="sm"
               variant="outline"
+              onClick={() => setScheduleOpen((value) => !value)}
+              disabled={busy}
+              className="border-zinc-700 text-zinc-400 hover:text-zinc-200 gap-1 text-xs h-8"
+            >
+              <Calendar size={12} /> Schedule
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               onClick={() => act(onReject)}
               disabled={busy}
               className="border-zinc-700 text-zinc-400 hover:text-red-400 hover:border-red-900 gap-1 text-xs h-8"
@@ -1000,6 +1123,35 @@ function PostCard({
             </Button>
           </div>
         )}
+        {scheduleOpen && (
+          <div className="flex gap-2 rounded-lg border border-zinc-800 bg-zinc-950 p-2">
+            <input
+              type="datetime-local"
+              value={publishAt}
+              onChange={(e) => setPublishAt(e.target.value)}
+              className="h-8 min-w-0 flex-1 rounded border border-zinc-800 bg-black px-2 text-xs text-zinc-300 outline-none"
+            />
+            <Button size="sm" onClick={handleSchedule} disabled={busy || !publishAt} className="h-8 bg-indigo-600 text-xs">
+              Save
+            </Button>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={copyCaption} className="h-8 border-zinc-800 px-2 text-xs text-zinc-400">
+            <Copy size={12} /> Copy
+          </Button>
+          {firstMediaUrl && (
+            <a href={firstMediaUrl} download target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1 rounded-md border border-zinc-800 px-2 text-xs text-zinc-400 hover:text-zinc-200">
+              <Download size={12} /> Download
+            </a>
+          )}
+          {(isPending || isApproved) && (
+            <Button size="sm" variant="outline" onClick={markUsed} disabled={busy} className="h-8 border-zinc-800 px-2 text-xs text-zinc-400">
+              Used outside app
+            </Button>
+          )}
+        </div>
 
         {!isPending && !isApproved && (
           <div className="flex items-center gap-2 mt-auto pt-1">

@@ -43,12 +43,21 @@ export const api = {
     create: (data: { name: string; website_url?: string }) =>
       request<Suite>("/suites/", { method: "POST", body: JSON.stringify(data) }),
     get: (id: string) => request<Suite>(`/suites/${id}`),
+    updateBrand: (suiteId: string, brand: Brand) =>
+      request<{ ok: boolean }>(`/suites/${suiteId}/brand`, { method: "PATCH", body: JSON.stringify(brand) }),
     marketResearch: (suiteId: string) =>
       request<{ results: MarketResult[] }>(`/suites/${suiteId}/market-research`),
     metaAds: (suiteId: string) =>
       request<{ ads: MetaAd[]; library_url: string; query?: string; countries?: string[]; warning?: string }>(
         `/suites/${suiteId}/meta-ads`
       ),
+    loops: (suiteId: string) =>
+      request<{ loops: SocialLoop[]; suggestions: SocialLoopSuggestions }>(`/suites/${suiteId}/loops`),
+    saveLoop: (suiteId: string, data: SocialLoop) =>
+      request<{ ok: boolean; loop: SocialLoop; loops: SocialLoop[] }>(`/suites/${suiteId}/loops`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
   },
 
   onboarding: {
@@ -103,16 +112,31 @@ export const api = {
   },
 
   content: {
-    generate: (suiteId: string) =>
-      request<{ message: string }>(`/content/${suiteId}/generate`, { method: "POST", body: "{}" }),
+    generate: (suiteId: string, data: GenerateContentRequest = {}) =>
+      request<{ message: string }>(`/content/${suiteId}/generate`, { method: "POST", body: JSON.stringify(data) }),
     list: (suiteId: string, status?: string) =>
       request<Post[]>(`/content/${suiteId}${status ? `?status=${status}` : ""}`),
+    update: (suiteId: string, postId: string, data: { caption?: string; hashtags?: string[]; topic?: string }) =>
+      request<Post>(`/content/${suiteId}/${postId}`, { method: "PATCH", body: JSON.stringify(data) }),
     approve: (suiteId: string, postId: string) =>
       request<{ ok: boolean }>(`/content/${suiteId}/${postId}/approve`, { method: "POST", body: "{}" }),
     reject: (suiteId: string, postId: string) =>
       request<{ ok: boolean }>(`/content/${suiteId}/${postId}/reject`, { method: "POST", body: "{}" }),
-    regenerate: (suiteId: string, postId: string) =>
-      request<{ message: string }>(`/content/${suiteId}/${postId}/regenerate`, { method: "POST", body: "{}" }),
+    regenerate: (suiteId: string, postId: string, feedback?: string) =>
+      request<{ message: string }>(`/content/${suiteId}/${postId}/regenerate`, {
+        method: "POST",
+        body: JSON.stringify({ feedback }),
+      }),
+    schedule: (suiteId: string, postId: string, publish_at: string) =>
+      request<{ ok: boolean; status: string; publish_at: string }>(`/content/${suiteId}/${postId}/schedule`, {
+        method: "POST",
+        body: JSON.stringify({ publish_at }),
+      }),
+    markUsed: (suiteId: string, postId: string) =>
+      request<{ ok: boolean; status: string; used_externally: boolean }>(
+        `/content/${suiteId}/${postId}/mark-used`,
+        { method: "POST", body: "{}" }
+      ),
     publish: (suiteId: string, postId: string, platforms: string[] = ["facebook", "instagram"]) =>
       request<{ ok: boolean; results: Record<string, string>; status: string }>(
         `/content/${suiteId}/${postId}/publish`,
@@ -380,6 +404,34 @@ export interface Post {
   created_at: string;
 }
 
+export interface GenerateContentRequest {
+  count?: number;
+  prompt?: string;
+  mode?: "quick" | "set" | "loop" | "campaign";
+  content_type?: "mixed" | "image" | "video" | "carousel";
+  aspect_ratio?: string;
+  destination?: string;
+  model_tier?: string;
+  use_brand?: boolean;
+}
+
+export interface SocialLoop {
+  id?: string;
+  name: string;
+  status?: string;
+  content_mix?: Array<{ type: string; label?: string; percentage: number }>;
+  divisions?: string[];
+  formats?: Array<{ type: string; label?: string; enabled: boolean }>;
+  cadence?: Record<string, unknown> | null;
+  notes?: string | null;
+}
+
+export interface SocialLoopSuggestions {
+  content_mix: Array<{ type: string; label: string; percentage: number }>;
+  divisions: string[];
+  formats: Array<{ type: string; label: string; enabled: boolean }>;
+}
+
 export interface Brand {
   name?: string;
   tagline?: string;
@@ -422,6 +474,8 @@ export interface Brand {
   logo_style?: "icon_only" | "with_name" | "initials";
   logo_source?: "uploaded" | "ai-generated" | "scraped";
   fonts_by_language?: Record<string, Array<{ name: string; url: string; format: string }>>;
+  content_rules?: Array<{ text: string; source?: string; post_id?: string; created_at?: string }>;
+  social_loops?: SocialLoop[];
 }
 
 export interface CompetitorEntry {

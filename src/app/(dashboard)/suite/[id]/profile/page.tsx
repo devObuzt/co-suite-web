@@ -14,9 +14,14 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
   const router = useRouter();
   const [suite, setSuite] = useState<Suite | null>(null);
   const [loading, setLoading] = useState(true);
+  const [rulesText, setRulesText] = useState("");
+  const [savingRules, setSavingRules] = useState(false);
 
   useEffect(() => {
-    api.suites.get(id).then(setSuite).finally(() => setLoading(false));
+    api.suites.get(id).then((data) => {
+      setSuite(data);
+      setRulesText((data.brand?.content_rules || []).map((rule) => rule.text).join("\n"));
+    }).finally(() => setLoading(false));
   }, [id]);
 
   if (loading) {
@@ -27,6 +32,21 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
   }
 
   const brand = suite.brand ?? undefined;
+
+  async function saveRules() {
+    if (!suite?.brand) return;
+    setSavingRules(true);
+    try {
+      const nextBrand = {
+        ...suite.brand,
+        content_rules: rulesText.split("\n").map((text) => text.trim()).filter(Boolean).map((text) => ({ text, source: "profile_edit" })),
+      };
+      await api.suites.updateBrand(id, nextBrand);
+      setSuite({ ...suite, brand: nextBrand });
+    } finally {
+      setSavingRules(false);
+    }
+  }
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-5">
@@ -174,6 +194,22 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
           </div>
         </ProfileSection>
       )}
+
+      <ProfileSection title="Content rules learned from feedback">
+        <textarea
+          value={rulesText}
+          onChange={(e) => setRulesText(e.target.value)}
+          rows={6}
+          placeholder="One rule per line. Example: Avoid formal Arabic. Use short hooks. Never mention prices without approval."
+          className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 outline-none"
+          dir="auto"
+        />
+        <div className="mt-3 flex justify-end">
+          <Button size="sm" onClick={saveRules} disabled={savingRules || !suite?.brand} className="bg-indigo-600 hover:bg-indigo-500">
+            {savingRules ? "Saving..." : "Save rules"}
+          </Button>
+        </div>
+      </ProfileSection>
     </div>
   );
 }
