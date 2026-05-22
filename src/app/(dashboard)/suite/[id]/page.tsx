@@ -1,24 +1,22 @@
 "use client";
 import { use, useEffect, useRef, useState } from "react";
-import { useT } from "@/lib/i18n/LanguageContext";
 import Link from "next/link";
 import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd, MetaCampaign, GoogleAdsCampaign } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import {
   Zap, BarChart3, Calendar, Settings, Globe, AtSign, Share2,
   Loader2, CheckCircle2, XCircle, RefreshCw, Hash, ImageIcon, LayoutList, Video,
-  Link2, Link2Off, CreditCard, Target,
+  Link2, Link2Off, CreditCard, Target, ChevronDown, Layers, Wand2, SlidersHorizontal,
+  Clock3, Megaphone, Sparkles,
 } from "lucide-react";
 
 const API_MEDIA = process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") || "http://localhost:8000";
 
 export default function SuiteDashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const t = useT();
   const [suite, setSuite] = useState<Suite | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -70,52 +68,19 @@ export default function SuiteDashboardPage({ params }: { params: Promise<{ id: s
 
       {/* Connections */}
       <ConnectionsPanel suiteId={id} />
+      <ContentTab suiteId={id} />
       <CompetitorsSection suiteId={id} strategy={suite?.strategy ?? null} />
-
-      {/* Tabs */}
-      <Tabs defaultValue="content" className="w-full min-w-0">
-        <TabsList className="w-full max-w-full justify-start overflow-x-auto bg-zinc-900 border border-zinc-800">
-          <TabsTrigger value="content" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white text-zinc-400">
-            <Zap size={14} className="mr-1.5" /> {t("tab.content")}
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white text-zinc-400">
-            <BarChart3 size={14} className="mr-1.5" /> {t("tab.analytics")}
-          </TabsTrigger>
-          <TabsTrigger value="schedule" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white text-zinc-400">
-            <Calendar size={14} className="mr-1.5" /> {t("tab.schedule")}
-          </TabsTrigger>
-          <TabsTrigger value="strategy" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white text-zinc-400">
-            <Target size={14} className="mr-1.5" /> {t("tab.strategy")}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="content" className="mt-4">
-          <ContentTab suiteId={id} />
-        </TabsContent>
-
-        <TabsContent value="analytics" className="mt-4">
-          <AnalyticsTab suiteId={id} />
-        </TabsContent>
-
-        <TabsContent value="schedule" className="mt-4">
-          <div className="border border-dashed border-zinc-800 rounded-xl p-12 text-center">
-            <Calendar size={32} className="text-indigo-400 mx-auto mb-3" />
-            <p className="text-white font-medium">Content calendar</p>
-            <p className="text-zinc-400 text-sm mt-1">Scheduled posts will appear here</p>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="strategy" className="mt-4">
-          <StrategyPanel strategy={suite?.strategy ?? null} suiteId={id} brand={suite?.brand ?? null} onRegenerate={async () => {
-            try {
-              const res = await api.onboarding.generateStrategy({ suite_id: id });
-              setSuite((s) => s ? { ...s, strategy: res.strategy } : s);
-            } catch (err: unknown) {
-              alert(err instanceof Error ? err.message : "Regeneration failed");
-            }
-          }} />
-        </TabsContent>
-      </Tabs>
+      <MetaAdsInspirationSection suiteId={id} />
+      <CampaignsHub suiteId={id} />
+      <AnalyticsTab suiteId={id} />
+      <StrategyPanel strategy={suite?.strategy ?? null} suiteId={id} brand={suite?.brand ?? null} onRegenerate={async () => {
+        try {
+          const res = await api.onboarding.generateStrategy({ suite_id: id });
+          setSuite((s) => s ? { ...s, strategy: res.strategy } : s);
+        } catch (err: unknown) {
+          alert(err instanceof Error ? err.message : "Regeneration failed");
+        }
+      }} />
     </div>
   );
 }
@@ -185,18 +150,14 @@ function ContentTab({ suiteId }: { suiteId: string }) {
   const hiddenPostCount = Math.max(0, filtered.length - visiblePosts.length);
 
   return (
-    <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 gap-2"
-        >
-          {generating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-          {generating ? "Generating…" : "Generate 3 posts"}
-        </Button>
+    <section className="space-y-4">
+      <CreateCommandCenter onGenerate={handleGenerate} generating={generating} />
 
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-white">Recent content</h2>
+          <p className="text-xs text-zinc-500 mt-1">Review, approve, schedule, or publish generated work.</p>
+        </div>
         <div className="flex max-w-full gap-1 overflow-x-auto bg-zinc-900 border border-zinc-800 p-1 rounded-lg">
           {(["pending", "approved", "published", "rejected"] as const).map((f) => (
             <button
@@ -256,10 +217,175 @@ function ContentTab({ suiteId }: { suiteId: string }) {
         </>
       )}
 
-      <MetaAdsInspirationSection suiteId={suiteId} />
-      <MetaCampaignsSection suiteId={suiteId} />
-      <GoogleAdsCampaignsSection suiteId={suiteId} />
-    </div>
+    </section>
+  );
+}
+
+type CreateMode = "quick" | "set" | "loop" | "campaign";
+
+function CreateCommandCenter({
+  onGenerate,
+  generating,
+}: {
+  onGenerate: () => Promise<void>;
+  generating: boolean;
+}) {
+  const [mode, setMode] = useState<CreateMode>("set");
+  const [useBrand, setUseBrand] = useState(true);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [contentType, setContentType] = useState<"mixed" | "image" | "video" | "carousel">("mixed");
+  const [aspectRatio, setAspectRatio] = useState("Auto");
+
+  const modes: {
+    id: CreateMode;
+    title: string;
+    description: string;
+    icon: typeof Zap;
+    status?: string;
+  }[] = [
+    { id: "quick", title: "Quick post", description: "One post, image, video, carousel, or text.", icon: Wand2 },
+    { id: "set", title: "Content set", description: "A batch of branded posts from one prompt.", icon: Layers },
+    { id: "loop", title: "Social loop", description: "A repeatable publishing rhythm and calendar.", icon: Clock3, status: "draft" },
+    { id: "campaign", title: "Campaign builder", description: "Creatives, copy, budget, and launch plan.", icon: Megaphone, status: "next" },
+  ];
+
+  return (
+    <section className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-300">
+            <Sparkles size={16} />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-white">Create & generate</h2>
+            <p className="text-xs text-zinc-500">Choose the job first. Details stay quiet until needed.</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setUseBrand((value) => !value)}
+          className={`flex h-9 items-center justify-between gap-3 rounded-full border px-3 text-xs font-medium transition-colors ${
+            useBrand
+              ? "border-emerald-800 bg-emerald-950/60 text-emerald-200"
+              : "border-zinc-800 bg-zinc-900 text-zinc-500"
+          }`}
+        >
+          <span className={`h-2 w-2 rounded-full ${useBrand ? "bg-emerald-400" : "bg-zinc-600"}`} />
+          Use brand
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        {modes.map((item) => {
+          const Icon = item.icon;
+          const active = mode === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setMode(item.id)}
+              className={`min-h-32 rounded-xl border p-3 text-left transition-colors ${
+                active
+                  ? "border-indigo-500 bg-indigo-500/10"
+                  : "border-zinc-800 bg-zinc-900 hover:border-zinc-700"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${active ? "bg-indigo-500 text-white" : "bg-zinc-800 text-zinc-400"}`}>
+                  <Icon size={15} />
+                </span>
+                {item.status && (
+                  <span className="rounded-full border border-zinc-700 px-2 py-0.5 text-[10px] uppercase tracking-wide text-zinc-500">
+                    {item.status}
+                  </span>
+                )}
+              </div>
+              <p className="mt-3 text-sm font-semibold text-zinc-100">{item.title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-500">{item.description}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 rounded-xl border border-zinc-800 bg-black/30 p-3">
+        <textarea
+          rows={3}
+          className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-indigo-700"
+          placeholder={mode === "loop" ? "Describe the posting rhythm you want..." : mode === "campaign" ? "Describe the campaign offer, objective, and audience..." : "What should we create?"}
+          dir="auto"
+        />
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {(["mixed", "image", "video", "carousel"] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setContentType(type)}
+                className={`rounded-full border px-3 py-1 text-xs capitalize transition-colors ${
+                  contentType === type
+                    ? "border-indigo-600 bg-indigo-500/15 text-indigo-200"
+                    : "border-zinc-800 text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+          <Button
+            onClick={onGenerate}
+            disabled={generating}
+            className="w-full bg-indigo-600 hover:bg-indigo-500 gap-2 sm:w-auto"
+          >
+            {generating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+            {generating ? "Generating…" : mode === "quick" ? "Create post" : mode === "loop" ? "Build loop draft" : mode === "campaign" ? "Build campaign draft" : "Generate content set"}
+          </Button>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setAdvancedOpen((value) => !value)}
+          className="mt-3 flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-300"
+        >
+          <SlidersHorizontal size={13} />
+          Advanced settings
+          <ChevronDown size={13} className={`transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
+        </button>
+        {advancedOpen && (
+          <div className="mt-3 grid gap-3 border-t border-zinc-800 pt-3 sm:grid-cols-3">
+            <label className="space-y-1">
+              <span className="text-[11px] uppercase tracking-wide text-zinc-600">Aspect ratio</span>
+              <select
+                value={aspectRatio}
+                onChange={(e) => setAspectRatio(e.target.value)}
+                className="h-9 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-2 text-xs text-zinc-300 outline-none"
+              >
+                <option>Auto</option>
+                <option>1:1</option>
+                <option>4:5</option>
+                <option>9:16</option>
+                <option>16:9</option>
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-[11px] uppercase tracking-wide text-zinc-600">Destination</span>
+              <select className="h-9 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-2 text-xs text-zinc-300 outline-none">
+                <option>Social media</option>
+                <option>Ads</option>
+                <option>Both</option>
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-[11px] uppercase tracking-wide text-zinc-600">Model</span>
+              <select className="h-9 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-2 text-xs text-zinc-300 outline-none">
+                <option>Auto</option>
+                <option>Fast draft</option>
+                <option>Highest quality</option>
+              </select>
+            </label>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -377,6 +503,56 @@ function MetaAdsInspirationSection({ suiteId }: { suiteId: string }) {
 }
 
 // ─── Connected Meta Campaigns ────────────────────────────────────────────────
+
+function CampaignsHub({ suiteId }: { suiteId: string }) {
+  const [source, setSource] = useState<"all" | "meta" | "google">("all");
+
+  return (
+    <section className="space-y-4">
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-white flex items-center gap-2">
+              <BarChart3 size={16} className="text-emerald-400" /> Campaigns
+            </h2>
+            <p className="text-xs text-zinc-500 mt-1">Live campaigns by source. Creation and editing actions will land here.</p>
+          </div>
+          <div className="flex gap-1 rounded-lg border border-zinc-800 bg-zinc-900 p-1">
+            {(["all", "meta", "google"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setSource(item)}
+                className={`rounded px-3 py-1.5 text-xs capitalize transition-colors ${
+                  source === item ? "bg-zinc-700 text-white" : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <button className="rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-left hover:border-zinc-700">
+            <p className="text-sm font-medium text-zinc-100">Create campaign</p>
+            <p className="mt-1 text-xs text-zinc-500">Build copy, creatives, budget, and audience draft.</p>
+          </button>
+          <button className="rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-left hover:border-zinc-700">
+            <p className="text-sm font-medium text-zinc-100">Edit selected</p>
+            <p className="mt-1 text-xs text-zinc-500">Budget, dates, audiences, and creative set.</p>
+          </button>
+          <button className="rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-left hover:border-zinc-700">
+            <p className="text-sm font-medium text-zinc-100">Pause / resume</p>
+            <p className="mt-1 text-xs text-zinc-500">Controls will activate after write permissions.</p>
+          </button>
+        </div>
+      </div>
+
+      {(source === "all" || source === "meta") && <MetaCampaignsSection suiteId={suiteId} />}
+      {(source === "all" || source === "google") && <GoogleAdsCampaignsSection suiteId={suiteId} />}
+    </section>
+  );
+}
 
 function metaInsights(edge?: MetaCampaign["insights"]) {
   return edge?.data?.[0] || {};
@@ -850,6 +1026,7 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
   const [connections, setConnections] = useState<Connections>({});
   const [connecting, setConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState("");
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     api.connections.get(suiteId).then(setConnections).catch(() => {});
@@ -890,16 +1067,42 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
   const metaAds = connections.meta_ads;
   const metaConnected = !!fb?.connected;
   const googleAds = connections.google_ads;
+  const indicators = [
+    { label: "Meta", connected: metaConnected },
+    { label: "Google", connected: !!googleAds?.connected },
+    { label: "TikTok", connected: !!connections.tiktok?.connected },
+  ];
 
   return (
-    <div>
-      <h2 className="text-sm font-medium text-zinc-400 mb-3">Connections</h2>
+    <section className="rounded-2xl border border-zinc-800 bg-zinc-950/70">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center justify-between gap-4 p-4 text-left"
+      >
+        <div>
+          <h2 className="text-sm font-semibold text-white">Connections</h2>
+          <p className="text-xs text-zinc-500 mt-1">Accounts used for publishing, campaigns, and analytics.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            {indicators.map((item) => (
+              <span
+                key={item.label}
+                title={item.label}
+                className={`h-2.5 w-2.5 rounded-full ${item.connected ? "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" : "bg-zinc-700"}`}
+              />
+            ))}
+          </div>
+          <ChevronDown size={16} className={`text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} />
+        </div>
+      </button>
       {connectionError && (
-        <div className="mb-3 rounded-lg border border-red-900/70 bg-red-950/50 px-3 py-2 text-xs text-red-200">
+        <div className="mx-4 mb-3 rounded-lg border border-red-900/70 bg-red-950/50 px-3 py-2 text-xs text-red-200">
           {connectionError}
         </div>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {open && <div className="grid grid-cols-1 gap-3 border-t border-zinc-800 p-4 md:grid-cols-3">
         {/* Meta (Facebook + Instagram) */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
@@ -986,8 +1189,8 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
           </div>
           <p className="text-zinc-500 text-xs">Coming soon</p>
         </div>
-      </div>
-    </div>
+      </div>}
+    </section>
   );
 }
 
