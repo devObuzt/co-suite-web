@@ -234,13 +234,16 @@ export interface Connections {
   facebook?: { connected: boolean; page_id: string; page_name: string };
   instagram?: { connected: boolean; ig_user_id: string; username: string };
   meta_ads?: { connected: boolean; ad_account_id: string; ad_account_name?: string; currency?: string };
-  google_ads?: { connected: boolean; customer_id: string; customer_name?: string };
+  google_ads?: { connected: boolean; customer_id: string; customer_name?: string; user_email?: string; user_name?: string };
   tiktok?: { connected: boolean; username: string };
 }
 
 export interface GoogleAdsCustomer {
   id: string;
   resource_name: string;
+  name?: string;
+  currency_code?: string;
+  time_zone?: string;
 }
 
 export interface GoogleAdsMetrics {

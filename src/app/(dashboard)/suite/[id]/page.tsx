@@ -950,7 +950,13 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
           </div>
           {googleAds?.connected ? (
             <>
-              <p className="text-zinc-400 text-xs">{googleAds.customer_name || googleAds.customer_id}</p>
+              <div className="space-y-1">
+                <p className="text-zinc-300 text-xs font-medium">{googleAds.customer_name || googleAds.customer_id}</p>
+                <p className="text-zinc-500 text-xs">{googleAds.customer_id}</p>
+                {googleAds.user_email && (
+                  <p className="text-zinc-400 text-xs" dir="ltr">{googleAds.user_email}</p>
+                )}
+              </div>
               <Button
                 size="sm"
                 variant="outline"

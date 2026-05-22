@@ -56,12 +56,13 @@ function CallbackInner() {
 
   async function saveSelection() {
     if (!suiteId || !selectedCustomerId) return;
+    const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
     setStep("saving");
     try {
       await api.connections.googleSelectCustomer({
         suite_id: suiteId,
         customer_id: selectedCustomerId,
-        customer_name: selectedCustomerId,
+        customer_name: selectedCustomer?.name || selectedCustomerId,
       });
       setStep("done");
       setTimeout(() => router.push(`/suite/${suiteId}`), 1200);
@@ -104,8 +105,14 @@ function CallbackInner() {
                         : "border-border bg-card hover:bg-accent"
                     }`}
                   >
-                    <div className="text-sm font-medium text-foreground">{customer.id}</div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">{customer.resource_name}</div>
+                    <div className="text-sm font-medium text-foreground">
+                      {customer.name || customer.id}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>{customer.id}</span>
+                      {customer.currency_code && <span>{customer.currency_code}</span>}
+                      {customer.time_zone && <span>{customer.time_zone}</span>}
+                    </div>
                   </button>
                 ))}
               </div>
