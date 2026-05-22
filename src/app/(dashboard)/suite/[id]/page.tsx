@@ -888,6 +888,16 @@ function PostCard({
   const firstMediaUrl = firstMedia ? mediaUrl(firstMedia) : "";
   const [mediaFailed, setMediaFailed] = useState(false);
   const FormatIcon = fmt === "carousel" ? LayoutList : fmt === "video" ? Video : ImageIcon;
+  const generatedAt = new Date(post.created_at);
+  const generatedLabel = Number.isNaN(generatedAt.getTime())
+    ? post.created_at
+    : generatedAt.toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
   async function act(fn: () => Promise<void>) {
     setBusy(true);
@@ -1017,6 +1027,11 @@ function PostCard({
             {post.caption || post.topic}
           </p>
         )}
+
+        <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+          <Clock3 size={12} />
+          <span>Generated {generatedLabel}</span>
+        </div>
 
         {/* Hashtags */}
         {post.hashtags && post.hashtags.length > 0 && (
