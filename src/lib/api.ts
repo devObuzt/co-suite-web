@@ -113,7 +113,9 @@ export const api = {
 
   content: {
     generate: (suiteId: string, data: GenerateContentRequest = {}) =>
-      request<{ message: string }>(`/content/${suiteId}/generate`, { method: "POST", body: JSON.stringify(data) }),
+      request<GenerationStatus>(`/content/${suiteId}/generate`, { method: "POST", body: JSON.stringify(data) }),
+    generationStatus: (suiteId: string) =>
+      request<GenerationStatus>(`/content/${suiteId}/generation-status`),
     list: (suiteId: string, status?: string) =>
       request<Post[]>(`/content/${suiteId}${status ? `?status=${status}` : ""}`),
     update: (suiteId: string, postId: string, data: { caption?: string; hashtags?: string[]; topic?: string }) =>
@@ -123,7 +125,7 @@ export const api = {
     reject: (suiteId: string, postId: string) =>
       request<{ ok: boolean }>(`/content/${suiteId}/${postId}/reject`, { method: "POST", body: "{}" }),
     regenerate: (suiteId: string, postId: string, feedback?: string) =>
-      request<{ message: string }>(`/content/${suiteId}/${postId}/regenerate`, {
+      request<GenerationStatus>(`/content/${suiteId}/${postId}/regenerate`, {
         method: "POST",
         body: JSON.stringify({ feedback }),
       }),
@@ -413,6 +415,20 @@ export interface GenerateContentRequest {
   destination?: string;
   model_tier?: string;
   use_brand?: boolean;
+}
+
+export interface GenerationStatus {
+  suite_id?: string;
+  job_id?: string;
+  status: "idle" | "queued" | "running" | "success" | "failed";
+  stage?: string;
+  message?: string;
+  progress?: number;
+  error?: string;
+  created_at?: string;
+  updated_at?: string;
+  finished_at?: string;
+  post_ids?: string[];
 }
 
 export interface SocialLoop {

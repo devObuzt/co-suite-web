@@ -1,7 +1,7 @@
 "use client";
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd, MetaCampaign, GoogleAdsCampaign, GenerateContentRequest } from "@/lib/api";
+import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd, MetaCampaign, GoogleAdsCampaign, GenerateContentRequest, GenerationStatus } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,6 +90,7 @@ export default function SuiteDashboardPage({ params }: { params: Promise<{ id: s
 function ContentTab({ suiteId }: { suiteId: string }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "published">("pending");
   const [showAllPosts, setShowAllPosts] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -99,15 +100,30 @@ function ContentTab({ suiteId }: { suiteId: string }) {
     setPosts(data);
   };
 
+  const syncGenerationStatus = async () => {
+    const status = await api.content.generationStatus(suiteId);
+    setGenerationStatus(status);
+    const active = status.status === "queued" || status.status === "running";
+    setGenerating(active);
+    return status;
+  };
+
   useEffect(() => {
     load();
+    syncGenerationStatus().catch(() => setGenerating(false));
     setShowAllPosts(false);
   }, [suiteId, filter]);
 
-  // Poll every 4 s while generating
+  // Poll status and posts while the backend job is active.
   useEffect(() => {
     if (generating) {
-      pollRef.current = setInterval(load, 4000);
+      pollRef.current = setInterval(async () => {
+        await load();
+        const status = await syncGenerationStatus();
+        if (status.status === "success" || status.status === "failed" || status.status === "idle") {
+          await load();
+        }
+      }, 3000);
     } else {
       if (pollRef.current) clearInterval(pollRef.current);
     }
@@ -117,9 +133,9 @@ function ContentTab({ suiteId }: { suiteId: string }) {
   async function handleGenerate(request: GenerateContentRequest) {
     setGenerating(true);
     try {
-      await api.content.generate(suiteId, request);
-      // poll will pick up new posts; stop after 90s
-      setTimeout(() => setGenerating(false), 90_000);
+      const status = await api.content.generate(suiteId, request);
+      setGenerationStatus(status);
+      setGenerating(status.status === "queued" || status.status === "running");
     } catch {
       setGenerating(false);
     }
@@ -139,10 +155,10 @@ function ContentTab({ suiteId }: { suiteId: string }) {
   }
 
   async function handleRegenerate(postId: string, feedback?: string) {
-    await api.content.regenerate(suiteId, postId, feedback);
+    const status = await api.content.regenerate(suiteId, postId, feedback);
+    setGenerationStatus(status);
     setPosts((p) => p.filter((x) => x.id !== postId));
-    setGenerating(true);
-    setTimeout(() => setGenerating(false), 90_000);
+    setGenerating(status.status === "queued" || status.status === "running");
   }
 
   const filtered = posts.filter((p) => p.status === filter);
@@ -174,9 +190,23 @@ function ContentTab({ suiteId }: { suiteId: string }) {
       </div>
 
       {generating && (
-        <div className="flex items-center gap-2 text-sm text-indigo-400 bg-indigo-950/40 border border-indigo-900 rounded-lg px-4 py-2.5">
-          <Loader2 size={14} className="animate-spin" />
-          AI is writing and generating images — this takes ~30 seconds…
+        <div className="space-y-2 text-sm text-indigo-300 bg-indigo-950/40 border border-indigo-900 rounded-lg px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Loader2 size={14} className="animate-spin" />
+            {generationStatus?.message || "AI is generating content…"}
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-indigo-950">
+            <div
+              className="h-full rounded-full bg-indigo-400 transition-all"
+              style={{ width: `${Math.max(5, Math.min(100, generationStatus?.progress || 10))}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {generationStatus?.status === "failed" && (
+        <div className="text-sm text-red-300 bg-red-950/40 border border-red-900 rounded-lg px-4 py-3">
+          {generationStatus.error || generationStatus.message || "Generation failed."}
         </div>
       )}
 
