@@ -104,14 +104,20 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
     });
   }, [id]);
 
-  const refreshBatch = useCallback(async () => {
+  const refreshBatch = useCallback(async (options?: { settleIfIdle?: boolean }) => {
     if (!batch?.id) {
       await loadBatches();
-      return;
+      return null;
     }
     const next = await api.productBulk.get(id, batch.id);
     setBatch(next);
     setBatches((current) => current.map((candidate) => (candidate.id === next.id ? next : candidate)));
+    if (options?.settleIfIdle && !isBatchRunning(next)) {
+      setGenerationStatus((current) => (isJobRunning(current) ? null : current));
+      setPollingRequested(false);
+      setBusyAction(null);
+    }
+    return next;
   }, [batch?.id, id, loadBatches]);
 
   useEffect(() => {
@@ -139,7 +145,7 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
 
     pollRef.current = setInterval(async () => {
       try {
-        await refreshBatch();
+        await refreshBatch({ settleIfIdle: true });
       } catch (err) {
         setError(friendlyError(err));
         setPollingRequested(false);
@@ -697,9 +703,9 @@ function TemplateSection({
           return (
             <Card key={template.id} className={`border-zinc-800 bg-zinc-900 text-white ${selected ? "ring-1 ring-emerald-500" : ""}`}>
               {sampleUrl ? (
-                <img src={sampleUrl} alt={`${template.name} sample`} className="aspect-square w-full bg-zinc-950 object-cover" />
+                <img src={sampleUrl} alt={`${template.name} sample`} className="aspect-[4/5] w-full bg-zinc-950 object-contain" />
               ) : (
-                <div className="flex aspect-square w-full items-center justify-center bg-zinc-950 text-zinc-700">
+                <div className="flex aspect-[4/5] w-full items-center justify-center bg-zinc-950 text-zinc-700">
                   <ImageIcon size={32} />
                 </div>
               )}
@@ -780,9 +786,9 @@ function AssetsGrid({
             return (
               <Card key={asset.id} className="border-zinc-800 bg-zinc-900 text-white">
                 {url ? (
-                  <img src={url} alt={item?.product_name ? `${item.product_name} generated asset` : "Generated product asset"} className="aspect-square w-full bg-zinc-950 object-cover" />
+                  <img src={url} alt={item?.product_name ? `${item.product_name} generated asset` : "Generated product asset"} className="aspect-[4/5] w-full bg-zinc-950 object-contain" />
                 ) : (
-                  <div className="flex aspect-square w-full items-center justify-center bg-zinc-950 text-zinc-700">
+                  <div className="flex aspect-[4/5] w-full items-center justify-center bg-zinc-950 text-zinc-700">
                     {asset.status === "generating" ? <Loader2 size={28} className="animate-spin" /> : <ImageIcon size={32} />}
                   </div>
                 )}
