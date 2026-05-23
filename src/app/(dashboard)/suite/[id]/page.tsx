@@ -932,6 +932,7 @@ function PostCard({
   const firstMedia = post.media_urls?.[0];
   const firstMediaUrl = firstMedia ? mediaUrl(firstMedia) : "";
   const [mediaFailed, setMediaFailed] = useState(false);
+  const [mediaLoadState, setMediaLoadState] = useState<"idle" | "loaded" | "failed">("idle");
   const FormatIcon = fmt === "carousel" ? LayoutList : fmt === "video" ? Video : ImageIcon;
   const generatedAt = new Date(post.created_at);
   const generatedLabel = Number.isNaN(generatedAt.getTime())
@@ -1003,10 +1004,16 @@ function PostCard({
     }
   }
 
+  const mediaErrorText = !firstMedia
+    ? "No media was generated for this post."
+    : fmt === "video"
+      ? "Video preview failed. Open the media URL to verify the file."
+      : "Image preview failed. Open the media URL to verify the file.";
+
   return (
     <Card className="bg-zinc-900 border-zinc-800 flex flex-col overflow-hidden">
       {/* Media preview */}
-      <div className="relative bg-zinc-800 aspect-square w-full overflow-hidden">
+      <div className="relative bg-zinc-800 aspect-square w-full overflow-hidden" dir="ltr">
         {firstMedia && !mediaFailed && fmt === "video" ? (
           <video
             src={firstMediaUrl}
@@ -1014,23 +1021,43 @@ function PostCard({
             playsInline
             preload="metadata"
             className="h-full w-full object-cover bg-zinc-950"
-            onError={() => setMediaFailed(true)}
+            onLoadedMetadata={() => setMediaLoadState("loaded")}
+            onCanPlay={() => setMediaLoadState("loaded")}
+            onError={() => {
+              setMediaLoadState("failed");
+              setMediaFailed(true);
+            }}
           />
         ) : firstMedia && !mediaFailed ? (
           <img
             src={firstMediaUrl}
             alt={post.topic || "post"}
             className="h-full w-full object-cover"
-            onError={() => setMediaFailed(true)}
+            onLoad={() => setMediaLoadState("loaded")}
+            onError={() => {
+              setMediaLoadState("failed");
+              setMediaFailed(true);
+            }}
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
             <FormatIcon size={32} className="text-zinc-600" />
-            {firstMedia && (
-              <span className="text-xs text-zinc-500">
-                {fmt === "video" ? "Video unavailable. Regenerate this post." : "Image unavailable. Regenerate this post."}
-              </span>
+            <span className="text-xs text-zinc-500">{mediaErrorText}</span>
+            {firstMediaUrl && (
+              <a
+                href={firstMediaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+              >
+                Open media
+              </a>
             )}
+          </div>
+        )}
+        {firstMedia && !mediaFailed && mediaLoadState === "idle" && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-zinc-950/30">
+            <Loader2 size={18} className="animate-spin text-zinc-500" />
           </div>
         )}
         <div className="absolute top-2 left-2">
@@ -1075,7 +1102,7 @@ function PostCard({
 
         <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
           <Clock3 size={12} />
-          <span>Generated {generatedLabel}</span>
+          <span dir="ltr">Generated {generatedLabel}</span>
         </div>
 
         {/* Hashtags */}
@@ -1201,6 +1228,11 @@ function PostCard({
           <Button size="sm" variant="outline" onClick={copyCaption} className="h-8 border-zinc-800 px-2 text-xs text-zinc-400">
             <Copy size={12} /> Copy
           </Button>
+          {firstMediaUrl && (
+            <a href={firstMediaUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1 rounded-md border border-zinc-800 px-2 text-xs text-zinc-400 hover:text-zinc-200">
+              <ImageIcon size={12} /> Open media
+            </a>
+          )}
           {firstMediaUrl && (
             <a href={firstMediaUrl} download target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1 rounded-md border border-zinc-800 px-2 text-xs text-zinc-400 hover:text-zinc-200">
               <Download size={12} /> Download
@@ -1328,12 +1360,12 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
         </div>
       </button>
       {connectionError && (
-        <div className="mx-4 mb-3 rounded-lg border border-red-900/70 bg-red-950/50 px-3 py-2 text-xs text-red-200">
+        <div className="mx-4 mb-3 rounded-lg border border-red-900/70 bg-red-950/50 px-3 py-2 text-xs text-red-200" dir="ltr">
           {connectionError}
         </div>
       )}
       {storage && !storage.configured && (
-        <div className="mx-4 mb-3 rounded-lg border border-amber-900/70 bg-amber-950/40 px-3 py-2 text-xs text-amber-100">
+        <div className="mx-4 mb-3 rounded-lg border border-amber-900/70 bg-amber-950/40 px-3 py-2 text-xs text-amber-100" dir="ltr">
           Media storage is not public yet. Configure R2 so generated images/videos survive deploys and can be published.
           {storage.missing.length > 0 && (
             <span className="block mt-1 text-amber-300" dir="ltr">
@@ -1438,16 +1470,16 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
             </div>
             <span className={`w-2 h-2 rounded-full ${storage?.configured ? "bg-emerald-400" : "bg-amber-500"}`} />
           </div>
-          <p className="text-zinc-400 text-xs">
+          <p className="text-zinc-400 text-xs" dir="ltr">
             {storage?.configured ? "R2 public storage is ready." : "Local fallback is active."}
           </p>
           {storageTest && (
-            <p className={`text-xs ${storageTest.ok ? "text-emerald-300" : "text-amber-300"}`}>
+            <p className={`text-xs ${storageTest.ok ? "text-emerald-300" : "text-amber-300"}`} dir="ltr">
               {storageTest.ok ? "Upload test passed." : storageTest.error || "Upload test failed."}
             </p>
           )}
           {!storage?.configured && (
-            <p className="text-zinc-500 text-xs">
+            <p className="text-zinc-500 text-xs" dir="ltr">
               Add R2 variables to publish images and videos reliably.
             </p>
           )}
