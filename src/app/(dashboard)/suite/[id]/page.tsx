@@ -10,7 +10,7 @@ import {
   Zap, BarChart3, Calendar, Settings, Globe, AtSign, Share2,
   Loader2, CheckCircle2, XCircle, RefreshCw, Hash, ImageIcon, LayoutList, Video,
   Link2, Link2Off, CreditCard, Target, ChevronDown, Layers, Wand2, SlidersHorizontal,
-  Clock3, Megaphone, Sparkles, Copy, Download, Pencil,
+  Clock3, Megaphone, Sparkles, Copy, Download, Pencil, PackageOpen,
 } from "lucide-react";
 
 const API_MEDIA = process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") || "http://localhost:8000";
@@ -359,6 +359,22 @@ function CreateCommandCenter({
           );
         })}
       </div>
+
+      <Link
+        href={`/suite/${suiteId}/product-bulk`}
+        className="mt-3 flex flex-col gap-2 rounded-xl border border-zinc-800 bg-zinc-900 p-3 transition-colors hover:border-indigo-500 hover:bg-indigo-500/10 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-zinc-100">Product bulk studio</span>
+          <span className="mt-1 block text-xs leading-relaxed text-zinc-500">
+            Upload Excel + ZIP, approve one template, then generate the full product catalog.
+          </span>
+        </span>
+        <span className="inline-flex w-fit items-center gap-2 rounded-full border border-zinc-700 px-3 py-1 text-xs text-indigo-200">
+          <PackageOpen size={13} />
+          Bulk products
+        </span>
+      </Link>
 
       <div className="mt-4 rounded-xl border border-zinc-800 bg-black/30 p-3">
         <textarea
