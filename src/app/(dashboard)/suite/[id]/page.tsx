@@ -1,7 +1,7 @@
 "use client";
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd, MetaCampaign, GoogleAdsCampaign, GenerateContentRequest, GenerationStatus, StorageStatus } from "@/lib/api";
+import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd, MetaCampaign, GoogleAdsCampaign, GenerateContentRequest, GenerationStatus, StorageStatus, StorageTestResult } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1237,6 +1237,8 @@ function PostCard({
 function ConnectionsPanel({ suiteId }: { suiteId: string }) {
   const [connections, setConnections] = useState<Connections>({});
   const [storage, setStorage] = useState<StorageStatus | null>(null);
+  const [storageTest, setStorageTest] = useState<StorageTestResult | null>(null);
+  const [testingStorage, setTestingStorage] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState("");
   const [open, setOpen] = useState(false);
@@ -1274,6 +1276,20 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
     await api.connections.disconnect(suiteId, platform);
     const updated = await api.connections.get(suiteId);
     setConnections(updated);
+  }
+
+  async function runStorageTest() {
+    setTestingStorage(true);
+    setConnectionError("");
+    try {
+      const result = await api.suites.storageTest(suiteId);
+      setStorageTest(result);
+      setStorage(result);
+    } catch (e: unknown) {
+      setConnectionError(e instanceof Error ? e.message : "Storage test failed");
+    } finally {
+      setTestingStorage(false);
+    }
   }
 
   const fb = connections.facebook;
@@ -1425,11 +1441,26 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
           <p className="text-zinc-400 text-xs">
             {storage?.configured ? "R2 public storage is ready." : "Local fallback is active."}
           </p>
+          {storageTest && (
+            <p className={`text-xs ${storageTest.ok ? "text-emerald-300" : "text-amber-300"}`}>
+              {storageTest.ok ? "Upload test passed." : storageTest.error || "Upload test failed."}
+            </p>
+          )}
           {!storage?.configured && (
             <p className="text-zinc-500 text-xs">
               Add R2 variables to publish images and videos reliably.
             </p>
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={runStorageTest}
+            disabled={testingStorage}
+            className="w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800 gap-1 text-xs h-7"
+          >
+            {testingStorage ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+            Test storage
+          </Button>
         </div>
       </div>}
     </section>

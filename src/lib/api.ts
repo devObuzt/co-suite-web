@@ -53,6 +53,8 @@ export const api = {
       ),
     storageStatus: (suiteId: string) =>
       request<StorageStatus>(`/suites/${suiteId}/storage-status`),
+    storageTest: (suiteId: string) =>
+      request<StorageTestResult>(`/suites/${suiteId}/storage-test`, { method: "POST", body: "{}" }),
     loops: (suiteId: string) =>
       request<{ loops: SocialLoop[]; suggestions: SocialLoopSuggestions }>(`/suites/${suiteId}/loops`),
     saveLoop: (suiteId: string, data: SocialLoop) =>
@@ -404,6 +406,16 @@ export interface StorageStatus {
   public_url_configured: boolean;
   missing: string[];
   warnings: string[];
+}
+
+export interface StorageTestResult extends StorageStatus {
+  ok: boolean;
+  uploaded: boolean;
+  public_fetch_ok: boolean;
+  status_code?: number;
+  url?: string;
+  key?: string;
+  error?: string | null;
 }
 
 export interface Post {
