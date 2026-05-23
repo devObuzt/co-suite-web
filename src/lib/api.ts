@@ -51,6 +51,8 @@ export const api = {
       request<{ ads: MetaAd[]; library_url: string; query?: string; countries?: string[]; warning?: string }>(
         `/suites/${suiteId}/meta-ads`
       ),
+    storageStatus: (suiteId: string) =>
+      request<StorageStatus>(`/suites/${suiteId}/storage-status`),
     loops: (suiteId: string) =>
       request<{ loops: SocialLoop[]; suggestions: SocialLoopSuggestions }>(`/suites/${suiteId}/loops`),
     saveLoop: (suiteId: string, data: SocialLoop) =>
@@ -392,6 +394,16 @@ export interface Suite {
   status: "onboarding" | "active" | "suspended";
   brand: Brand | null;
   strategy: MarketingStrategy | null;
+}
+
+export interface StorageStatus {
+  configured: boolean;
+  backend: "r2" | "local";
+  public: boolean;
+  bucket_configured: boolean;
+  public_url_configured: boolean;
+  missing: string[];
+  warnings: string[];
 }
 
 export interface Post {

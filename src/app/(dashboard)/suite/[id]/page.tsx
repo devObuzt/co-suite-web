@@ -1,7 +1,7 @@
 "use client";
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd, MetaCampaign, GoogleAdsCampaign, GenerateContentRequest, GenerationStatus } from "@/lib/api";
+import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd, MetaCampaign, GoogleAdsCampaign, GenerateContentRequest, GenerationStatus, StorageStatus } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1236,12 +1236,14 @@ function PostCard({
 
 function ConnectionsPanel({ suiteId }: { suiteId: string }) {
   const [connections, setConnections] = useState<Connections>({});
+  const [storage, setStorage] = useState<StorageStatus | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState("");
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     api.connections.get(suiteId).then(setConnections).catch(() => {});
+    api.suites.storageStatus(suiteId).then(setStorage).catch(() => {});
   }, [suiteId]);
 
   async function connectMeta() {
@@ -1282,7 +1284,7 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
   const indicators = [
     { label: "Meta", connected: metaConnected },
     { label: "Google", connected: !!googleAds?.connected },
-    { label: "TikTok", connected: !!connections.tiktok?.connected },
+    { label: "Storage", connected: !!storage?.configured },
   ];
 
   return (
@@ -1314,7 +1316,17 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
           {connectionError}
         </div>
       )}
-      {open && <div className="grid grid-cols-1 gap-3 border-t border-zinc-800 p-4 md:grid-cols-3">
+      {storage && !storage.configured && (
+        <div className="mx-4 mb-3 rounded-lg border border-amber-900/70 bg-amber-950/40 px-3 py-2 text-xs text-amber-100">
+          Media storage is not public yet. Configure R2 so generated images/videos survive deploys and can be published.
+          {storage.missing.length > 0 && (
+            <span className="block mt-1 text-amber-300" dir="ltr">
+              Missing: {storage.missing.join(", ")}
+            </span>
+          )}
+        </div>
+      )}
+      {open && <div className="grid grid-cols-1 gap-3 border-t border-zinc-800 p-4 md:grid-cols-4">
         {/* Meta (Facebook + Instagram) */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
@@ -1400,6 +1412,24 @@ function ConnectionsPanel({ suiteId }: { suiteId: string }) {
             <AtSign size={15} /> TikTok
           </div>
           <p className="text-zinc-500 text-xs">Coming soon</p>
+        </div>
+
+        {/* Storage */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-zinc-300 text-sm font-medium">
+              <ImageIcon size={15} className={storage?.configured ? "text-emerald-400" : "text-amber-400"} /> Media Storage
+            </div>
+            <span className={`w-2 h-2 rounded-full ${storage?.configured ? "bg-emerald-400" : "bg-amber-500"}`} />
+          </div>
+          <p className="text-zinc-400 text-xs">
+            {storage?.configured ? "R2 public storage is ready." : "Local fallback is active."}
+          </p>
+          {!storage?.configured && (
+            <p className="text-zinc-500 text-xs">
+              Add R2 variables to publish images and videos reliably.
+            </p>
+          )}
         </div>
       </div>}
     </section>
