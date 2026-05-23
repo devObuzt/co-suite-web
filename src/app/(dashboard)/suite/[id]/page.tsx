@@ -87,6 +87,16 @@ export default function SuiteDashboardPage({ params }: { params: Promise<{ id: s
 
 // ─── Content Tab ────────────────────────────────────────────────────────────
 
+function isGenerationActive(status?: GenerationStatus | null) {
+  return [
+    "queued",
+    "waiting_capacity",
+    "waiting_provider_limit",
+    "running",
+    "retrying",
+  ].includes(status?.status || "");
+}
+
 function ContentTab({ suiteId }: { suiteId: string }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [generating, setGenerating] = useState(false);
@@ -103,7 +113,7 @@ function ContentTab({ suiteId }: { suiteId: string }) {
   const syncGenerationStatus = async () => {
     const status = await api.content.generationStatus(suiteId);
     setGenerationStatus(status);
-    const active = status.status === "queued" || status.status === "running";
+    const active = isGenerationActive(status);
     setGenerating(active);
     return status;
   };
@@ -120,7 +130,7 @@ function ContentTab({ suiteId }: { suiteId: string }) {
       pollRef.current = setInterval(async () => {
         await load();
         const status = await syncGenerationStatus();
-        if (status.status === "success" || status.status === "failed" || status.status === "idle") {
+        if (status.status === "completed" || status.status === "failed" || status.status === "idle") {
           await load();
         }
       }, 3000);
@@ -135,7 +145,7 @@ function ContentTab({ suiteId }: { suiteId: string }) {
     try {
       const status = await api.content.generate(suiteId, request);
       setGenerationStatus(status);
-      setGenerating(status.status === "queued" || status.status === "running");
+      setGenerating(isGenerationActive(status));
     } catch {
       setGenerating(false);
     }
@@ -158,12 +168,17 @@ function ContentTab({ suiteId }: { suiteId: string }) {
     const status = await api.content.regenerate(suiteId, postId, feedback);
     setGenerationStatus(status);
     setPosts((p) => p.filter((x) => x.id !== postId));
-    setGenerating(status.status === "queued" || status.status === "running");
+    setGenerating(isGenerationActive(status));
   }
 
   const filtered = posts.filter((p) => p.status === filter);
   const visiblePosts = showAllPosts ? filtered : filtered.slice(0, 3);
   const hiddenPostCount = Math.max(0, filtered.length - visiblePosts.length);
+  const waitMessage = generationStatus?.status === "waiting_provider_limit"
+    ? `Waiting for ${generationStatus.provider || "AI provider"} capacity${
+        generationStatus.estimated_wait_seconds ? ` (~${Math.ceil(generationStatus.estimated_wait_seconds / 60)} min)` : ""
+      }. You can leave this page.`
+    : generationStatus?.message || "AI is generating content…";
 
   return (
     <section className="space-y-4">
@@ -193,7 +208,7 @@ function ContentTab({ suiteId }: { suiteId: string }) {
         <div className="space-y-2 text-sm text-indigo-300 bg-indigo-950/40 border border-indigo-900 rounded-lg px-4 py-3">
           <div className="flex items-center gap-2">
             <Loader2 size={14} className="animate-spin" />
-            {generationStatus?.message || "AI is generating content…"}
+            {waitMessage}
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-indigo-950">
             <div

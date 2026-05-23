@@ -420,15 +420,31 @@ export interface GenerateContentRequest {
 export interface GenerationStatus {
   suite_id?: string;
   job_id?: string;
-  status: "idle" | "queued" | "running" | "success" | "failed";
+  status:
+    | "idle"
+    | "queued"
+    | "waiting_capacity"
+    | "waiting_provider_limit"
+    | "running"
+    | "retrying"
+    | "completed"
+    | "failed"
+    | "cancelled"
+    | "timeout";
   stage?: string;
   message?: string;
   progress?: number;
   error?: string;
+  provider?: string | null;
+  model?: string | null;
+  retry_count?: number;
+  next_retry_at?: string | null;
+  rate_limit_reset_at?: string | null;
+  estimated_wait_seconds?: number | null;
   created_at?: string;
   updated_at?: string;
   finished_at?: string;
-  post_ids?: string[];
+  result?: { post_ids?: string[]; count?: number } | null;
 }
 
 export interface SocialLoop {
