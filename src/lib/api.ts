@@ -5,15 +5,28 @@ function getToken(): string | null {
   return localStorage.getItem("cosuite_token");
 }
 
+function buildHeaders(options: RequestInit, token: string | null): HeadersInit {
+  const bodyIsFormData = options.body instanceof FormData;
+  const headers = new Headers(options.headers);
+
+  if (bodyIsFormData) {
+    headers.delete("Content-Type");
+  } else if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  return headers;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
-    headers: {
-      ...(!(options.body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
+    headers: buildHeaders(options, token),
   });
 
   if (!res.ok) {
@@ -148,6 +161,57 @@ export const api = {
         `/content/${suiteId}/${postId}/publish`,
         { method: "POST", body: JSON.stringify({ platforms }) }
       ),
+  },
+
+  productBulk: {
+    list: (suiteId: string) =>
+      request<{ batches: ProductBulkBatch[] }>(`/suites/${suiteId}/product-bulk`),
+    get: (suiteId: string, batchId: string) =>
+      request<ProductBulkBatch>(`/suites/${suiteId}/product-bulk/${batchId}`),
+    create: (
+      suiteId: string,
+      data: { excel: File; imagesZip: File; creativePrompt?: string; brandEnabled?: boolean }
+    ) => {
+      const form = new FormData();
+      form.append("excel", data.excel);
+      form.append("images_zip", data.imagesZip);
+      form.append("creative_prompt", data.creativePrompt || "");
+      form.append("brand_enabled", String(data.brandEnabled ?? true));
+      return request<ProductBulkBatch>(`/suites/${suiteId}/product-bulk`, {
+        method: "POST",
+        body: form,
+      });
+    },
+    generateFirst: (suiteId: string, batchId: string) =>
+      request<GenerationStatus>(`/suites/${suiteId}/product-bulk/${batchId}/generate-first`, {
+        method: "POST",
+        body: "{}",
+      }),
+    approveTemplate: (suiteId: string, batchId: string, templateId: string) =>
+      request<{ ok: boolean; template_id: string; status: string }>(
+        `/suites/${suiteId}/product-bulk/${batchId}/templates/${templateId}/approve`,
+        { method: "POST", body: "{}" }
+      ),
+    generateAll: (suiteId: string, batchId: string) =>
+      request<GenerationStatus>(`/suites/${suiteId}/product-bulk/${batchId}/generate-all`, {
+        method: "POST",
+        body: "{}",
+      }),
+    approveAsset: (suiteId: string, batchId: string, assetId: string) =>
+      request<{ ok: boolean; asset_id: string; status: string }>(
+        `/suites/${suiteId}/product-bulk/${batchId}/assets/${assetId}/approve`,
+        { method: "POST", body: "{}" }
+      ),
+    rejectAsset: (suiteId: string, batchId: string, assetId: string) =>
+      request<{ ok: boolean; asset_id: string; status: string }>(
+        `/suites/${suiteId}/product-bulk/${batchId}/assets/${assetId}/reject`,
+        { method: "POST", body: "{}" }
+      ),
+    regenerateAsset: (suiteId: string, batchId: string, assetId: string, feedback?: string) =>
+      request<GenerationStatus>(`/suites/${suiteId}/product-bulk/${batchId}/assets/${assetId}/regenerate`, {
+        method: "POST",
+        body: JSON.stringify({ feedback }),
+      }),
   },
 
   analytics: {
@@ -439,6 +503,75 @@ export interface GenerateContentRequest {
   destination?: string;
   model_tier?: string;
   use_brand?: boolean;
+}
+
+export interface ProductBulkAsset {
+  id: string;
+  item_id: string;
+  template_direction_id?: string | null;
+  status: "pending" | "generating" | "generated" | "approved" | "rejected" | "failed";
+  media_url?: string | null;
+  media_type: string;
+  feedback?: string | null;
+  ai_metadata?: Record<string, unknown> | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface ProductBulkItem {
+  id: string;
+  row_index: number;
+  product_name: string;
+  image_ref?: string | null;
+  image_url?: string | null;
+  slogan?: string | null;
+  description?: string | null;
+  price?: string | null;
+  global_addition?: string | null;
+  notes?: string | null;
+  raw_row?: Record<string, unknown> | null;
+  status: "pending" | "first_sample" | "generating" | "generated" | "approved" | "rejected" | "failed";
+  assets: ProductBulkAsset[];
+}
+
+export interface ProductTemplateDirection {
+  id: string;
+  name: string;
+  description?: string | null;
+  visual_rules?: Record<string, unknown> | null;
+  prompt_rules?: Record<string, unknown> | null;
+  sample_asset_id?: string | null;
+  status: "candidate" | "approved" | "rejected";
+}
+
+export interface ProductBulkBatch {
+  id: string;
+  suite_id: string;
+  name: string;
+  status:
+    | "uploaded"
+    | "mapped"
+    | "first_generating"
+    | "awaiting_template_approval"
+    | "approved_template"
+    | "generating_all"
+    | "completed"
+    | "failed"
+    | "cancelled";
+  source_excel_url?: string | null;
+  source_zip_url?: string | null;
+  creative_prompt?: string | null;
+  column_mapping?: Record<string, unknown> | null;
+  approved_template_id?: string | null;
+  brand_enabled: boolean;
+  total_products: number;
+  completed_products: number;
+  failed_products: number;
+  items: ProductBulkItem[];
+  template_directions: ProductTemplateDirection[];
+  assets: ProductBulkAsset[];
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 export interface GenerationStatus {
