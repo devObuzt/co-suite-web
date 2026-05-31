@@ -9,12 +9,15 @@ import { useT } from "@/lib/i18n/LanguageContext";
 import { BrandMark } from "@/components/BrandMark";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { SuiteNav } from "@/components/suite/SuiteNav";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, _hasHydrated } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
   const t = useT();
+  const suiteMatch = pathname.match(/^\/suite\/([^/]+)/);
+  const activeSuiteId = suiteMatch?.[1] && suiteMatch[1] !== "new" ? suiteMatch[1] : null;
 
   useEffect(() => {
     // Wait for Zustand to finish reading localStorage before redirecting
@@ -41,6 +44,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <SideLink href="/suites" icon={<LayoutDashboard size={16} />} label={t("nav.dashboard")} active={pathname === "/suites"} />
           <SideLink href="/suite/new" icon={<Plus size={16} />} label={t("nav.newSuite")} active={pathname === "/suite/new"} />
           <SideLink href="/settings" icon={<Settings size={16} />} label={t("nav.settings")} active={pathname === "/settings"} />
+          {activeSuiteId && <SuiteNav suiteId={activeSuiteId} />}
         </nav>
         <div className="border-t border-border pt-4 mt-4">
           <div className="text-sm text-muted-foreground px-2 mb-2 truncate">{user.email}</div>

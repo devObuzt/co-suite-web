@@ -509,7 +509,7 @@ export interface Post {
 export interface GenerateContentRequest {
   count?: number;
   prompt?: string;
-  mode?: "quick" | "set" | "loop" | "campaign";
+  mode?: "quick" | "anything" | "set" | "loop" | "campaign" | "product_bulk" | "image" | "video" | "carousel";
   content_type?: "mixed" | "image" | "video" | "carousel";
   aspect_ratio?: string;
   destination?: string;
