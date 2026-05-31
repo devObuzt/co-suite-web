@@ -126,6 +126,18 @@ export const api = {
         headers: {},  // let browser set multipart boundary
       });
     },
+    uploadPersonaAsset: (suiteId: string, file: File, personaName: string) => {
+      const form = new FormData();
+      form.append("suite_id", suiteId);
+      form.append("asset_type", "persona");
+      form.append("persona_name", personaName);
+      form.append("file", file);
+      return request<{ url: string; brand: Brand }>("/onboarding/upload-brand-asset", {
+        method: "POST",
+        body: form,
+        headers: {},
+      });
+    },
   },
 
   content: {
@@ -634,6 +646,7 @@ export interface Brand {
   location?: string;
   logo_url?: string;
   logo_description?: string;
+  brand_logos?: BrandLogo[];
   target_audience?: string;
   competitors?: string[];
   unique_value?: string;
@@ -641,6 +654,10 @@ export interface Brand {
   esp?: string;
   content_themes?: string[];
   audience_languages?: string[];
+  audience_language_names?: string[];
+  audience_notes?: string;
+  audience_behaviors?: string[];
+  audience_social_statuses?: string[];
   niche?: string;
   audience_location?: {
     countries: string[];
@@ -667,6 +684,33 @@ export interface Brand {
   fonts_by_language?: Record<string, Array<{ name: string; url: string; format: string }>>;
   content_rules?: Array<{ text: string; source?: string; post_id?: string; created_at?: string }>;
   social_loops?: SocialLoop[];
+  brand_personas?: BrandPersona[];
+}
+
+export interface BrandLogo {
+  name: string;
+  url: string;
+  format?: string;
+  width?: number | null;
+  height?: number | null;
+  shape?: "square" | "horizontal" | "vertical" | "vector" | "unknown";
+  background?: "transparent" | "light" | "dark" | "unknown";
+}
+
+export interface BrandPersonaImage {
+  name: string;
+  url: string;
+  format?: string;
+  width?: number | null;
+  height?: number | null;
+  shape?: string;
+  background?: string;
+}
+
+export interface BrandPersona {
+  name: string;
+  role?: string;
+  images: BrandPersonaImage[];
 }
 
 export interface CompetitorEntry {

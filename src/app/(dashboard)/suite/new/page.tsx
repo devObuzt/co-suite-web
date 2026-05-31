@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, Brand, MarketingStrategy } from "@/lib/api";
+import { api, Brand, BrandPersona, MarketingStrategy } from "@/lib/api";
 import { useT, useLanguage } from "@/lib/i18n/LanguageContext";
 import { LANGUAGES, LangCode } from "@/lib/i18n/translations";
 import { getSuggestions, findNicheIndex, getEnglishNiche } from "@/lib/i18n/suggestions";
@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 
 type Step = "name" | "links" | "extracting"
-  | "step-a" | "step-b" | "step-c" | "step-d" | "step-e" | "step-f" | "step-g"
+  | "step-a" | "step-b" | "step-c" | "step-d" | "step-e" | "step-f" | "step-g" | "step-h"
   | "strategy" | "preview" | "done";
 
 // ── Platform helpers ──────────────────────────────────────────────────────────
@@ -35,6 +35,15 @@ const PLATFORMS = [
 const LANG_TO_DIALECT: Record<string, string> = {
   "ar": "Palestinian Arabic", "he": "Hebrew", "en": "English",
   "ru": "Russian", "fr": "French", "es": "Spanish", "tr": "Turkish", "zh": "Chinese",
+};
+
+const META_INTERESTS: Record<string, string[]> = {
+  marketing: ["Meta Ads", "Instagram Business", "Small business", "Entrepreneurship", "Digital marketing"],
+  restaurant: ["Restaurants", "Food delivery", "Local food", "Dining out", "Coffee shops"],
+  fashion: ["Fashion accessories", "Beauty salons", "Shopping", "Style", "Cosmetics"],
+  realestate: ["Real estate", "Home buyers", "Interior design", "Mortgage loans", "Home improvement"],
+  pets: ["Pet owners", "Dog owners", "Cat owners", "Veterinary care", "Pet food"],
+  default: ["Small business", "Online shopping", "Local services", "Social media", "Technology"],
 };
 
 // ── Step indicator ────────────────────────────────────────────────────────────
@@ -102,6 +111,7 @@ export default function NewSuitePage() {
     { key: "step-e", label: t("suite.new.stepAudience") },
     { key: "step-f", label: t("suite.new.stepWhyUs") },
     { key: "step-g", label: t("suite.new.stepBrand") },
+    { key: "step-h", label: t("suite.new.stepPersonas") },
     { key: "strategy", label: t("suite.new.stepStrategy") },
     { key: "preview", label: t("suite.new.stepPreview") },
     { key: "done", label: t("suite.new.stepDone") },
@@ -131,13 +141,17 @@ export default function NewSuitePage() {
   const [showNicheInput, setShowNicheInput] = useState(false);
   // Step C
   const [orderedLangs, setOrderedLangs] = useState<string[]>([]);
+  const [customLanguage, setCustomLanguage] = useState("");
   // Step D
   const [serviceItems, setServiceItems] = useState<string[]>([]);
   // Step E
   const [locationScope, setLocationScope] = useState("Worldwide");
   const [customCountries, setCustomCountries] = useState("");
   const [customCities, setCustomCities] = useState("");
+  const [audienceNotes, setAudienceNotes] = useState("");
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [selectedBehaviors, setSelectedBehaviors] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   // Step F
   const [uspPoints, setUspPoints] = useState<string[]>([]);
   const [espPoints, setEspPoints] = useState<string[]>([]);
@@ -147,6 +161,8 @@ export default function NewSuitePage() {
   const [generatingFonts, setGeneratingFonts] = useState(false);
   const [logoStyle, setLogoStyle] = useState<"icon_only" | "with_name" | "initials">("icon_only");
   const [uploadingAsset, setUploadingAsset] = useState(false);
+  const [personas, setPersonas] = useState<BrandPersona[]>([]);
+  const [newPersonaName, setNewPersonaName] = useState("");
   const [localColors, setLocalColors] = useState<{ primary: string; secondary: string; accent: string }>({
     primary: "#0a0a0a", secondary: "#f8d84a", accent: "#ff4fa3",
   });
@@ -162,14 +178,66 @@ export default function NewSuitePage() {
       "step-e": "step-d",
       "step-f": "step-e",
       "step-g": "step-f",
-      strategy: "step-g",
-      preview: "step-g",
+      "step-h": "step-g",
+      strategy: "step-h",
+      preview: "step-h",
     };
     const target = previous[step];
     if (target) setStep(target);
   }
 
   const canGoBack = step !== "name" && step !== "done";
+  const languageLabel = (code: string) => {
+    if (code.startsWith("custom:")) return code.slice("custom:".length);
+    return LANGUAGES.find((l) => l.code === code)?.label || code;
+  };
+  const languageDir = (code: string) => {
+    if (code.startsWith("custom:")) return "auto";
+    return LANGUAGES.find((l) => l.code === code)?.dir || "ltr";
+  };
+  const selectedNicheLabel = selectedResearchNiche || (selectedNicheIdx >= 0 ? suggestions.niches[selectedNicheIdx] : customNiche);
+  const derivedInterestKey = (selectedNicheLabel || brand?.industry || "").toLowerCase();
+  const metaInterestKey = derivedInterestKey.includes("pet") || derivedInterestKey.includes("חיות") || derivedInterestKey.includes("حيوان")
+    ? "pets"
+    : derivedInterestKey.includes("restaurant") || derivedInterestKey.includes("food") || derivedInterestKey.includes("مطعم") || derivedInterestKey.includes("אוכל")
+      ? "restaurant"
+      : derivedInterestKey.includes("fashion") || derivedInterestKey.includes("beauty") || derivedInterestKey.includes("אופנה") || derivedInterestKey.includes("جمال")
+        ? "fashion"
+        : derivedInterestKey.includes("real") || derivedInterestKey.includes("נדל") || derivedInterestKey.includes("عقار")
+          ? "realestate"
+          : derivedInterestKey.includes("marketing") || derivedInterestKey.includes("שיווק") || derivedInterestKey.includes("تسويق")
+            ? "marketing"
+            : "default";
+  const audienceInterestSuggestions = Array.from(new Set([
+    ...(suggestions.interests[selectedNicheLabel] || suggestions.interests["default"] || []),
+    ...(brand?.content_themes || []),
+    ...(brand?.services || []).slice(0, 5),
+    ...(META_INTERESTS[metaInterestKey] || META_INTERESTS.default),
+  ].filter(Boolean)));
+  const audienceBehaviorSuggestions = [
+    t("suite.new.behaviorOnlineBuyers"),
+    t("suite.new.behaviorEngagedSocial"),
+    t("suite.new.behaviorLocalSearch"),
+    t("suite.new.behaviorPriceSensitive"),
+    t("suite.new.behaviorPremiumBuyers"),
+  ];
+  const audienceStatusSuggestions = [
+    t("suite.new.statusParents"),
+    t("suite.new.statusBusinessOwners"),
+    t("suite.new.statusDoctors"),
+    t("suite.new.statusEngaged"),
+    t("suite.new.statusStudents"),
+  ];
+  const audienceNotesPlaceholder = (() => {
+    const countryText = `${customCountries} ${customCities}`.toLowerCase();
+    if (lang === "ar" && (countryText.includes("israel") || countryText.includes("إسرائيل") || countryText.includes("اسرائيل"))) {
+      return t("suite.new.audienceNotesPlaceholderArIsrael");
+    }
+    if (lang === "he" && (countryText.includes("israel") || countryText.includes("ישראל"))) {
+      return t("suite.new.audienceNotesPlaceholderHeIsrael");
+    }
+    return t("suite.new.audienceNotesPlaceholder");
+  })();
 
   // ── Step 1: name ─────────────────────────────────────────────────────────
 
@@ -245,6 +313,11 @@ export default function NewSuitePage() {
       setSelectedNicheIdx(foundNicheIdx);
       setSelectedResearchNiche(foundNicheIdx >= 0 ? "" : (researchedNiches[0] || ""));
       setOrderedLangs(res.brand?.audience_languages || []);
+      setAudienceNotes(res.brand?.audience_notes || "");
+      setSelectedInterests(res.brand?.audience_interests || []);
+      setSelectedBehaviors(res.brand?.audience_behaviors || []);
+      setSelectedStatuses(res.brand?.audience_social_statuses || []);
+      setPersonas(res.brand?.brand_personas || []);
       setServiceItems([...(res.brand?.services || []), ...(res.brand?.products || [])].filter(Boolean));
       // Pre-fill USP/ESP — translate to user's language if not English
       const rawUsp = res.brand?.unique_value || "";
@@ -349,6 +422,21 @@ export default function NewSuitePage() {
       setBrand(res.brand);
     } catch {
       // local preview stays even if upload fails
+    } finally {
+      setUploadingAsset(false);
+    }
+  }
+
+  async function uploadPersonaImages(personaName: string, files: FileList | File[]) {
+    const name = personaName.trim();
+    if (!name) return;
+    setUploadingAsset(true);
+    try {
+      for (const file of Array.from(files)) {
+        const res = await api.onboarding.uploadPersonaAsset(suiteId, file, name);
+        setBrand(res.brand);
+        setPersonas(res.brand.brand_personas || []);
+      }
     } finally {
       setUploadingAsset(false);
     }
@@ -672,15 +760,36 @@ export default function NewSuitePage() {
                   >{l.label}</button>
                 ))}
               </div>
+              <div className="flex gap-2">
+                <Input
+                  value={customLanguage}
+                  onChange={(e) => setCustomLanguage(e.target.value)}
+                  placeholder={t("suite.new.customLanguagePlaceholder")}
+                  className="bg-background text-foreground text-sm"
+                  dir="auto"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const value = customLanguage.trim();
+                    if (!value) return;
+                    const key = `custom:${value}`;
+                    setOrderedLangs((prev) => prev.includes(key) ? prev : [...prev, key]);
+                    setCustomLanguage("");
+                  }}
+                >
+                  {t("suite.new.add")}
+                </Button>
+              </div>
               {orderedLangs.length > 0 && (
                 <div className="space-y-2 mt-2">
                   <p className="text-muted-foreground text-xs">{t("suite.new.selectedOrder")}</p>
                   {orderedLangs.map((code, idx) => {
-                    const lang = LANGUAGES.find((l) => l.code === code);
                     return (
                       <div key={code} className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2.5">
                         <span className="text-xs text-muted-foreground w-4 shrink-0">{idx + 1}</span>
-                        <span className="text-foreground flex-1 text-sm" dir={lang?.dir}>{lang?.label}</span>
+                        <span className="text-foreground flex-1 text-sm" dir={languageDir(code)}>{languageLabel(code)}</span>
                         {idx === 0 && <span className="text-xs text-[#2f80ff] bg-[#2f80ff]/10 px-1.5 py-0.5 rounded">{t("suite.new.langMain")}</span>}
                         <button
                           onClick={() => setOrderedLangs((prev) => {
@@ -716,7 +825,8 @@ export default function NewSuitePage() {
               if (orderedLangs.length > 0) {
                 await saveStep("c", {
                   audience_languages: orderedLangs,
-                  dialect: LANG_TO_DIALECT[orderedLangs[0]] || "English",
+                  audience_language_names: orderedLangs.map(languageLabel),
+                  dialect: orderedLangs[0]?.startsWith("custom:") ? languageLabel(orderedLangs[0]) : (LANG_TO_DIALECT[orderedLangs[0]] || "English"),
                 });
               }
               setStep("step-d");
@@ -818,7 +928,7 @@ export default function NewSuitePage() {
                 <Label className="text-foreground">{t("suite.new.interests")}</Label>
                 <div className="flex flex-wrap gap-2">
                   {/* Suggested interests */}
-                  {(suggestions.interests[suggestions.niches[selectedNicheIdx]] || suggestions.interests["default"]).map((interest) => (
+                  {audienceInterestSuggestions.map((interest) => (
                     <button
                       key={interest}
                       onClick={() => setSelectedInterests((prev) =>
@@ -834,7 +944,7 @@ export default function NewSuitePage() {
                   ))}
                   {/* Custom interests added by user */}
                   {selectedInterests
-                    .filter((i) => !(suggestions.interests[suggestions.niches[selectedNicheIdx]] || suggestions.interests["default"]).includes(i))
+                    .filter((i) => !audienceInterestSuggestions.includes(i))
                     .map((interest) => (
                       <button
                         key={interest}
@@ -874,6 +984,46 @@ export default function NewSuitePage() {
                   ><Plus size={13} /> {t("suite.new.add")}</button>
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label className="text-foreground">{t("suite.new.behaviors")}</Label>
+                <div className="flex flex-wrap gap-2">
+                  {audienceBehaviorSuggestions.map((item) => (
+                    <button
+                      key={item}
+                      onClick={() => setSelectedBehaviors((prev) => prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item])}
+                      className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                        selectedBehaviors.includes(item) ? "bg-foreground border-foreground text-background" : "border-border text-muted-foreground hover:border-zinc-500"
+                      }`}
+                      dir="auto"
+                    >{item}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-foreground">{t("suite.new.socialStatus")}</Label>
+                <div className="flex flex-wrap gap-2">
+                  {audienceStatusSuggestions.map((item) => (
+                    <button
+                      key={item}
+                      onClick={() => setSelectedStatuses((prev) => prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item])}
+                      className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                        selectedStatuses.includes(item) ? "bg-foreground border-foreground text-background" : "border-border text-muted-foreground hover:border-zinc-500"
+                      }`}
+                      dir="auto"
+                    >{item}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-foreground">{t("suite.new.audienceNotes")}</Label>
+                <textarea
+                  value={audienceNotes}
+                  onChange={(e) => setAudienceNotes(e.target.value)}
+                  placeholder={audienceNotesPlaceholder}
+                  className="min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-[#2f80ff]"
+                  dir="auto"
+                />
+              </div>
             </CardContent>
           </Card>
           <div className="flex gap-3">
@@ -889,10 +1039,16 @@ export default function NewSuitePage() {
               const interestsText = selectedInterests.length > 0
                 ? `, interested in: ${selectedInterests.join(", ")}`
                 : "";
-              const targetAudience = `${locationText}${interestsText}`;
+              const behaviorText = selectedBehaviors.length > 0 ? `. Behaviors: ${selectedBehaviors.join(", ")}` : "";
+              const statusText = selectedStatuses.length > 0 ? `. Social status: ${selectedStatuses.join(", ")}` : "";
+              const notesText = audienceNotes.trim() ? `. Notes: ${audienceNotes.trim()}` : "";
+              const targetAudience = `${locationText}${interestsText}${behaviorText}${statusText}${notesText}`;
               await saveStep("e", {
                 audience_location: { scope: locationScope === "Worldwide" ? "world" : "custom", countries, cities },
                 audience_interests: selectedInterests,
+                audience_behaviors: selectedBehaviors,
+                audience_social_statuses: selectedStatuses,
+                audience_notes: audienceNotes,
                 target_audience: targetAudience,
               });
               setStep("step-f");
@@ -937,6 +1093,13 @@ export default function NewSuitePage() {
                     </button>
                   ))}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setUspPoints((prev) => Array.from(new Set([...prev, ...suggestions.usp])))}
+                  className="text-xs text-[#2f80ff] hover:underline"
+                >
+                  {t("suite.new.addAllSuggestions")}
+                </button>
                 <button onClick={() => setUspPoints((prev) => [...prev, ""])}
                   className="flex items-center gap-1.5 text-[#2f80ff] hover:underline text-sm transition-colors mt-1">
                   <Plus size={13} /> {t("suite.new.addPoint")}
@@ -964,6 +1127,13 @@ export default function NewSuitePage() {
                     </button>
                   ))}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setEspPoints((prev) => Array.from(new Set([...prev, ...suggestions.esp])))}
+                  className="text-xs text-[#2f80ff] hover:underline"
+                >
+                  {t("suite.new.addAllSuggestions")}
+                </button>
                 <button onClick={() => setEspPoints((prev) => [...prev, ""])}
                   className="flex items-center gap-1.5 text-[#2f80ff] hover:underline text-sm transition-colors mt-1">
                   <Plus size={13} /> {t("suite.new.addPoint")}
@@ -1031,15 +1201,30 @@ export default function NewSuitePage() {
                       <input
                         type="file"
                         accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                        multiple
                         className="hidden"
                         onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (file) await uploadBrandAsset("logo", file);
+                          const files = Array.from(e.target.files || []);
+                          for (const file of files) await uploadBrandAsset("logo", file);
                         }}
                       />
                       {uploadingAsset ? <Loader2 size={14} className="animate-spin" /> : null}
                       {t("suite.new.uploadLogo")}
                     </label>
+                    {(brand?.brand_logos || []).length > 0 && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {(brand?.brand_logos || []).map((logo) => (
+                          <div key={logo.url} className="rounded-lg border border-border bg-muted p-2">
+                            <img src={logo.url} alt={logo.name} className="h-14 w-full object-contain" />
+                            <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
+                              <span>{logo.shape || "unknown"}</span>
+                              <span>{logo.background || "unknown"}</span>
+                              {logo.width && logo.height && <span>{logo.width}x{logo.height}</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Logo style selector */}
                     <div className="space-y-1">
@@ -1199,6 +1384,90 @@ export default function NewSuitePage() {
                 colors: { primary: localColors.primary, secondary: localColors.secondary, accent: localColors.accent },
                 logo_style: logoStyle,
               });
+              setStep("step-h");
+            }}
+            className="bg-foreground text-background hover:bg-foreground/90 gap-2 w-full"
+          >
+            <ForwardIcon size={15} /> {t("suite.new.confirmBrand")}
+          </Button>
+          <button
+            onClick={() => setStep("step-h")}
+            className="text-muted-foreground text-sm hover:text-foreground w-full text-center"
+          >
+            {t("suite.new.skipBrand")}
+          </button>
+        </div>
+      )}
+
+      {/* ── Step H: Brand personas ── */}
+      {step === "step-h" && (
+        <div className="space-y-4">
+          <Card className="border-border bg-card text-card-foreground">
+            <CardHeader>
+              <CardTitle>{t("suite.new.stepHTitle")}</CardTitle>
+              <CardDescription className="text-muted-foreground">{t("suite.new.stepHSubtitle")}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <Input
+                  value={newPersonaName}
+                  onChange={(e) => setNewPersonaName(e.target.value)}
+                  placeholder={t("suite.new.personaNamePlaceholder")}
+                  className="bg-background text-foreground"
+                  dir="auto"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const name = newPersonaName.trim();
+                    if (!name) return;
+                    setPersonas((prev) => prev.some((p) => p.name === name) ? prev : [...prev, { name, role: "", images: [] }]);
+                    setNewPersonaName("");
+                  }}
+                >
+                  {t("suite.new.add")}
+                </Button>
+              </div>
+              {personas.length === 0 && (
+                <p className="text-sm text-muted-foreground">{t("suite.new.noPersonas")}</p>
+              )}
+              <div className="space-y-3">
+                {personas.map((persona) => (
+                  <div key={persona.name} className="rounded-xl border border-border bg-muted p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium" dir="auto">{persona.name}</p>
+                        <p className="text-xs text-muted-foreground">{persona.images.length} {t("suite.new.images")}</p>
+                      </div>
+                      <label className="cursor-pointer rounded-lg border border-border bg-background px-3 py-2 text-xs text-[#2f80ff] hover:underline">
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={async (e) => {
+                            if (e.target.files?.length) await uploadPersonaImages(persona.name, e.target.files);
+                          }}
+                        />
+                        {uploadingAsset ? <Loader2 size={12} className="inline animate-spin" /> : t("suite.new.uploadImages")}
+                      </label>
+                    </div>
+                    {persona.images.length > 0 && (
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        {persona.images.map((image) => (
+                          <img key={image.url} src={image.url} alt={image.name} className="h-20 w-full rounded-lg object-cover" />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          <Button
+            onClick={async () => {
+              await saveStep("h", { brand_personas: personas });
               setStep("strategy");
               await runGenerateStrategy();
             }}
@@ -1213,7 +1482,7 @@ export default function NewSuitePage() {
             }}
             className="text-muted-foreground text-sm hover:text-foreground w-full text-center"
           >
-            {t("suite.new.skipBrand")}
+            {t("suite.new.skip")}
           </button>
         </div>
       )}
