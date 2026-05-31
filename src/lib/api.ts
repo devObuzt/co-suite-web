@@ -639,6 +639,7 @@ export interface Brand {
   unique_value?: string;
   how_they_help?: string;
   esp?: string;
+  content_themes?: string[];
   audience_languages?: string[];
   niche?: string;
   audience_location?: {

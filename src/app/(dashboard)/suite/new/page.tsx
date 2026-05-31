@@ -125,6 +125,8 @@ export default function NewSuitePage() {
   const [bizName, setBizName] = useState("");
   // Step B
   const [selectedNicheIdx, setSelectedNicheIdx] = useState(-1); // index into suggestions.niches
+  const [selectedResearchNiche, setSelectedResearchNiche] = useState("");
+  const [researchNicheOptions, setResearchNicheOptions] = useState<string[]>([]);
   const [customNiche, setCustomNiche] = useState("");
   const [showNicheInput, setShowNicheInput] = useState(false);
   // Step C
@@ -233,7 +235,15 @@ export default function NewSuitePage() {
       clearTimeout(t2);
       setBrand(res.brand);
       setBizName(res.brand?.name || suiteName);
-      setSelectedNicheIdx(findNicheIndex(res.brand?.industry || ""));
+      const researchedNiches = Array.from(new Set([
+        res.brand?.industry,
+        res.brand?.niche,
+        ...(res.brand?.content_themes || []).slice(0, 3),
+      ].filter((item): item is string => Boolean(item?.trim()))));
+      setResearchNicheOptions(researchedNiches);
+      const foundNicheIdx = findNicheIndex(res.brand?.industry || "");
+      setSelectedNicheIdx(foundNicheIdx);
+      setSelectedResearchNiche(foundNicheIdx >= 0 ? "" : (researchedNiches[0] || ""));
       setOrderedLangs(res.brand?.audience_languages || []);
       setServiceItems([...(res.brand?.services || []), ...(res.brand?.products || [])].filter(Boolean));
       // Pre-fill USP/ESP — translate to user's language if not English
@@ -271,6 +281,8 @@ export default function NewSuitePage() {
       clearTimeout(t2);
       setBizName(suiteName);
       setSelectedNicheIdx(-1);
+      setSelectedResearchNiche("");
+      setResearchNicheOptions([]);
       setOrderedLangs([]);
       setServiceItems([]);
       setStep("step-a");
@@ -572,10 +584,35 @@ export default function NewSuitePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-2">
+                {researchNicheOptions.length > 0 && (
+                  <span className="w-full text-xs text-muted-foreground">{t("suite.new.researchSuggestions")}</span>
+                )}
+                {researchNicheOptions.map((n, idx) => (
+                  <button
+                    key={`research-${idx}-${n}`}
+                    onClick={() => {
+                      setSelectedResearchNiche(n);
+                      setSelectedNicheIdx(-1);
+                      setShowNicheInput(false);
+                      setCustomNiche("");
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                      selectedResearchNiche === n
+                        ? "bg-foreground border-foreground text-background"
+                        : "border-[#2f80ff]/40 bg-[#2f80ff]/10 text-foreground hover:border-foreground"
+                    }`}
+                    dir="auto"
+                  >{n}</button>
+                ))}
                 {suggestions.niches.map((n, idx) => (
                   <button
                     key={idx}
-                    onClick={() => { setSelectedNicheIdx(idx); setShowNicheInput(false); setCustomNiche(""); }}
+                    onClick={() => {
+                      setSelectedNicheIdx(idx);
+                      setSelectedResearchNiche("");
+                      setShowNicheInput(false);
+                      setCustomNiche("");
+                    }}
                     className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
                       selectedNicheIdx === idx
                         ? "bg-foreground border-foreground text-background"
@@ -585,7 +622,7 @@ export default function NewSuitePage() {
                   >{n}</button>
                 ))}
                 <button
-                  onClick={() => { setShowNicheInput(true); setSelectedNicheIdx(-1); }}
+                  onClick={() => { setShowNicheInput(true); setSelectedNicheIdx(-1); setSelectedResearchNiche(""); }}
                   className="px-3 py-1.5 rounded-full text-sm border border-dashed border-zinc-600 text-muted-foreground hover:border-zinc-400"
                 >{t("suite.new.otherNiche")}</button>
               </div>
@@ -602,8 +639,8 @@ export default function NewSuitePage() {
           </Card>
           <div className="flex gap-3">
             <Button onClick={async () => {
-              const englishNiche = selectedNicheIdx >= 0 ? getEnglishNiche(selectedNicheIdx) : customNiche;
-              const localNiche = selectedNicheIdx >= 0 ? suggestions.niches[selectedNicheIdx] : customNiche;
+              const englishNiche = selectedResearchNiche || (selectedNicheIdx >= 0 ? getEnglishNiche(selectedNicheIdx) : customNiche);
+              const localNiche = selectedResearchNiche || (selectedNicheIdx >= 0 ? suggestions.niches[selectedNicheIdx] : customNiche);
               if (englishNiche) await saveStep("b", { niche: localNiche, industry: englishNiche });
               setStep("step-c");
             }} className="bg-foreground text-background hover:bg-foreground/90 gap-2">

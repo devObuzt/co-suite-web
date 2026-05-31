@@ -15,7 +15,7 @@ export function BrandMark({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
           alt="co-Suite logo"
           fill
           sizes={`${iconSize}px`}
-          className="object-cover"
+          className="object-contain"
           priority={size === "lg"}
         />
       </span>
