@@ -36,45 +36,45 @@ export default function LoginPage() {
   }
 
   return (
-    <Card className="bg-zinc-900 border-zinc-800 text-white">
+    <Card className="border-border bg-card text-card-foreground shadow-xl">
       <CardHeader className="space-y-1">
         <div className="mb-2"><BrandMark size="lg" /></div>
         <CardTitle className="text-xl">{t("auth.signIn")}</CardTitle>
-        <CardDescription className="text-zinc-400">{t("auth.signInSubtitle")}</CardDescription>
+        <CardDescription className="text-muted-foreground">{t("auth.signInSubtitle")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-zinc-300">{t("auth.email")}</Label>
+            <Label htmlFor="email">{t("auth.email")}</Label>
             <Input
               id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t("auth.emailPlaceholder")}
               required
-              className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+              className="bg-background"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-zinc-300">{t("auth.password")}</Label>
+            <Label htmlFor="password">{t("auth.password")}</Label>
             <Input
               id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="bg-zinc-800 border-zinc-700 text-white"
+              className="bg-background"
             />
           </div>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-          <Button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-500">
+          {error && <p className="text-destructive text-sm">{error}</p>}
+          <Button type="submit" disabled={loading} className="w-full bg-foreground text-background hover:bg-foreground/90">
             {loading ? t("auth.signingIn") : t("auth.signIn")}
           </Button>
         </form>
         <p className="text-center text-sm text-zinc-500 mt-4">
           {t("auth.noAccount")}{" "}
-          <Link href="/signup" className="text-indigo-400 hover:text-indigo-300">
+          <Link href="/signup" className="font-medium text-[#2f80ff] hover:underline">
             {t("auth.signUpFree")}
           </Link>
         </p>

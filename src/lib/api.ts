@@ -622,6 +622,7 @@ export interface SocialLoopSuggestions {
 }
 
 export interface Brand {
+  account_type?: "business" | "creator" | "agency" | string;
   name?: string;
   tagline?: string;
   description?: string;
