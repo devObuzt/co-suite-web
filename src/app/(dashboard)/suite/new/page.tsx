@@ -145,7 +145,7 @@ export default function NewSuitePage() {
   // Step D
   const [serviceItems, setServiceItems] = useState<string[]>([]);
   // Step E
-  const [locationScope, setLocationScope] = useState("Worldwide");
+  const [locationScope, setLocationScope] = useState("Custom");
   const [customCountries, setCustomCountries] = useState("");
   const [customCities, setCustomCities] = useState("");
   const [audienceNotes, setAudienceNotes] = useState("");
@@ -214,20 +214,28 @@ export default function NewSuitePage() {
     ...(brand?.services || []).slice(0, 5),
     ...(META_INTERESTS[metaInterestKey] || META_INTERESTS.default),
   ].filter(Boolean)));
-  const audienceBehaviorSuggestions = [
+  const fallbackBehaviorSuggestions = [
     t("suite.new.behaviorOnlineBuyers"),
     t("suite.new.behaviorEngagedSocial"),
     t("suite.new.behaviorLocalSearch"),
     t("suite.new.behaviorPriceSensitive"),
     t("suite.new.behaviorPremiumBuyers"),
   ];
-  const audienceStatusSuggestions = [
+  const fallbackStatusSuggestions = [
     t("suite.new.statusParents"),
     t("suite.new.statusBusinessOwners"),
     t("suite.new.statusDoctors"),
     t("suite.new.statusEngaged"),
     t("suite.new.statusStudents"),
   ];
+  const audienceBehaviorSuggestions = Array.from(new Set([
+    ...((brand?.audience_behaviors || []).filter(Boolean)),
+    ...((brand?.audience_behaviors || []).length > 0 ? [] : fallbackBehaviorSuggestions),
+  ]));
+  const audienceStatusSuggestions = Array.from(new Set([
+    ...((brand?.audience_social_statuses || []).filter(Boolean)),
+    ...((brand?.audience_social_statuses || []).length > 0 ? [] : fallbackStatusSuggestions),
+  ]));
   const audienceNotesPlaceholder = (() => {
     const countryText = `${customCountries} ${customCities}`.toLowerCase();
     if (lang === "ar" && (countryText.includes("israel") || countryText.includes("إسرائيل") || countryText.includes("اسرائيل"))) {
@@ -925,7 +933,18 @@ export default function NewSuitePage() {
                 )}
               </div>
               <div className="space-y-2">
-                <Label className="text-foreground">{t("suite.new.interests")}</Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label className="text-foreground">{t("suite.new.interests")}</Label>
+                  {audienceInterestSuggestions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedInterests((prev) => Array.from(new Set([...prev, ...audienceInterestSuggestions])))}
+                      className="text-xs text-[#2f80ff] hover:underline"
+                    >
+                      {t("suite.new.addAllSuggestions")}
+                    </button>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {/* Suggested interests */}
                   {audienceInterestSuggestions.map((interest) => (
@@ -985,7 +1004,18 @@ export default function NewSuitePage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-foreground">{t("suite.new.behaviors")}</Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label className="text-foreground">{t("suite.new.behaviors")}</Label>
+                  {audienceBehaviorSuggestions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBehaviors((prev) => Array.from(new Set([...prev, ...audienceBehaviorSuggestions])))}
+                      className="text-xs text-[#2f80ff] hover:underline"
+                    >
+                      {t("suite.new.addAllSuggestions")}
+                    </button>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {audienceBehaviorSuggestions.map((item) => (
                     <button
@@ -1000,7 +1030,18 @@ export default function NewSuitePage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-foreground">{t("suite.new.socialStatus")}</Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label className="text-foreground">{t("suite.new.socialStatus")}</Label>
+                  {audienceStatusSuggestions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStatuses((prev) => Array.from(new Set([...prev, ...audienceStatusSuggestions])))}
+                      className="text-xs text-[#2f80ff] hover:underline"
+                    >
+                      {t("suite.new.addAllSuggestions")}
+                    </button>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {audienceStatusSuggestions.map((item) => (
                     <button
