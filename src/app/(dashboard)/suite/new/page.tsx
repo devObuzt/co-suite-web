@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, Brand, BrandPersona, MarketingStrategy } from "@/lib/api";
+import { api, Brand, BrandLogo, BrandPersona, MarketingStrategy } from "@/lib/api";
 import { useT, useLanguage } from "@/lib/i18n/LanguageContext";
 import { LANGUAGES, LangCode } from "@/lib/i18n/translations";
 import { getSuggestions, findNicheIndex, getEnglishNiche } from "@/lib/i18n/suggestions";
@@ -45,6 +45,53 @@ const META_INTERESTS: Record<string, string[]> = {
   pets: ["Pet owners", "Dog owners", "Cat owners", "Veterinary care", "Pet food"],
   default: ["Small business", "Online shopping", "Local services", "Social media", "Technology"],
 };
+
+function classifyLogoShape(width?: number | null, height?: number | null): BrandLogo["shape"] {
+  if (!width || !height) return "unknown";
+  const ratio = width / height;
+  if (ratio >= 0.85 && ratio <= 1.18) return "square";
+  return ratio > 1.18 ? "horizontal" : "vertical";
+}
+
+function logoShapeLabel(shape?: BrandLogo["shape"]) {
+  if (shape === "square") return "Square";
+  if (shape === "horizontal") return "Horizontal";
+  if (shape === "vertical") return "Vertical";
+  if (shape === "vector") return "Vector";
+  return "Unknown";
+}
+
+async function buildLocalLogoPreview(file: File): Promise<BrandLogo> {
+  const url = URL.createObjectURL(file);
+  const format = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : file.type.split("/").pop();
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      resolve({
+        name: file.name,
+        url,
+        format,
+        width: img.naturalWidth || null,
+        height: img.naturalHeight || null,
+        shape: classifyLogoShape(img.naturalWidth, img.naturalHeight),
+        background: "unknown",
+      });
+    };
+    img.onerror = () => {
+      resolve({
+        name: file.name,
+        url,
+        format,
+        width: null,
+        height: null,
+        shape: format === "svg" ? "vector" : "unknown",
+        background: "unknown",
+      });
+    };
+    img.src = url;
+  });
+}
 
 // ── Step indicator ────────────────────────────────────────────────────────────
 
@@ -246,6 +293,12 @@ export default function NewSuitePage() {
     }
     return t("suite.new.audienceNotesPlaceholder");
   })();
+  const brandLogos = brand?.brand_logos || [];
+  const logoGroups = [
+    { key: "square", label: "Square logos", items: brandLogos.filter((logo) => logo.shape === "square") },
+    { key: "horizontal", label: "Horizontal logos", items: brandLogos.filter((logo) => logo.shape === "horizontal") },
+    { key: "other", label: "Other logos", items: brandLogos.filter((logo) => !["square", "horizontal"].includes(logo.shape || "")) },
+  ].filter((group) => group.items.length > 0);
 
   // ── Step 1: name ─────────────────────────────────────────────────────────
 
@@ -433,6 +486,30 @@ export default function NewSuitePage() {
     } finally {
       setUploadingAsset(false);
     }
+  }
+
+  async function uploadLogoFiles(files: File[]) {
+    if (files.length === 0) return;
+    setUploadingAsset(true);
+    const localLogos = await Promise.all(files.map(buildLocalLogoPreview));
+    setBrand((prev) => ({
+      ...(prev || {}),
+      logo_url: localLogos[0]?.url || prev?.logo_url,
+      logo_source: "uploaded",
+      brand_logos: [...(prev?.brand_logos || []), ...localLogos],
+    }));
+
+    let latestBrand: Brand | null = null;
+    for (const file of files) {
+      try {
+        const res = await api.onboarding.uploadBrandAsset(suiteId, "logo", file);
+        latestBrand = res.brand;
+      } catch {
+        // Keep local previews visible when storage upload is unavailable.
+      }
+    }
+    if (latestBrand) setBrand(latestBrand);
+    setUploadingAsset(false);
   }
 
   async function uploadPersonaImages(personaName: string, files: FileList | File[]) {
@@ -1246,21 +1323,32 @@ export default function NewSuitePage() {
                         className="hidden"
                         onChange={async (e) => {
                           const files = Array.from(e.target.files || []);
-                          for (const file of files) await uploadBrandAsset("logo", file);
+                          await uploadLogoFiles(files);
+                          e.currentTarget.value = "";
                         }}
                       />
                       {uploadingAsset ? <Loader2 size={14} className="animate-spin" /> : null}
                       {t("suite.new.uploadLogo")}
                     </label>
-                    {(brand?.brand_logos || []).length > 0 && (
-                      <div className="grid grid-cols-2 gap-2">
-                        {(brand?.brand_logos || []).map((logo) => (
-                          <div key={logo.url} className="rounded-lg border border-border bg-muted p-2">
-                            <img src={logo.url} alt={logo.name} className="h-14 w-full object-contain" />
-                            <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
-                              <span>{logo.shape || "unknown"}</span>
-                              <span>{logo.background || "unknown"}</span>
-                              {logo.width && logo.height && <span>{logo.width}x{logo.height}</span>}
+                    {logoGroups.length > 0 && (
+                      <div className="space-y-3">
+                        {logoGroups.map((group) => (
+                          <div key={group.key} className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-medium text-foreground">{group.label}</p>
+                              <span className="text-[10px] text-muted-foreground">{group.items.length}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              {group.items.map((logo) => (
+                                <div key={`${logo.url}-${logo.name}`} className="rounded-lg border border-border bg-muted p-2">
+                                  <img src={logo.url} alt={logo.name} className="h-14 w-full object-contain" />
+                                  <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
+                                    <span>{logoShapeLabel(logo.shape)}</span>
+                                    <span>{logo.background || "unknown"}</span>
+                                    {logo.width && logo.height && <span>{logo.width}x{logo.height}</span>}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         ))}
