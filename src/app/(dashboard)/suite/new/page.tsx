@@ -139,12 +139,12 @@ export default function NewSuitePage() {
   const suggestions = getSuggestions(lang);
 
   const LOCATION_SCOPES: { value: string; label: string }[] = [
+    { value: "Custom", label: t("suite.new.scopeCustom") },
     { value: "Worldwide", label: t("suite.new.scopeWorldwide") },
     { value: "Middle East", label: t("suite.new.scopeMiddleEast") },
     { value: "Europe", label: t("suite.new.scopeEurope") },
     { value: "North America", label: t("suite.new.scopeNorthAmerica") },
     { value: "Asia", label: t("suite.new.scopeAsia") },
-    { value: "Custom", label: t("suite.new.scopeCustom") },
   ];
 
   const STEPS: { key: Step; label: string }[] = [
