@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, Brand, BrandLogo, BrandPersona, MarketingStrategy } from "@/lib/api";
+import { api, Brand, BrandLogo, BrandPersona, MarketingStrategy, ResearchDebug } from "@/lib/api";
 import { useT, useLanguage } from "@/lib/i18n/LanguageContext";
 import { LANGUAGES, LangCode } from "@/lib/i18n/translations";
 import { getSuggestions, findNicheIndex, getEnglishNiche } from "@/lib/i18n/suggestions";
@@ -127,6 +127,112 @@ function StepIndicator({ current, steps }: { current: Step; steps: { key: Step; 
   );
 }
 
+function ResearchDebugPanel({ debug, lang }: { debug: ResearchDebug | null; lang: string }) {
+  if (!debug) return null;
+  const labels = lang === "ar"
+    ? {
+        title: "تقرير قراءة المصادر",
+        sources: "المصادر",
+        context: "نص التحليل",
+        search: "البحث",
+        ai: "نتيجة الذكاء",
+        time: "وقت الذكاء",
+        fallback: "تصحيح تلقائي",
+        services: "خدمات",
+        products: "منتجات",
+        category: "فئة",
+        text: "نص",
+        posts: "بوستات",
+        captions: "كابشنز",
+        reason: "سبب",
+      }
+    : lang === "he"
+      ? {
+          title: "דוח קריאת מקורות",
+          sources: "מקורות",
+          context: "טקסט לניתוח",
+          search: "חיפוש",
+          ai: "תוצאת AI",
+          time: "זמן AI",
+          fallback: "תיקון אוטומטי",
+          services: "שירותים",
+          products: "מוצרים",
+          category: "קטגוריה",
+          text: "טקסט",
+          posts: "פוסטים",
+          captions: "כיתובים",
+          reason: "סיבה",
+        }
+      : {
+          title: "Source reading report",
+          sources: "Sources",
+          context: "Analysis text",
+          search: "Search",
+          ai: "AI result",
+          time: "AI time",
+          fallback: "Auto fallback",
+          services: "Services",
+          products: "Products",
+          category: "Category",
+          text: "Text",
+          posts: "Posts",
+          captions: "Captions",
+          reason: "Reason",
+        };
+  const reports = debug.source_reports || [];
+  const ai = debug.ai_output || {};
+
+  return (
+    <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground" dir="auto">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 font-medium text-foreground">
+          <Info size={14} /> {labels.title}
+        </div>
+        <div>
+          {labels.sources}: {debug.sources_ok || 0}/{debug.sources_requested || reports.length}
+        </div>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <div>{labels.context}: {(debug.context_chars || 0).toLocaleString()}</div>
+        <div>{labels.search}: {(debug.search_snippets_chars || 0).toLocaleString()}</div>
+        <div>
+          {labels.ai}: {labels.category} {ai.industry || ai.niche ? "ok" : "-"} · {labels.services} {ai.services_count || 0} · {labels.products} {ai.products_count || 0}
+        </div>
+      </div>
+      {debug.ai_elapsed_ms ? (
+        <div className="mt-2">
+          {labels.time}: {(debug.ai_elapsed_ms / 1000).toFixed(1)}s
+        </div>
+      ) : null}
+      {(debug.fallbacks_applied || []).length > 0 && (
+        <div className="mt-2 text-emerald-500">
+          {labels.fallback}: {debug.fallbacks_applied?.join(", ")}
+        </div>
+      )}
+      {debug.reason && <div className="mt-2 text-amber-500">{labels.reason}: {debug.reason}</div>}
+      {reports.length > 0 && (
+        <div className="mt-3 space-y-1">
+          {reports.map((item, idx) => (
+            <div key={`${item.url}-${idx}`} className="rounded-md border border-border/70 bg-background/60 px-2 py-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-medium text-foreground">{item.kind} · {item.status}</span>
+                <span className="truncate sm:max-w-[360px]">{item.title || item.url}</span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                <span>{labels.text}: {item.text_chars || item.description_chars || 0}</span>
+                <span>{labels.services}: {item.service_candidates || 0}</span>
+                <span>{labels.posts}: {item.recent_posts || 0}</span>
+                <span>{labels.captions}: {item.captions_chars || 0}</span>
+              </div>
+              {item.error && <div className="mt-1 text-red-400">{item.error}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function NewSuitePage() {
@@ -175,6 +281,7 @@ export default function NewSuitePage() {
   const [brand, setBrand] = useState<Brand | null>(null);
   const [error, setError] = useState("");
   const [extractLog, setExtractLog] = useState("");
+  const [researchDebug, setResearchDebug] = useState<ResearchDebug | null>(null);
   const [strategy, setStrategy] = useState<MarketingStrategy | null>(null);
   const [strategyError, setStrategyError] = useState("");
 
@@ -349,6 +456,7 @@ export default function NewSuitePage() {
       setError(t("suite.new.researchError"));
       return;
     }
+    setResearchDebug(null);
     setStep("extracting");
     setExtractLog(t("suite.new.extractLogScraping"));
     const t1 = setTimeout(() => setExtractLog(t("suite.new.extractLogSearch")), 4000);
@@ -363,6 +471,7 @@ export default function NewSuitePage() {
       clearTimeout(t1);
       clearTimeout(t2);
       setBrand(res.brand);
+      setResearchDebug(res.research_debug || res.brand?.research_debug || null);
       setBizName(res.brand?.name || suiteName);
       const researchedNiches = Array.from(new Set([
         res.brand?.industry,
@@ -419,6 +528,7 @@ export default function NewSuitePage() {
       setResearchNicheOptions([]);
       setOrderedLangs([]);
       setServiceItems([]);
+      setResearchDebug(null);
       setStep("step-a");
     }
   }
@@ -721,6 +831,7 @@ export default function NewSuitePage() {
       {/* ── Step A: Business Name ── */}
       {step === "step-a" && (
         <div className="space-y-4">
+          <ResearchDebugPanel debug={researchDebug} lang={lang} />
           <Card className="border-border bg-card text-card-foreground">
             <CardHeader>
               <CardTitle>{t("suite.new.stepATitle")}</CardTitle>
@@ -750,6 +861,7 @@ export default function NewSuitePage() {
       {/* ── Step B: Category / Niche ── */}
       {step === "step-b" && (
         <div className="space-y-4">
+          <ResearchDebugPanel debug={researchDebug} lang={lang} />
           <Card className="border-border bg-card text-card-foreground">
             <CardHeader>
               <CardTitle>{t("suite.new.stepBTitle")}</CardTitle>

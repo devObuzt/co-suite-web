@@ -86,7 +86,7 @@ export const api = {
       description?: string;
       user_language?: string;
       ai_provider?: "anthropic" | "openai";
-    }) => request<{ brand: Brand }>("/onboarding/extract-brand", { method: "POST", body: JSON.stringify(data) }),
+    }) => request<{ brand: Brand; research_debug?: ResearchDebug }>("/onboarding/extract-brand", { method: "POST", body: JSON.stringify(data) }),
     saveBrand: (data: { suite_id: string; brand: Brand }) =>
       request<{ ok: boolean }>("/onboarding/save-brand", { method: "POST", body: JSON.stringify(data) }),
     generateStrategy: (data: { suite_id: string; user_language?: string }) =>
@@ -685,6 +685,42 @@ export interface Brand {
   content_rules?: Array<{ text: string; source?: string; post_id?: string; created_at?: string }>;
   social_loops?: SocialLoop[];
   brand_personas?: BrandPersona[];
+  research_debug?: ResearchDebug;
+}
+
+export interface ResearchSourceReport {
+  url: string;
+  kind: string;
+  status: "ok" | "failed" | "empty" | string;
+  error?: string;
+  title?: string;
+  text_chars?: number;
+  description_chars?: number;
+  service_candidates?: number;
+  recent_posts?: number;
+  captions_chars?: number;
+}
+
+export interface ResearchDebug {
+  source_reports?: ResearchSourceReport[];
+  sources_requested?: number;
+  sources_ok?: number;
+  sources_failed?: number;
+  sources_empty?: number;
+  search_snippets_chars?: number;
+  context_chars?: number;
+  ai_elapsed_ms?: number;
+  fallbacks_applied?: string[];
+  reason?: string;
+  ai_output?: {
+    has_name?: boolean;
+    industry?: string;
+    niche?: string;
+    services_count?: number;
+    products_count?: number;
+    content_themes_count?: number;
+    audience_interests_count?: number;
+  };
 }
 
 export interface BrandLogo {
