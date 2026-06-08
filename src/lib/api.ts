@@ -190,6 +190,8 @@ export const api = {
       request<{ batches: ProductBulkBatch[] }>(`/suites/${suiteId}/product-bulk`),
     get: (suiteId: string, batchId: string) =>
       request<ProductBulkBatch>(`/suites/${suiteId}/product-bulk/${batchId}`),
+    generationStatus: (suiteId: string, batchId: string) =>
+      request<GenerationStatus>(`/suites/${suiteId}/product-bulk/${batchId}/generation-status`),
     create: (
       suiteId: string,
       data: { excel: File; imagesZip: File; creativePrompt?: string; brandEnabled?: boolean }
@@ -642,6 +644,10 @@ export interface GenerationStatus {
   next_retry_at?: string | null;
   rate_limit_reset_at?: string | null;
   estimated_wait_seconds?: number | null;
+  is_active?: boolean;
+  is_terminal?: boolean;
+  is_stale?: boolean;
+  stale_reason?: string | null;
   created_at?: string;
   updated_at?: string;
   finished_at?: string;

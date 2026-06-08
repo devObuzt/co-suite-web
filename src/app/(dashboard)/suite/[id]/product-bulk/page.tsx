@@ -109,12 +109,18 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
       await loadBatches();
       return null;
     }
-    const next = await api.productBulk.get(id, batch.id);
+    const [next, job] = await Promise.all([
+      api.productBulk.get(id, batch.id),
+      api.productBulk.generationStatus(id, batch.id),
+    ]);
     setBatch(next);
+    setGenerationStatus(job.status === "idle" ? null : job);
     setBatches((current) => current.map((candidate) => (candidate.id === next.id ? next : candidate)));
-    if (options?.settleIfIdle && !isBatchRunning(next)) {
-      setGenerationStatus((current) => (isJobRunning(current) ? null : current));
+    if (options?.settleIfIdle && !isBatchRunning(next) && !isJobRunning(job)) {
       setPollingRequested(false);
+      setBusyAction(null);
+    }
+    if (options?.settleIfIdle && job.is_terminal) {
       setBusyAction(null);
     }
     return next;
@@ -186,7 +192,32 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
     () => batch?.template_directions.find((template) => template.status === "approved" || template.id === batch.approved_template_id) || null,
     [batch]
   );
-  const canGenerateAll = Boolean(batch && approvedTemplate && !isBatchRunning(batch));
+  const firstProduct = batch?.items.slice().sort((a, b) => a.row_index - b.row_index)[0] || null;
+  const canGenerateFirst = Boolean(
+    batch
+    && batch.items.length > 0
+    && !isBatchRunning(batch)
+    && !isJobRunning(generationStatus)
+    && Boolean(firstProduct?.image_url)
+    && templateCards.length === 0
+  );
+  const canGenerateAll = Boolean(batch && approvedTemplate && !isBatchRunning(batch) && !isJobRunning(generationStatus));
+  const generateFirstBlocker = !batch
+    ? "Import a batch first."
+    : batch.items.length === 0
+      ? "The batch has no products."
+      : templateCards.length > 0
+        ? "Template directions already exist for this batch."
+        : !firstProduct?.image_url
+          ? "The first product needs a matched image before template generation."
+          : isBatchRunning(batch) || isJobRunning(generationStatus)
+            ? "Generation is already running."
+            : "";
+  const generateAllBlocker = !approvedTemplate
+    ? "Approve one template direction before generating all products."
+    : stats.missing > 0
+      ? `${stats.missing} product image${stats.missing === 1 ? " is" : "s are"} missing. Products without images will fail.`
+      : "";
 
   async function runAction(action: BusyAction, task: () => Promise<void>, keepPolling = false) {
     setBusyAction(action);
@@ -383,7 +414,11 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
                 onGenerateFirst={generateFirst}
                 onApproveTemplate={approveTemplate}
                 onGenerateAll={generateAll}
+                canGenerateFirst={canGenerateFirst}
                 canGenerateAll={canGenerateAll}
+                generateFirstBlocker={generateFirstBlocker}
+                generateAllBlocker={generateAllBlocker}
+                missingImages={stats.missing}
               />
               <AssetsGrid
                 batch={batch}
@@ -664,7 +699,11 @@ function TemplateSection({
   assetById,
   busyAction,
   approvedTemplate,
+  canGenerateFirst,
   canGenerateAll,
+  generateFirstBlocker,
+  generateAllBlocker,
+  missingImages,
   onGenerateFirst,
   onApproveTemplate,
   onGenerateAll,
@@ -674,7 +713,11 @@ function TemplateSection({
   assetById: Map<string, ProductBulkAsset>;
   busyAction: BusyAction | null;
   approvedTemplate: ProductTemplateDirection | null;
+  canGenerateFirst: boolean;
   canGenerateAll: boolean;
+  generateFirstBlocker: string;
+  generateAllBlocker: string;
+  missingImages: number;
   onGenerateFirst: () => void;
   onApproveTemplate: (templateId: string) => void;
   onGenerateAll: () => void;
@@ -689,7 +732,8 @@ function TemplateSection({
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button
             onClick={onGenerateFirst}
-            disabled={Boolean(busyAction) || isBatchRunning(batch)}
+            disabled={Boolean(busyAction) || !canGenerateFirst}
+            title={generateFirstBlocker || "Generate first templates"}
             className="gap-2 bg-indigo-600 hover:bg-indigo-500"
           >
             {busyAction === "generate-first" ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
@@ -698,6 +742,7 @@ function TemplateSection({
           <Button
             onClick={onGenerateAll}
             disabled={Boolean(busyAction) || !canGenerateAll}
+            title={generateAllBlocker || "Generate all products"}
             className="gap-2 bg-emerald-700 hover:bg-emerald-600"
           >
             {busyAction === "generate-all" ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
@@ -705,6 +750,13 @@ function TemplateSection({
           </Button>
         </div>
       </div>
+
+      {(generateFirstBlocker || generateAllBlocker || missingImages > 0) && (
+        <div className="rounded-lg border border-amber-900 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+          {generateFirstBlocker && templates.length === 0 ? <p>{generateFirstBlocker}</p> : null}
+          {generateAllBlocker ? <p>{generateAllBlocker}</p> : null}
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         {templates.map((template, index) => {

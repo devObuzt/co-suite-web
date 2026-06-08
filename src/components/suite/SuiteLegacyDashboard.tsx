@@ -213,7 +213,20 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
   async function handleRegenerate(postId: string, feedback?: string) {
     const status = await api.content.regenerate(suiteId, postId, feedback);
     setGenerationStatus(status);
-    setPosts((p) => p.filter((x) => x.id !== postId));
+    setPosts((current) => current.map((post) => {
+      if (post.id !== postId) return post;
+      const metadata = post.ai_metadata || {};
+      return {
+        ...post,
+        ai_metadata: {
+          ...metadata,
+          regeneration_requested: {
+            feedback: feedback?.trim() || "",
+            requested_at: new Date().toISOString(),
+          },
+        },
+      };
+    }));
     setGenerating(isGenerationActive(status));
   }
 
@@ -1303,6 +1316,11 @@ function PostCard({
     : media.reason;
   const canPreviewMedia = Boolean(firstMediaUrl && media.ready && !mediaFailed);
   const canDownloadMedia = Boolean(firstMediaUrl && media.ready && !mediaFailed);
+  const regenerationRequest = post.ai_metadata?.regeneration_requested;
+  const hasRegenerationRequest = Boolean(regenerationRequest);
+  const regenerationFeedback = regenerationRequest && typeof regenerationRequest === "object" && "feedback" in regenerationRequest
+    ? String(regenerationRequest.feedback || "").trim()
+    : "";
 
   return (
     <Card className="bg-zinc-900 border-zinc-800 flex flex-col overflow-hidden">
@@ -1374,6 +1392,17 @@ function PostCard({
       </div>
 
       <CardContent className="flex-1 flex flex-col p-4 gap-3">
+        {hasRegenerationRequest && (
+          <div className="rounded-lg border border-indigo-900 bg-indigo-950/30 px-3 py-2 text-xs text-indigo-200">
+            <div className="flex items-center gap-2 font-medium">
+              <RefreshCw size={12} className="animate-spin" />
+              Regeneration requested. Original content is kept until the new version is ready.
+            </div>
+            {regenerationFeedback && (
+              <p className="mt-1 line-clamp-2 text-indigo-200/75">{regenerationFeedback}</p>
+            )}
+          </div>
+        )}
         {/* Caption */}
         {editing ? (
           <div className="space-y-2">
