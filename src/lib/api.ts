@@ -753,6 +753,15 @@ export interface ResearchDebug {
     content_themes_count?: number;
     audience_interests_count?: number;
   };
+  final_output?: {
+    has_name?: boolean;
+    industry?: string;
+    niche?: string;
+    services_count?: number;
+    products_count?: number;
+    content_themes_count?: number;
+    audience_interests_count?: number;
+  };
 }
 
 export interface BrandLogo {

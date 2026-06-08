@@ -240,7 +240,7 @@ function ResearchDebugPanel({ debug, lang }: { debug: ResearchDebug | null; lang
           reason: "Reason",
         };
   const reports = debug.source_reports || [];
-  const ai = debug.ai_output || {};
+  const ai = debug.final_output || debug.ai_output || {};
 
   return (
     <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground" dir="auto">
