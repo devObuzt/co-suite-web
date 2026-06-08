@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { LANGUAGES, LangCode } from "@/lib/i18n/translations";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
@@ -9,11 +10,13 @@ export function FirstTimeLanguagePicker() {
   const [show, setShow] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const { setLang, t } = useLanguage();
+  const pathname = usePathname();
 
   useEffect(() => {
+    if (pathname === "/") return;
     const alreadySet = localStorage.getItem("co_suite_lang_set");
     if (!alreadySet) setShow(true);
-  }, []);
+  }, [pathname]);
 
   function chooseLanguage(code: LangCode) {
     setLang(code);

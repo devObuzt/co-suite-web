@@ -5,7 +5,7 @@ import { api, Suite } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowRight } from "lucide-react";
+import { Plus, ArrowRight, Sparkles } from "lucide-react";
 
 export default function DashboardPage() {
   const [suites, setSuites] = useState<Suite[]>([]);
@@ -16,30 +16,60 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Your Suites</h1>
-          <p className="text-zinc-400 text-sm mt-1">Each suite is a complete marketing workspace for one business</p>
+          <h1 className="text-2xl font-bold text-foreground">Your Suites</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Each suite is a complete marketing workspace for one business.</p>
         </div>
-        <Link href="/suite/new">
-          <Button className="bg-indigo-600 hover:bg-indigo-500 gap-2">
-            <Plus size={16} /> New Suite
-          </Button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Link href="/create">
+            <Button variant="outline" className="w-full gap-2 sm:w-auto">
+              <Sparkles size={16} /> Quick create
+            </Button>
+          </Link>
+          <Link href="/suite/new">
+            <Button className="w-full gap-2 sm:w-auto">
+              <Plus size={16} /> New Suite
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      <div className="mb-6 grid gap-4 md:grid-cols-2">
+        <Link href="/create" className="group rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/60">
+          <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Sparkles size={18} />
+          </div>
+          <h2 className="text-base font-semibold text-foreground">Create without a Suite</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Generate quick content with brand mode off. Good for testing ideas before full setup.</p>
+          <div className="mt-4 flex items-center gap-1 text-sm text-primary transition-all group-hover:gap-2">
+            Open quick create <ArrowRight size={14} />
+          </div>
+        </Link>
+        <Link href="/suite/new" className="group rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/60">
+          <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+            <Plus size={18} />
+          </div>
+          <h2 className="text-base font-semibold text-foreground">Build a full Suite</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Research a business, save the brand profile, connect platforms, and generate consistent content.</p>
+          <div className="mt-4 flex items-center gap-1 text-sm text-primary transition-all group-hover:gap-2">
+            Start setup <ArrowRight size={14} />
+          </div>
         </Link>
       </div>
 
       {loading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-40 bg-zinc-900 border border-zinc-800 rounded-xl animate-pulse" />
+            <div key={i} className="h-40 animate-pulse rounded-xl border border-border bg-card" />
           ))}
         </div>
       ) : suites.length === 0 ? (
-        <div className="text-center py-24 border border-dashed border-zinc-800 rounded-xl">
-          <p className="text-zinc-400 mb-4">No suites yet — create your first one</p>
+        <div className="rounded-xl border border-dashed border-border py-24 text-center">
+          <p className="mb-4 text-muted-foreground">No full suites yet. You can create a quick post now or build your first suite.</p>
           <Link href="/suite/new">
-            <Button className="bg-indigo-600 hover:bg-indigo-500 gap-2">
+            <Button className="gap-2">
               <Plus size={16} /> Create Suite
             </Button>
           </Link>
@@ -56,15 +86,17 @@ export default function DashboardPage() {
 }
 
 function SuiteCard({ suite }: { suite: Suite }) {
-  const statusColor = suite.status === "active" ? "bg-emerald-950 text-emerald-400 border-emerald-800" : "bg-amber-950 text-amber-400 border-amber-800";
+  const statusColor = suite.status === "active"
+    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+    : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300";
 
   return (
     <Link href={`/suite/${suite.id}`}>
-      <Card className="bg-zinc-900 border-zinc-800 hover:border-zinc-600 transition-colors group cursor-pointer h-full">
+      <Card className="h-full cursor-pointer transition-colors hover:ring-primary/50 group">
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between">
             <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm mb-3"
+              className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold text-white"
               style={{ backgroundColor: suite.brand?.colors?.primary || "#4f46e5" }}
             >
               {suite.name[0].toUpperCase()}
@@ -73,13 +105,13 @@ function SuiteCard({ suite }: { suite: Suite }) {
               {suite.status}
             </Badge>
           </div>
-          <CardTitle className="text-white text-base">{suite.name}</CardTitle>
+          <CardTitle className="text-base text-foreground">{suite.name}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-zinc-400 text-sm line-clamp-2 mb-4">
+          <p className="mb-4 line-clamp-2 text-sm text-muted-foreground">
             {suite.brand?.description || suite.brand?.tagline || "Complete your suite setup to get started."}
           </p>
-          <div className="flex items-center text-indigo-400 text-sm gap-1 group-hover:gap-2 transition-all">
+          <div className="flex items-center gap-1 text-sm text-primary transition-all group-hover:gap-2">
             Open suite <ArrowRight size={14} />
           </div>
         </CardContent>

@@ -46,6 +46,66 @@ const META_INTERESTS: Record<string, string[]> = {
   default: ["Small business", "Online shopping", "Local services", "Social media", "Technology"],
 };
 
+function localizedAudienceBehaviors(lang: string, key: string): string[] {
+  const sets: Record<string, Record<string, string[]>> = {
+    ar: {
+      marketing: ["يبحثون عن عملاء محتملين", "يتابعون محتوى تسويق رقمي", "يقارنون أداء الحملات", "يحتاجون أتمتة للمحتوى"],
+      restaurant: ["يطلبون عبر الإنترنت", "يتأثرون بصور الطعام", "يبحثون عن مطاعم قريبة", "يتابعون العروض اليومية"],
+      fashion: ["يتسوقون عبر إنستغرام", "يتابعون الترندات", "يقارنون الأسعار", "يفضلون صور منتجات واضحة"],
+      realestate: ["يبحثون عن عقارات", "يقارنون مواقع وأسعار", "يهتمون بالتمويل", "يتابعون مشاريع جديدة"],
+      pets: ["يشترون مستلزمات حيوانات", "يتابعون نصائح العناية", "يبحثون عن خدمات قريبة", "يتفاعلون مع محتوى صور الحيوانات"],
+      default: ["يبحثون عن حلول محلية", "يتفاعلون مع محتوى السوشيال", "يقارنون الأسعار", "يفضلون خدمة شخصية"],
+    },
+    he: {
+      marketing: ["מחפשים לידים חדשים", "עוקבים אחרי תוכן שיווק דיגיטלי", "משווים ביצועי קמפיינים", "צריכים אוטומציה לתוכן"],
+      restaurant: ["מזמינים אונליין", "מושפעים מתמונות אוכל", "מחפשים מסעדות קרובות", "עוקבים אחרי מבצעים יומיים"],
+      fashion: ["קונים דרך אינסטגרם", "עוקבים אחרי טרנדים", "משווים מחירים", "מעדיפים תמונות מוצר ברורות"],
+      realestate: ["מחפשים נכסים", "משווים אזורים ומחירים", "מתעניינים במימון", "עוקבים אחרי פרויקטים חדשים"],
+      pets: ["קונים מוצרים לחיות", "עוקבים אחרי טיפים לטיפול", "מחפשים שירותים קרובים", "מגיבים לתוכן עם תמונות חיות"],
+      default: ["מחפשים פתרונות מקומיים", "מגיבים לתוכן ברשתות", "משווים מחירים", "מעדיפים שירות אישי"],
+    },
+    en: {
+      marketing: ["Look for new leads", "Follow digital marketing content", "Compare campaign performance", "Need content automation"],
+      restaurant: ["Order online", "React to food visuals", "Search for nearby restaurants", "Follow daily offers"],
+      fashion: ["Shop through Instagram", "Follow trends", "Compare prices", "Prefer clear product photos"],
+      realestate: ["Search for properties", "Compare locations and prices", "Care about financing", "Follow new projects"],
+      pets: ["Buy pet supplies", "Follow care tips", "Search for nearby services", "Engage with pet photo content"],
+      default: ["Look for local solutions", "Engage with social content", "Compare prices", "Prefer personal service"],
+    },
+  };
+  return (sets[lang]?.[key] || sets.en[key] || sets.en.default).slice(0, 5);
+}
+
+function localizedAudienceStatuses(lang: string, key: string): string[] {
+  const sets: Record<string, Record<string, string[]>> = {
+    ar: {
+      marketing: ["أصحاب مصالح تجارية", "مدراء تسويق", "مستقلون", "شركات صغيرة"],
+      restaurant: ["عائلات", "موظفون قريبون", "طلاب", "محبو التجارب المحلية"],
+      fashion: ["نساء مهتمات بالأناقة", "عرائس ومخطوبات", "شابات", "متسوقون أونلاين"],
+      realestate: ["أزواج شباب", "مستثمرون", "عائلات تبحث عن بيت", "أصحاب مصالح"],
+      pets: ["أصحاب حيوانات", "عائلات مع أطفال", "مربو كلاب", "مربو قطط"],
+      default: ["أصحاب مصالح تجارية", "أهالي لأولاد", "طلاب", "جمهور بريميوم"],
+    },
+    he: {
+      marketing: ["בעלי עסקים", "מנהלי שיווק", "עצמאים", "עסקים קטנים"],
+      restaurant: ["משפחות", "עובדים באזור", "סטודנטים", "אוהבי חוויות מקומיות"],
+      fashion: ["נשים שמתעניינות בסטייל", "כלות ומאורסות", "צעירות", "קונים אונליין"],
+      realestate: ["זוגות צעירים", "משקיעים", "משפחות שמחפשות בית", "בעלי עסקים"],
+      pets: ["בעלי חיות", "משפחות עם ילדים", "בעלי כלבים", "בעלי חתולים"],
+      default: ["בעלי עסקים", "הורים לילדים", "סטודנטים", "קהל פרימיום"],
+    },
+    en: {
+      marketing: ["Business owners", "Marketing managers", "Freelancers", "Small companies"],
+      restaurant: ["Families", "Nearby employees", "Students", "Local experience seekers"],
+      fashion: ["Style-conscious women", "Brides and engaged couples", "Young adults", "Online shoppers"],
+      realestate: ["Young couples", "Investors", "Families looking for a home", "Business owners"],
+      pets: ["Pet owners", "Families with children", "Dog owners", "Cat owners"],
+      default: ["Business owners", "Parents", "Students", "Premium buyers"],
+    },
+  };
+  return (sets[lang]?.[key] || sets.en[key] || sets.en.default).slice(0, 5);
+}
+
 function classifyLogoShape(width?: number | null, height?: number | null): BrandLogo["shape"] {
   if (!width || !height) return "unknown";
   const ratio = width / height;
@@ -369,6 +429,7 @@ export default function NewSuitePage() {
     ...(META_INTERESTS[metaInterestKey] || META_INTERESTS.default),
   ].filter(Boolean)));
   const fallbackBehaviorSuggestions = [
+    ...localizedAudienceBehaviors(lang, metaInterestKey),
     t("suite.new.behaviorOnlineBuyers"),
     t("suite.new.behaviorEngagedSocial"),
     t("suite.new.behaviorLocalSearch"),
@@ -376,6 +437,7 @@ export default function NewSuitePage() {
     t("suite.new.behaviorPremiumBuyers"),
   ];
   const fallbackStatusSuggestions = [
+    ...localizedAudienceStatuses(lang, metaInterestKey),
     t("suite.new.statusParents"),
     t("suite.new.statusBusinessOwners"),
     t("suite.new.statusDoctors"),
@@ -484,6 +546,10 @@ export default function NewSuitePage() {
       setSelectedResearchNiche(foundNicheIdx >= 0 ? "" : (researchedNiches[0] || ""));
       setOrderedLangs(res.brand?.audience_languages || []);
       setAudienceNotes(res.brand?.audience_notes || "");
+      const audienceLocation = res.brand?.audience_location;
+      setLocationScope("Custom");
+      setCustomCountries((audienceLocation?.countries || []).join(", ") || res.brand?.location || "");
+      setCustomCities((audienceLocation?.cities || []).join(", "));
       setSelectedInterests(res.brand?.audience_interests || []);
       setSelectedBehaviors(res.brand?.audience_behaviors || []);
       setSelectedStatuses(res.brand?.audience_social_statuses || []);
@@ -620,6 +686,11 @@ export default function NewSuitePage() {
     }
     if (latestBrand) setBrand(latestBrand);
     setUploadingAsset(false);
+  }
+
+  async function setPrimaryLogo(logo: BrandLogo) {
+    setBrand((prev) => ({ ...(prev || {}), logo_url: logo.url, logo_source: "uploaded" }));
+    await saveStep("g-logo-primary", { logo_url: logo.url, logo_source: "uploaded" });
   }
 
   async function uploadPersonaImages(personaName: string, files: FileList | File[]) {
@@ -1096,11 +1167,12 @@ export default function NewSuitePage() {
                     <button
                       key={value}
                       onClick={() => setLocationScope(value)}
-                      className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                      className={`max-w-full px-3 py-1.5 rounded-full text-sm border transition-colors text-start leading-snug ${
                         locationScope === value
                           ? "bg-foreground border-foreground text-background"
                           : "border-border text-muted-foreground hover:border-zinc-500"
                       }`}
+                      dir="auto"
                     >{label}</button>
                   ))}
                 </div>
@@ -1122,13 +1194,13 @@ export default function NewSuitePage() {
                 )}
               </div>
               <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <Label className="text-foreground">{t("suite.new.interests")}</Label>
                   {audienceInterestSuggestions.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setSelectedInterests((prev) => Array.from(new Set([...prev, ...audienceInterestSuggestions])))}
-                      className="text-xs text-[#2f80ff] hover:underline"
+                      className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15"
                     >
                       {t("suite.new.addAllSuggestions")}
                     </button>
@@ -1146,7 +1218,7 @@ export default function NewSuitePage() {
                         selectedInterests.includes(interest)
                           ? "bg-foreground border-foreground text-background"
                           : "border-border text-muted-foreground hover:border-zinc-500"
-                      }`}
+                      } max-w-full text-start leading-snug`}
                       dir="auto"
                     >{interest}</button>
                   ))}
@@ -1164,10 +1236,10 @@ export default function NewSuitePage() {
                   }
                 </div>
                 {/* Add custom interest */}
-                <div className="flex gap-2 mt-1">
+                <div className="mt-1 flex flex-col gap-2 sm:flex-row">
                   <Input
                     placeholder={t("suite.new.customInterestPlaceholder")}
-                    className="bg-background text-foreground text-sm flex-1"
+                    className="min-h-11 flex-1 bg-background text-sm text-foreground"
                     dir="auto"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && e.currentTarget.value.trim()) {
@@ -1180,7 +1252,7 @@ export default function NewSuitePage() {
                   />
                   <button
                     type="button"
-                    className="text-[#2f80ff] text-sm hover:text-[#2f80ff] px-2 flex items-center gap-1"
+                    className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border px-3 text-sm font-medium text-[#2f80ff] hover:bg-muted sm:w-auto"
                     onClick={(e) => {
                       const input = (e.currentTarget.previousSibling as HTMLInputElement);
                       const val = input?.value?.trim();
@@ -1193,13 +1265,13 @@ export default function NewSuitePage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <Label className="text-foreground">{t("suite.new.behaviors")}</Label>
                   {audienceBehaviorSuggestions.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setSelectedBehaviors((prev) => Array.from(new Set([...prev, ...audienceBehaviorSuggestions])))}
-                      className="text-xs text-[#2f80ff] hover:underline"
+                      className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15"
                     >
                       {t("suite.new.addAllSuggestions")}
                     </button>
@@ -1212,20 +1284,58 @@ export default function NewSuitePage() {
                       onClick={() => setSelectedBehaviors((prev) => prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item])}
                       className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
                         selectedBehaviors.includes(item) ? "bg-foreground border-foreground text-background" : "border-border text-muted-foreground hover:border-zinc-500"
-                      }`}
+                      } max-w-full text-start leading-snug`}
                       dir="auto"
                     >{item}</button>
                   ))}
+                  {selectedBehaviors
+                    .filter((item) => !audienceBehaviorSuggestions.includes(item))
+                    .map((item) => (
+                      <button
+                        key={item}
+                        onClick={() => setSelectedBehaviors((prev) => prev.filter((i) => i !== item))}
+                        className="flex max-w-full items-center gap-1 rounded-full border border-foreground bg-foreground px-3 py-1.5 text-start text-sm leading-snug text-background"
+                        dir="auto"
+                      >{item} <X size={11} /></button>
+                    ))
+                  }
+                </div>
+                <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    placeholder={t("suite.new.customBehaviorPlaceholder")}
+                    className="min-h-11 flex-1 bg-background text-sm text-foreground"
+                    dir="auto"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && e.currentTarget.value.trim()) {
+                        const val = e.currentTarget.value.trim();
+                        setSelectedBehaviors((prev) => prev.includes(val) ? prev : [...prev, val]);
+                        e.currentTarget.value = "";
+                        e.preventDefault();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border px-3 text-sm font-medium text-[#2f80ff] hover:bg-muted sm:w-auto"
+                    onClick={(e) => {
+                      const input = (e.currentTarget.previousSibling as HTMLInputElement);
+                      const val = input?.value?.trim();
+                      if (val) {
+                        setSelectedBehaviors((prev) => prev.includes(val) ? prev : [...prev, val]);
+                        input.value = "";
+                      }
+                    }}
+                  ><Plus size={13} /> {t("suite.new.add")}</button>
                 </div>
               </div>
               <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <Label className="text-foreground">{t("suite.new.socialStatus")}</Label>
                   {audienceStatusSuggestions.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setSelectedStatuses((prev) => Array.from(new Set([...prev, ...audienceStatusSuggestions])))}
-                      className="text-xs text-[#2f80ff] hover:underline"
+                      className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15"
                     >
                       {t("suite.new.addAllSuggestions")}
                     </button>
@@ -1238,10 +1348,48 @@ export default function NewSuitePage() {
                       onClick={() => setSelectedStatuses((prev) => prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item])}
                       className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
                         selectedStatuses.includes(item) ? "bg-foreground border-foreground text-background" : "border-border text-muted-foreground hover:border-zinc-500"
-                      }`}
+                      } max-w-full text-start leading-snug`}
                       dir="auto"
                     >{item}</button>
                   ))}
+                  {selectedStatuses
+                    .filter((item) => !audienceStatusSuggestions.includes(item))
+                    .map((item) => (
+                      <button
+                        key={item}
+                        onClick={() => setSelectedStatuses((prev) => prev.filter((i) => i !== item))}
+                        className="flex max-w-full items-center gap-1 rounded-full border border-foreground bg-foreground px-3 py-1.5 text-start text-sm leading-snug text-background"
+                        dir="auto"
+                      >{item} <X size={11} /></button>
+                    ))
+                  }
+                </div>
+                <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    placeholder={t("suite.new.customStatusPlaceholder")}
+                    className="min-h-11 flex-1 bg-background text-sm text-foreground"
+                    dir="auto"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && e.currentTarget.value.trim()) {
+                        const val = e.currentTarget.value.trim();
+                        setSelectedStatuses((prev) => prev.includes(val) ? prev : [...prev, val]);
+                        e.currentTarget.value = "";
+                        e.preventDefault();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border px-3 text-sm font-medium text-[#2f80ff] hover:bg-muted sm:w-auto"
+                    onClick={(e) => {
+                      const input = (e.currentTarget.previousSibling as HTMLInputElement);
+                      const val = input?.value?.trim();
+                      if (val) {
+                        setSelectedStatuses((prev) => prev.includes(val) ? prev : [...prev, val]);
+                        input.value = "";
+                      }
+                    }}
+                  ><Plus size={13} /> {t("suite.new.add")}</button>
                 </div>
               </div>
               <div className="space-y-2">
@@ -1256,7 +1404,7 @@ export default function NewSuitePage() {
               </div>
             </CardContent>
           </Card>
-          <div className="flex gap-3">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
             <Button onClick={async () => {
               const countries = locationScope === "Custom"
                 ? customCountries.split(",").map((c) => c.trim()).filter(Boolean)
@@ -1267,11 +1415,11 @@ export default function NewSuitePage() {
                 ? "Worldwide"
                 : [...countries, ...cities].join(", ") || locationScope;
               const interestsText = selectedInterests.length > 0
-                ? `, interested in: ${selectedInterests.join(", ")}`
+                ? `, ${t("suite.new.targetAudienceInterestsLabel")}: ${selectedInterests.join(", ")}`
                 : "";
-              const behaviorText = selectedBehaviors.length > 0 ? `. Behaviors: ${selectedBehaviors.join(", ")}` : "";
-              const statusText = selectedStatuses.length > 0 ? `. Social status: ${selectedStatuses.join(", ")}` : "";
-              const notesText = audienceNotes.trim() ? `. Notes: ${audienceNotes.trim()}` : "";
+              const behaviorText = selectedBehaviors.length > 0 ? `. ${t("suite.new.targetAudienceBehaviorsLabel")}: ${selectedBehaviors.join(", ")}` : "";
+              const statusText = selectedStatuses.length > 0 ? `. ${t("suite.new.targetAudienceStatusesLabel")}: ${selectedStatuses.join(", ")}` : "";
+              const notesText = audienceNotes.trim() ? `. ${t("suite.new.targetAudienceNotesLabel")}: ${audienceNotes.trim()}` : "";
               const targetAudience = `${locationText}${interestsText}${behaviorText}${statusText}${notesText}`;
               await saveStep("e", {
                 audience_location: { scope: locationScope === "Worldwide" ? "world" : "custom", countries, cities },
@@ -1282,10 +1430,10 @@ export default function NewSuitePage() {
                 target_audience: targetAudience,
               });
               setStep("step-f");
-            }} className="bg-foreground text-background hover:bg-foreground/90 gap-2">
+            }} className="w-full justify-center gap-2 bg-foreground text-background hover:bg-foreground/90 sm:w-auto">
               <ForwardIcon size={15} /> {t("suite.new.confirmAudience")}
             </Button>
-            <button onClick={() => setStep("step-f")} className="text-muted-foreground text-sm hover:text-foreground">{t("suite.new.skip")}</button>
+            <button onClick={() => setStep("step-f")} className="min-h-10 text-sm text-muted-foreground hover:text-foreground sm:px-2">{t("suite.new.skip")}</button>
           </div>
         </div>
       )}
@@ -1304,36 +1452,40 @@ export default function NewSuitePage() {
               <div className="space-y-2">
                 <Label className="text-foreground">{t("suite.new.uspLabel")}</Label>
                 {uspPoints.map((point, i) => (
-                  <div key={i} className="flex gap-2 items-center">
+                  <div key={i} className="flex items-center gap-2">
                     <Input
                       value={point}
                       onChange={(e) => setUspPoints((prev) => prev.map((p, idx) => idx === i ? e.target.value : p))}
-                      className="flex-1 bg-background text-foreground text-sm"
+                      className="min-h-11 flex-1 bg-background text-sm text-foreground"
                       dir="auto"
                     />
                     <button onClick={() => setUspPoints((prev) => prev.filter((_, idx) => idx !== i))}
-                      className="text-muted-foreground hover:text-red-400 transition-colors"><X size={14} /></button>
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-red-400"><X size={14} /></button>
                   </div>
                 ))}
-                <div className="flex flex-wrap gap-1.5 mt-1">
+                <div className="mt-2 flex flex-wrap gap-2">
                   {suggestions.usp.filter((s) => !uspPoints.includes(s)).map((s) => (
                     <button key={s} onClick={() => setUspPoints((prev) => [...prev, s])}
-                      className="text-xs px-2 py-1 border border-border text-muted-foreground rounded-full hover:border-foreground hover:text-[#2f80ff] transition-colors">
+                      className="max-w-full rounded-full border border-border px-3 py-1.5 text-start text-xs leading-snug text-muted-foreground transition-colors hover:border-foreground hover:text-[#2f80ff]"
+                      dir="auto"
+                    >
                       + {s}
                     </button>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setUspPoints((prev) => Array.from(new Set([...prev, ...suggestions.usp])))}
-                  className="text-xs text-[#2f80ff] hover:underline"
-                >
-                  {t("suite.new.addAllSuggestions")}
-                </button>
-                <button onClick={() => setUspPoints((prev) => [...prev, ""])}
-                  className="flex items-center gap-1.5 text-[#2f80ff] hover:underline text-sm transition-colors mt-1">
-                  <Plus size={13} /> {t("suite.new.addPoint")}
-                </button>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setUspPoints((prev) => Array.from(new Set([...prev, ...suggestions.usp])))}
+                    className="inline-flex min-h-10 items-center justify-center rounded-lg border border-primary/40 bg-primary/10 px-3 text-sm font-medium text-primary hover:bg-primary/15 sm:w-auto"
+                  >
+                    {t("suite.new.addAllSuggestions")}
+                  </button>
+                  <button onClick={() => setUspPoints((prev) => [...prev, ""])}
+                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-[#2f80ff] transition-colors hover:bg-muted sm:w-auto">
+                    <Plus size={13} /> {t("suite.new.addPoint")}
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label className="text-foreground">{t("suite.new.espLabel")}</Label>
@@ -1342,36 +1494,40 @@ export default function NewSuitePage() {
                     <Input
                       value={point}
                       onChange={(e) => setEspPoints((prev) => prev.map((p, idx) => idx === i ? e.target.value : p))}
-                      className="flex-1 bg-background text-foreground text-sm"
+                      className="min-h-11 flex-1 bg-background text-sm text-foreground"
                       dir="auto"
                     />
                     <button onClick={() => setEspPoints((prev) => prev.filter((_, idx) => idx !== i))}
-                      className="text-muted-foreground hover:text-red-400 transition-colors"><X size={14} /></button>
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-red-400"><X size={14} /></button>
                   </div>
                 ))}
-                <div className="flex flex-wrap gap-1.5 mt-1">
+                <div className="mt-2 flex flex-wrap gap-2">
                   {suggestions.esp.filter((s) => !espPoints.includes(s)).map((s) => (
                     <button key={s} onClick={() => setEspPoints((prev) => [...prev, s])}
-                      className="text-xs px-2 py-1 border border-border text-muted-foreground rounded-full hover:border-foreground hover:text-[#2f80ff] transition-colors">
+                      className="max-w-full rounded-full border border-border px-3 py-1.5 text-start text-xs leading-snug text-muted-foreground transition-colors hover:border-foreground hover:text-[#2f80ff]"
+                      dir="auto"
+                    >
                       + {s}
                     </button>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setEspPoints((prev) => Array.from(new Set([...prev, ...suggestions.esp])))}
-                  className="text-xs text-[#2f80ff] hover:underline"
-                >
-                  {t("suite.new.addAllSuggestions")}
-                </button>
-                <button onClick={() => setEspPoints((prev) => [...prev, ""])}
-                  className="flex items-center gap-1.5 text-[#2f80ff] hover:underline text-sm transition-colors mt-1">
-                  <Plus size={13} /> {t("suite.new.addPoint")}
-                </button>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setEspPoints((prev) => Array.from(new Set([...prev, ...suggestions.esp])))}
+                    className="inline-flex min-h-10 items-center justify-center rounded-lg border border-primary/40 bg-primary/10 px-3 text-sm font-medium text-primary hover:bg-primary/15 sm:w-auto"
+                  >
+                    {t("suite.new.addAllSuggestions")}
+                  </button>
+                  <button onClick={() => setEspPoints((prev) => [...prev, ""])}
+                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-[#2f80ff] transition-colors hover:bg-muted sm:w-auto">
+                    <Plus size={13} /> {t("suite.new.addPoint")}
+                  </button>
+                </div>
               </div>
             </CardContent>
           </Card>
-          <div className="flex gap-3">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
             <Button onClick={async () => {
               const filteredUsp = uspPoints.filter(Boolean);
               const filteredEsp = espPoints.filter(Boolean);
@@ -1383,10 +1539,10 @@ export default function NewSuitePage() {
                 how_they_help: filteredUsp[0] || brand?.how_they_help || "",
               });
               setStep("step-g");
-            }} className="bg-foreground text-background hover:bg-foreground/90 gap-2">
+            }} className="w-full justify-center gap-2 bg-foreground text-background hover:bg-foreground/90 sm:w-auto">
               <ForwardIcon size={15} /> {t("suite.new.confirmWhyUs")}
             </Button>
-            <button onClick={() => setStep("step-g")} className="text-muted-foreground text-sm hover:text-foreground">{t("suite.new.skip")}</button>
+            <button onClick={() => setStep("step-g")} className="min-h-10 text-sm text-muted-foreground hover:text-foreground sm:px-2">{t("suite.new.skip")}</button>
           </div>
         </div>
       )}
@@ -1459,6 +1615,17 @@ export default function NewSuitePage() {
                                     <span>{logo.background || "unknown"}</span>
                                     {logo.width && logo.height && <span>{logo.width}x{logo.height}</span>}
                                   </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setPrimaryLogo(logo)}
+                                    className={`mt-2 w-full rounded-md border px-2 py-1 text-[11px] transition-colors ${
+                                      brand?.logo_url === logo.url
+                                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                        : "border-border text-muted-foreground hover:bg-background hover:text-foreground"
+                                    }`}
+                                  >
+                                    {brand?.logo_url === logo.url ? t("suite.new.primaryLogo") : t("suite.new.setPrimaryLogo")}
+                                  </button>
                                 </div>
                               ))}
                             </div>
@@ -1579,15 +1746,15 @@ export default function NewSuitePage() {
                     const langName = code === "ar" ? "العربية" : code === "he" ? "עברית" : code === "en" ? "English" : code === "fr" ? "Français" : code === "es" ? "Español" : code === "tr" ? "Türkçe" : "All";
                     const uploadedFonts = (brand?.fonts_by_language?.[code] || brand?.fonts_by_language?.["all"] || []);
                     return (
-                      <div key={code} className="flex items-center gap-3 bg-muted rounded-lg px-3 py-2">
-                        <span className="text-foreground text-sm w-20 shrink-0" dir={code === "ar" || code === "he" ? "rtl" : "ltr"}>{langName}</span>
-                        <div className="flex-1 flex flex-wrap gap-1">
+                      <div key={code} className="flex flex-col gap-2 rounded-lg bg-muted px-3 py-2 sm:flex-row sm:items-center">
+                        <span className="w-full shrink-0 text-sm text-foreground sm:w-20" dir={code === "ar" || code === "he" ? "rtl" : "ltr"}>{langName}</span>
+                        <div className="flex flex-1 flex-wrap gap-1">
                           {uploadedFonts.map((font) => (
                             <span key={font.url} className="text-xs bg-zinc-700 text-foreground px-2 py-0.5 rounded">{font.name}</span>
                           ))}
                           {uploadedFonts.length === 0 && <span className="text-muted-foreground text-xs">{t("suite.new.noFontUploaded")}</span>}
                         </div>
-                        <label className="cursor-pointer text-xs text-[#2f80ff] hover:underline transition-colors shrink-0">
+                        <label className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-md border border-border px-2 text-xs text-[#2f80ff] transition-colors hover:bg-background shrink-0">
                           <input
                             type="file"
                             accept=".ttf,.otf,.woff,.woff2"
@@ -1649,12 +1816,12 @@ export default function NewSuitePage() {
               <CardDescription className="text-muted-foreground">{t("suite.new.stepHSubtitle")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <Input
                   value={newPersonaName}
                   onChange={(e) => setNewPersonaName(e.target.value)}
                   placeholder={t("suite.new.personaNamePlaceholder")}
-                  className="bg-background text-foreground"
+                  className="min-h-11 bg-background text-foreground"
                   dir="auto"
                 />
                 <Button
@@ -1666,6 +1833,7 @@ export default function NewSuitePage() {
                     setPersonas((prev) => prev.some((p) => p.name === name) ? prev : [...prev, { name, role: "", images: [] }]);
                     setNewPersonaName("");
                   }}
+                  className="min-h-11 justify-center"
                 >
                   {t("suite.new.add")}
                 </Button>
@@ -1676,28 +1844,55 @@ export default function NewSuitePage() {
               <div className="space-y-3">
                 {personas.map((persona) => (
                   <div key={persona.name} className="rounded-xl border border-border bg-muted p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
                         <p className="font-medium" dir="auto">{persona.name}</p>
                         <p className="text-xs text-muted-foreground">{persona.images.length} {t("suite.new.images")}</p>
                       </div>
-                      <label className="cursor-pointer rounded-lg border border-border bg-background px-3 py-2 text-xs text-[#2f80ff] hover:underline">
-                        <input
-                          type="file"
-                          multiple
-                          accept="image/png,image/jpeg,image/webp"
-                          className="hidden"
-                          onChange={async (e) => {
-                            if (e.target.files?.length) await uploadPersonaImages(persona.name, e.target.files);
-                          }}
-                        />
-                        {uploadingAsset ? <Loader2 size={12} className="inline animate-spin" /> : t("suite.new.uploadImages")}
-                      </label>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <label className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-lg border border-border bg-background px-3 py-2 text-xs text-[#2f80ff] transition-colors hover:bg-card">
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/png,image/jpeg,image/webp"
+                            className="hidden"
+                            onChange={async (e) => {
+                              if (e.target.files?.length) await uploadPersonaImages(persona.name, e.target.files);
+                              e.currentTarget.value = "";
+                            }}
+                          />
+                          {uploadingAsset ? <Loader2 size={12} className="inline animate-spin" /> : t("suite.new.uploadImages")}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setPersonas((prev) => prev.filter((item) => item.name !== persona.name))}
+                          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-card hover:text-red-400"
+                          aria-label={t("suite.new.removePersona")}
+                          title={t("suite.new.removePersona")}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
                     </div>
                     {persona.images.length > 0 && (
                       <div className="mt-3 grid grid-cols-3 gap-2">
                         {persona.images.map((image) => (
-                          <img key={image.url} src={image.url} alt={image.name} className="h-20 w-full rounded-lg object-cover" />
+                          <div key={image.url} className="group relative">
+                            <img src={image.url} alt={image.name} className="h-20 w-full rounded-lg object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => setPersonas((prev) => prev.map((item) => (
+                                item.name === persona.name
+                                  ? { ...item, images: item.images.filter((candidate) => candidate.url !== image.url) }
+                                  : item
+                              )))}
+                              className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-background/90 text-muted-foreground opacity-100 shadow-sm transition-colors hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100"
+                              aria-label={t("suite.new.removeImage")}
+                              title={t("suite.new.removeImage")}
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
                         ))}
                       </div>
                     )}
@@ -1712,7 +1907,7 @@ export default function NewSuitePage() {
               setStep("strategy");
               await runGenerateStrategy();
             }}
-            className="bg-foreground text-background hover:bg-foreground/90 gap-2 w-full"
+            className="w-full justify-center gap-2 bg-foreground text-background hover:bg-foreground/90"
           >
             <ForwardIcon size={15} /> {t("suite.new.buildStrategy2")}
           </Button>

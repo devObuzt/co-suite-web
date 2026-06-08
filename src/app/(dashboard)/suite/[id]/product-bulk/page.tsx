@@ -265,19 +265,31 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
 
   async function rejectAsset(assetId: string) {
     if (!batch) return;
+    const feedback = (feedbackByAsset[assetId] || "").trim();
+    if (!feedback) {
+      setError("Add feedback before rejecting this asset, so the next generation can learn from it.");
+      return;
+    }
     await runAction(`reject-${assetId}`, async () => {
-      await api.productBulk.rejectAsset(id, batch.id, assetId);
+      await api.productBulk.rejectAsset(id, batch.id, assetId, feedback);
+      setFeedbackByAsset((current) => ({ ...current, [assetId]: "" }));
       await refreshBatch();
     });
   }
 
   async function regenerateAsset(assetId: string) {
     if (!batch) return;
+    const feedback = (feedbackByAsset[assetId] || "").trim();
+    if (!feedback) {
+      setError("Add feedback before regenerating this asset, so the next version has a clear direction.");
+      return;
+    }
     await runAction(
       `regenerate-${assetId}`,
       async () => {
-        const status = await api.productBulk.regenerateAsset(id, batch.id, assetId, feedbackByAsset[assetId]);
+        const status = await api.productBulk.regenerateAsset(id, batch.id, assetId, feedback);
         setGenerationStatus(status);
+        setFeedbackByAsset((current) => ({ ...current, [assetId]: "" }));
         await refreshBatch();
       },
       true
@@ -295,22 +307,22 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-5 md:p-8">
       <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <Link href={`/suite/${id}`} className="mt-1 text-zinc-500 transition-colors hover:text-white" aria-label="Back to suite">
+          <Link href={`/suite/${id}`} className="mt-1 text-muted-foreground transition-colors hover:text-foreground" aria-label="Back to suite">
             <ArrowLeft size={18} />
           </Link>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold text-white">Product Bulk Studio</h1>
+              <h1 className="text-2xl font-bold text-foreground">Product Bulk Studio</h1>
               {batch && <StatusBadge status={batch.status} />}
             </div>
-            <p className="mt-1 max-w-2xl text-sm text-zinc-500">
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
               Import a catalog, choose the first product direction, then generate and review every product asset.
             </p>
           </div>
         </div>
 
         {batches.length > 1 && (
-          <label className="flex flex-col gap-1 text-xs text-zinc-500">
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
             Batch
             <select
               value={batch?.id || ""}
@@ -320,7 +332,7 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
                 setGenerationStatus(null);
                 setError(null);
               }}
-              className="h-9 max-w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-sm text-zinc-200 outline-none focus:border-indigo-500"
+              className="h-9 max-w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus:border-ring"
             >
               {batches.map((candidate) => (
                 <option key={candidate.id} value={candidate.id}>
@@ -340,7 +352,7 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-5 text-sm text-zinc-400">
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-5 text-sm text-muted-foreground">
           <Loader2 size={16} className="animate-spin" /> Loading product bulk batches...
         </div>
       ) : (
@@ -384,9 +396,9 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
               />
             </>
           ) : (
-            <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-950 px-6 py-12 text-center">
-              <PackageOpen size={32} className="mx-auto mb-3 text-zinc-600" />
-              <p className="text-sm text-zinc-400">No product bulk batch yet. Upload an Excel catalog and image ZIP to begin.</p>
+            <div className="rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
+              <PackageOpen size={32} className="mx-auto mb-3 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">No product bulk batch yet. Upload an Excel catalog and image ZIP to begin.</p>
             </div>
           )}
         </>
@@ -427,12 +439,12 @@ function UploadPanel({
   onUpload: () => void;
 }) {
   return (
-    <Card className="border-zinc-800 bg-zinc-900 text-white">
+    <Card className="border-border bg-card text-card-foreground">
       <CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-base">1. Import source files</CardTitle>
-            <p className="mt-1 text-xs text-zinc-500">Use one Excel sheet for product data and one ZIP for product images.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Use one Excel sheet for product data and one ZIP for product images.</p>
           </div>
           <Button onClick={onUpload} disabled={busy || !excelFile || !zipFile} className="w-full gap-2 bg-indigo-600 hover:bg-indigo-500 sm:w-auto">
             {busy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
@@ -459,17 +471,17 @@ function UploadPanel({
         />
         <div className="space-y-3">
           <label className="block space-y-1">
-            <span className="text-xs text-zinc-500">Creative prompt</span>
+            <span className="text-xs text-muted-foreground">Creative prompt</span>
             <textarea
               value={creativePrompt}
               onChange={(event) => onPromptChange(event.target.value)}
               rows={4}
               dir="auto"
               placeholder="Visual direction, campaign angle, aspect ratio, placement rules..."
-              className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-700 focus:border-indigo-500"
+              className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring"
             />
           </label>
-          <label className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-300">
+          <label className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
             <span>Use brand profile</span>
             <input
               type="checkbox"
@@ -500,14 +512,14 @@ function FileInput({
   onChange: (file: File | null) => void;
 }) {
   return (
-    <label htmlFor={id} className="flex min-h-36 cursor-pointer flex-col justify-between rounded-lg border border-dashed border-zinc-700 bg-zinc-950 p-4 transition-colors hover:border-zinc-500">
-      <span className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+    <label htmlFor={id} className="flex min-h-36 cursor-pointer flex-col justify-between rounded-lg border border-dashed border-border bg-background p-4 transition-colors hover:border-ring">
+      <span className="flex items-center gap-2 text-sm font-medium text-foreground">
         <span className="text-indigo-300">{icon}</span>
         {label}
       </span>
-      <span className="mt-5 min-w-0 text-xs text-zinc-500">
+      <span className="mt-5 min-w-0 text-xs text-muted-foreground">
         {file ? (
-          <span className="block truncate text-zinc-300">{file.name}</span>
+          <span className="block truncate text-foreground">{file.name}</span>
         ) : (
           <span>Choose {accept.replaceAll(".", "").toUpperCase()}</span>
         )}
@@ -567,10 +579,10 @@ function BatchProgress({
 }
 
 function Stat({ label, value, tone = "zinc" }: { label: string; value: number; tone?: "zinc" | "emerald" | "amber" }) {
-  const valueClass = tone === "emerald" ? "text-emerald-300" : tone === "amber" ? "text-amber-300" : "text-white";
+  const valueClass = tone === "emerald" ? "text-emerald-500" : tone === "amber" ? "text-amber-500" : "text-foreground";
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3">
-      <p className="text-xs text-zinc-500">{label}</p>
+    <div className="rounded-lg border border-border bg-card px-4 py-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
       <p className={`mt-1 text-2xl font-semibold ${valueClass}`}>{value}</p>
     </div>
   );
@@ -585,12 +597,12 @@ function ImportPreview({
 }) {
   const rows = batch.items.slice(0, 8);
   return (
-    <Card className="border-zinc-800 bg-zinc-900 text-white">
+    <Card className="border-border bg-card text-card-foreground">
       <CardHeader>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-base">2. Import preview</CardTitle>
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               {stats.matched} images matched, {stats.missing} missing.
             </p>
           </div>
@@ -598,9 +610,9 @@ function ImportPreview({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto rounded-lg border border-zinc-800">
+        <div className="overflow-x-auto rounded-lg border border-border">
           <table className="min-w-[760px] w-full text-left text-sm">
-            <thead className="bg-zinc-950 text-xs text-zinc-500">
+            <thead className="bg-muted text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Row</th>
                 <th className="px-3 py-2 font-medium">Product</th>
@@ -609,13 +621,13 @@ function ImportPreview({
                 <th className="px-3 py-2 font-medium">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800">
+            <tbody className="divide-y divide-border">
               {rows.map((item) => (
-                <tr key={item.id} className="text-zinc-300">
-                  <td className="whitespace-nowrap px-3 py-3 text-xs text-zinc-500">{item.row_index}</td>
+                <tr key={item.id} className="text-foreground">
+                  <td className="whitespace-nowrap px-3 py-3 text-xs text-muted-foreground">{item.row_index}</td>
                   <td className="max-w-[240px] px-3 py-3">
-                    <p className="truncate font-medium text-zinc-100" dir="auto">{item.product_name}</p>
-                    {item.price && <p className="mt-1 truncate text-xs text-zinc-500">{item.price}</p>}
+                    <p className="truncate font-medium text-foreground" dir="auto">{item.product_name}</p>
+                    {item.price && <p className="mt-1 truncate text-xs text-muted-foreground">{item.price}</p>}
                   </td>
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2">
@@ -801,8 +813,14 @@ function AssetsGrid({
                     <StatusBadge status={asset.status} />
                   </div>
 
+                  {asset.feedback && (
+                    <p className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-400" dir="auto">
+                      Previous feedback: {asset.feedback}
+                    </p>
+                  )}
+
                   <label className="block space-y-1">
-                    <span className="text-xs text-zinc-500">Regeneration feedback</span>
+                    <span className="text-xs text-zinc-500">Feedback for reject/regenerate</span>
                     <textarea
                       value={feedbackByAsset[asset.id] || ""}
                       onChange={(event) => onFeedbackChange(asset.id, event.target.value)}
@@ -822,7 +840,7 @@ function AssetsGrid({
                       {busyAction === `reject-${asset.id}` ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
                       Reject
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => onRegenerate(asset.id)} disabled={Boolean(busyAction)} className="gap-1 border-zinc-700 text-xs text-zinc-300 hover:bg-zinc-800">
+                    <Button size="sm" variant="outline" onClick={() => onRegenerate(asset.id)} disabled={Boolean(busyAction) || !(feedbackByAsset[asset.id] || "").trim()} className="gap-1 border-zinc-700 text-xs text-zinc-300 hover:bg-zinc-800">
                       {busyAction === `regenerate-${asset.id}` ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
                       Regenerate
                     </Button>

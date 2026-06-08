@@ -49,6 +49,9 @@
 }
 
 :root {
+  --font-sans: "Helvetica Neue", "Segoe UI", sans-serif;
+  --font-cairo: "Tahoma", "Arial", sans-serif;
+  --font-hebrew: "Arial Hebrew", "Arial", sans-serif;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

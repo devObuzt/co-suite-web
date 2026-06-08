@@ -12,14 +12,14 @@ export function BrandMark({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
       >
         <Image
           src="/co-suite-logo.png"
-          alt="co-Suite logo"
+          alt="OneShare logo"
           fill
           sizes={`${iconSize}px`}
           className="object-contain"
           priority={size === "lg"}
         />
       </span>
-      <span className={`${textSize} font-bold tracking-tight text-foreground`}>co-Suite</span>
+      <span className={`${textSize} font-bold tracking-tight text-foreground`}>OneShare</span>
     </span>
   );
 }

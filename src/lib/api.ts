@@ -31,7 +31,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Request failed" }));
-    throw new Error(err.detail || "Request failed");
+    const detail = err.detail || err.message || "Request failed";
+    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
   }
 
   return res.json();
@@ -141,6 +142,12 @@ export const api = {
   },
 
   content: {
+    generateAccount: (data: GenerateContentRequest = {}) =>
+      request<GenerationStatus>("/content/account/generate", { method: "POST", body: JSON.stringify(data) }),
+    accountGenerationStatus: () =>
+      request<GenerationStatus>("/content/account/generation-status"),
+    listAccount: () =>
+      request<Post[]>("/content/account"),
     generate: (suiteId: string, data: GenerateContentRequest = {}) =>
       request<GenerationStatus>(`/content/${suiteId}/generate`, { method: "POST", body: JSON.stringify(data) }),
     generationStatus: (suiteId: string) =>
@@ -151,8 +158,11 @@ export const api = {
       request<Post>(`/content/${suiteId}/${postId}`, { method: "PATCH", body: JSON.stringify(data) }),
     approve: (suiteId: string, postId: string) =>
       request<{ ok: boolean }>(`/content/${suiteId}/${postId}/approve`, { method: "POST", body: "{}" }),
-    reject: (suiteId: string, postId: string) =>
-      request<{ ok: boolean }>(`/content/${suiteId}/${postId}/reject`, { method: "POST", body: "{}" }),
+    reject: (suiteId: string, postId: string, reason?: string) =>
+      request<{ ok: boolean }>(`/content/${suiteId}/${postId}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ reason, feedback: reason }),
+      }),
     regenerate: (suiteId: string, postId: string, feedback?: string) =>
       request<GenerationStatus>(`/content/${suiteId}/${postId}/regenerate`, {
         method: "POST",
@@ -214,10 +224,10 @@ export const api = {
         `/suites/${suiteId}/product-bulk/${batchId}/assets/${assetId}/approve`,
         { method: "POST", body: "{}" }
       ),
-    rejectAsset: (suiteId: string, batchId: string, assetId: string) =>
-      request<{ ok: boolean; asset_id: string; status: string }>(
+    rejectAsset: (suiteId: string, batchId: string, assetId: string, feedback?: string) =>
+      request<{ ok: boolean; asset_id: string; status: string; feedback?: string }>(
         `/suites/${suiteId}/product-bulk/${batchId}/assets/${assetId}/reject`,
-        { method: "POST", body: "{}" }
+        { method: "POST", body: JSON.stringify({ feedback }) }
       ),
     regenerateAsset: (suiteId: string, batchId: string, assetId: string, feedback?: string) =>
       request<GenerationStatus>(`/suites/${suiteId}/product-bulk/${batchId}/assets/${assetId}/regenerate`, {
@@ -494,6 +504,20 @@ export interface StorageTestResult extends StorageStatus {
   error?: string | null;
 }
 
+export interface MediaReadinessItem {
+  url: string;
+  backend?: string;
+  public?: boolean;
+  publish_ready?: boolean;
+}
+
+export interface MediaReadiness {
+  state?: "ready" | "missing" | "failed" | "local-only" | "unsupported" | "not_required" | "not-required" | string | null;
+  publish_ready?: boolean;
+  reason?: string | null;
+  items?: MediaReadinessItem[];
+}
+
 export interface Post {
   id: string;
   format: "image" | "carousel" | "video";
@@ -502,6 +526,13 @@ export interface Post {
   caption: string | null;
   hashtags: string[] | null;
   media_urls: string[] | null;
+  media_readiness?: MediaReadiness | "ready" | "missing" | "failed" | "local-only" | "unsupported" | "not_required" | "not-required" | string | null;
+  media_readiness_reason?: string | null;
+  media_missing_reason?: string | null;
+  media_ready?: boolean | null;
+  media_public_url?: string | null;
+  media_public_urls?: string[] | null;
+  media_local_only?: boolean | null;
   ai_metadata: Record<string, unknown> | null;
   created_at: string;
 }
@@ -515,6 +546,7 @@ export interface GenerateContentRequest {
   destination?: string;
   model_tier?: string;
   use_brand?: boolean;
+  language?: string;
 }
 
 export interface ProductBulkAsset {

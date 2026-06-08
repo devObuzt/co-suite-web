@@ -97,17 +97,60 @@ function isGenerationActive(status?: GenerationStatus | null) {
   ].includes(status?.status || "");
 }
 
+type ContentStatusFilter = "all" | "pending" | "approved" | "rejected" | "published";
+
+function jobStatusTone(status?: string) {
+  if (!status || status === "idle") return "border-zinc-800 bg-zinc-900/70 text-zinc-400";
+  if (["completed"].includes(status)) return "border-emerald-900 bg-emerald-950/40 text-emerald-300";
+  if (["failed", "cancelled", "timeout"].includes(status)) return "border-red-900 bg-red-950/40 text-red-300";
+  if (["waiting_capacity", "waiting_provider_limit", "retrying"].includes(status)) return "border-amber-900 bg-amber-950/40 text-amber-300";
+  return "border-indigo-900 bg-indigo-950/40 text-indigo-300";
+}
+
+function jobStatusLabel(status?: string) {
+  switch (status) {
+    case "queued": return "Queued";
+    case "running": return "Running";
+    case "waiting_capacity": return "Waiting";
+    case "waiting_provider_limit": return "Waiting for provider";
+    case "retrying": return "Retrying";
+    case "completed": return "Completed";
+    case "failed": return "Failed";
+    case "cancelled": return "Cancelled";
+    case "timeout": return "Timed out";
+    default: return "Idle";
+  }
+}
+
+function jobStatusMessage(status?: GenerationStatus | null) {
+  if (!status) return "";
+  if (status.status === "waiting_provider_limit") {
+    return `Waiting for ${status.provider || "AI provider"} capacity${
+      status.estimated_wait_seconds ? ` (~${Math.ceil(status.estimated_wait_seconds / 60)} min)` : ""
+    }. You can leave this page.`;
+  }
+  if (status.status === "queued") return status.message || "Your request is queued and will start shortly.";
+  if (status.status === "running") return status.message || "AI is generating content.";
+  if (status.status === "retrying") return status.message || "The provider failed once; retry is scheduled.";
+  if (status.status === "completed") return status.message || "Generation completed.";
+  if (status.status === "failed") return status.error || status.message || "Generation failed.";
+  if (status.status === "timeout") return status.error || status.message || "Generation timed out before completing.";
+  if (status.status === "cancelled") return status.message || "Generation was cancelled.";
+  return status.message || "";
+}
+
 export function ContentTab({ suiteId }: { suiteId: string }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [generating, setGenerating] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
-  const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "published">("pending");
+  const [generationError, setGenerationError] = useState("");
+  const [filter, setFilter] = useState<ContentStatusFilter>("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "post" | "image" | "video" | "carousel" | "set" | "bulk" | "campaign">("all");
   const [showAllPosts, setShowAllPosts] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = async () => {
-    const data = await api.content.list(suiteId, filter);
+    const data = await api.content.list(suiteId, filter === "all" ? undefined : filter);
     setPosts(data);
   };
 
@@ -143,12 +186,14 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
 
   async function handleGenerate(request: GenerateContentRequest) {
     setGenerating(true);
+    setGenerationError("");
     try {
       const status = await api.content.generate(suiteId, request);
       setGenerationStatus(status);
       setGenerating(isGenerationActive(status));
-    } catch {
+    } catch (e: unknown) {
       setGenerating(false);
+      setGenerationError(e instanceof Error ? e.message : "Content generation request failed");
     }
   }
 
@@ -160,8 +205,8 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
     setFilter("approved");
   }
 
-  async function handleReject(postId: string) {
-    await api.content.reject(suiteId, postId);
+  async function handleReject(postId: string, reason: string) {
+    await api.content.reject(suiteId, postId, reason);
     await load();
   }
 
@@ -185,16 +230,13 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
   };
 
   const filtered = [...posts]
-    .filter((p) => p.status === filter)
+    .filter((p) => filter === "all" || p.status === filter)
     .filter(typeMatches)
     .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
   const visiblePosts = showAllPosts ? filtered : filtered.slice(0, 3);
   const hiddenPostCount = Math.max(0, filtered.length - visiblePosts.length);
-  const waitMessage = generationStatus?.status === "waiting_provider_limit"
-    ? `Waiting for ${generationStatus.provider || "AI provider"} capacity${
-        generationStatus.estimated_wait_seconds ? ` (~${Math.ceil(generationStatus.estimated_wait_seconds / 60)} min)` : ""
-      }. You can leave this page.`
-    : generationStatus?.message || "AI is generating content…";
+  const generationMessage = jobStatusMessage(generationStatus);
+  const generationVisible = generationStatus && generationStatus.status !== "idle";
 
   return (
     <section className="space-y-4">
@@ -223,7 +265,7 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
             ))}
           </div>
           <div className="flex max-w-full gap-1 overflow-x-auto bg-zinc-900 border border-zinc-800 p-1 rounded-lg">
-            {(["pending", "approved", "published", "rejected"] as const).map((f) => (
+            {(["all", "pending", "approved", "rejected", "published"] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -238,24 +280,37 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
         </div>
       </div>
 
-      {generating && (
-        <div className="space-y-2 text-sm text-indigo-300 bg-indigo-950/40 border border-indigo-900 rounded-lg px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Loader2 size={14} className="animate-spin" />
-            {waitMessage}
+      {generationVisible && (
+        <div className={`space-y-2 rounded-lg border px-4 py-3 text-sm ${jobStatusTone(generationStatus.status)}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            {generating ? <Loader2 size={14} className="animate-spin" /> : generationStatus.status === "completed" ? <CheckCircle2 size={14} /> : generationStatus.status === "failed" ? <XCircle size={14} /> : <Clock3 size={14} />}
+            <span className="font-medium">{jobStatusLabel(generationStatus.status)}</span>
+            {generationStatus.stage && <span className="text-xs opacity-80">Stage: {generationStatus.stage}</span>}
+            {generationStatus.provider && <span className="text-xs opacity-80">Provider: {generationStatus.provider}</span>}
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-indigo-950">
-            <div
-              className="h-full rounded-full bg-indigo-400 transition-all"
-              style={{ width: `${Math.max(5, Math.min(100, generationStatus?.progress || 10))}%` }}
-            />
-          </div>
+          <div>{generationMessage}</div>
+          {(generating || typeof generationStatus.progress === "number") && (
+            <div className="h-1.5 overflow-hidden rounded-full bg-black/30">
+              <div
+                className="h-full rounded-full bg-current transition-all"
+                style={{ width: `${Math.max(5, Math.min(100, generationStatus.progress || (generating ? 10 : 100)))}%` }}
+              />
+            </div>
+          )}
+          {(generationStatus.retry_count || generationStatus.next_retry_at || generationStatus.rate_limit_reset_at) && (
+            <div className="text-xs opacity-80">
+              {generationStatus.retry_count ? `Retry ${generationStatus.retry_count}. ` : ""}
+              {generationStatus.next_retry_at ? `Next retry ${new Date(generationStatus.next_retry_at).toLocaleTimeString()}. ` : ""}
+              {generationStatus.rate_limit_reset_at ? `Rate limit resets ${new Date(generationStatus.rate_limit_reset_at).toLocaleTimeString()}.` : ""}
+            </div>
+          )}
         </div>
       )}
 
-      {generationStatus?.status === "failed" && (
-        <div className="text-sm text-red-300 bg-red-950/40 border border-red-900 rounded-lg px-4 py-3">
-          {generationStatus.error || generationStatus.message || "Generation failed."}
+      {generationError && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-900/70 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+          <XCircle size={15} className="mt-0.5 shrink-0" />
+          <span dir="auto">{generationError}</span>
         </div>
       )}
 
@@ -264,7 +319,7 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
         <div className="border border-dashed border-zinc-800 rounded-xl p-12 text-center">
           <Zap size={32} className="text-zinc-600 mx-auto mb-3" />
           <p className="text-zinc-400 text-sm">
-            {filter === "pending" ? "Click Generate 3 posts to create AI content" : `No ${filter} posts yet`}
+            {filter === "all" ? "Create content above to fill this review queue." : `No ${filter} content yet`}
           </p>
         </div>
       ) : (
@@ -276,7 +331,7 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
                 post={post}
                 suiteId={suiteId}
                 onApprove={() => handleApprove(post.id)}
-                onReject={() => handleReject(post.id)}
+                onReject={(reason) => handleReject(post.id, reason)}
                 onRegenerate={(feedback) => handleRegenerate(post.id, feedback)}
                 onPublish={load}
               />
@@ -302,6 +357,33 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
 
 type CreateMode = "quick" | "anything" | "campaign" | "product_bulk" | "set" | "image" | "video" | "carousel";
 
+function evaluateBrandReadiness(brand?: Suite["brand"] | null) {
+  const services = [...(brand?.services || []), ...(brand?.products || [])].filter(Boolean);
+  const audienceSignals = [
+    brand?.target_audience,
+    brand?.audience_notes,
+    ...(brand?.audience_interests || []),
+    ...(brand?.audience_languages || []),
+  ].filter(Boolean);
+  const messageSignals = [
+    brand?.description,
+    brand?.unique_value,
+    brand?.how_they_help,
+    ...(brand?.usp_points || []),
+    ...(brand?.esp_points || []),
+  ].filter(Boolean);
+  const hasIdentity = Boolean(brand?.name || brand?.niche || brand?.industry);
+  const ready = Boolean(hasIdentity && (services.length > 0 || messageSignals.length > 0) && audienceSignals.length > 0);
+
+  if (ready) {
+    return { ready, label: "Use brand", detail: "Brand profile has enough identity, audience, and offer context." };
+  }
+  if (hasIdentity || services.length > 0 || audienceSignals.length > 0 || messageSignals.length > 0) {
+    return { ready, label: "Limited brand", detail: "Brand profile is partial; generated content may need more manual direction." };
+  }
+  return { ready, label: "No brand yet", detail: "Add brand/profile details before relying on brand memory." };
+}
+
 function CreateCommandCenter({
   suiteId,
   onGenerate,
@@ -312,13 +394,30 @@ function CreateCommandCenter({
   generating: boolean;
 }) {
   const [mode, setMode] = useState<CreateMode>("quick");
-  const [useBrand, setUseBrand] = useState(true);
+  const [useBrand, setUseBrand] = useState(false);
+  const [brandReadiness, setBrandReadiness] = useState(evaluateBrandReadiness(null));
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [contentType, setContentType] = useState<"mixed" | "image" | "video" | "carousel">("mixed");
   const [aspectRatio, setAspectRatio] = useState("Auto");
   const [prompt, setPrompt] = useState("");
   const [destination, setDestination] = useState("social");
   const [modelTier, setModelTier] = useState("auto");
+
+  useEffect(() => {
+    let cancelled = false;
+    api.suites.get(suiteId).then((suite) => {
+      if (cancelled) return;
+      const readiness = evaluateBrandReadiness(suite.brand);
+      setBrandReadiness(readiness);
+      setUseBrand(readiness.ready);
+    }).catch(() => {
+      if (!cancelled) {
+        setBrandReadiness({ ready: false, label: "Brand unknown", detail: "Brand readiness could not be checked; generated content will use the prompt only." });
+        setUseBrand(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [suiteId]);
 
   const modes: {
     id: CreateMode;
@@ -336,6 +435,7 @@ function CreateCommandCenter({
     { id: "video", title: "Create Video", description: "A short video concept and generated asset.", icon: Video },
     { id: "carousel", title: "Carousel", description: "Multi-slide educational or promotional content.", icon: LayoutList },
   ];
+  const modeUnavailable = mode === "campaign";
 
   return (
     <section className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
@@ -351,17 +451,24 @@ function CreateCommandCenter({
         </div>
         <button
           type="button"
-          onClick={() => setUseBrand((value) => !value)}
+          onClick={() => setUseBrand((value) => brandReadiness.ready ? !value : false)}
+          disabled={!brandReadiness.ready}
+          title={brandReadiness.detail}
           className={`flex h-9 items-center justify-between gap-3 rounded-full border px-3 text-xs font-medium transition-colors ${
             useBrand
               ? "border-emerald-800 bg-emerald-950/60 text-emerald-200"
-              : "border-zinc-800 bg-zinc-900 text-zinc-500"
-          }`}
+              : brandReadiness.ready
+                ? "border-zinc-800 bg-zinc-900 text-zinc-500"
+                : "border-amber-900 bg-amber-950/30 text-amber-300"
+          } disabled:cursor-not-allowed`}
         >
           <span className={`h-2 w-2 rounded-full ${useBrand ? "bg-emerald-400" : "bg-zinc-600"}`} />
-          Use brand
+          {useBrand ? "Use brand" : brandReadiness.label}
         </button>
       </div>
+      {!brandReadiness.ready && (
+        <p className="mt-2 text-xs text-amber-300">{brandReadiness.detail}</p>
+      )}
 
       <div className="mt-4 grid gap-3 md:grid-cols-4">
         {modes.map((item) => {
@@ -451,13 +558,19 @@ function CreateCommandCenter({
               use_brand: useBrand,
               count: mode === "quick" || mode === "image" || mode === "video" || mode === "carousel" ? 1 : 3,
             })}
-            disabled={generating}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 gap-2 sm:w-auto"
+            disabled={generating || modeUnavailable}
+            title={modeUnavailable ? "Campaign Builder is being prepared. Use Quick Post/Ad or Create anything for now." : undefined}
+            className="w-full bg-indigo-600 hover:bg-indigo-500 gap-2 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500 sm:w-auto"
           >
             {generating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
             {generating ? "Generating…" : mode === "quick" ? "Create post" : mode === "campaign" ? "Build campaign draft" : mode === "image" ? "Create image" : mode === "video" ? "Create video" : mode === "carousel" ? "Create carousel" : "Generate"}
           </Button>
         </div>
+        {modeUnavailable && (
+          <p className="mt-2 text-xs text-amber-300">
+            Campaign Builder is visible for planning, but full campaign creation is not active yet. Use Quick Post/Ad, Content Set, Image, Video, or Carousel for production generation.
+          </p>
+        )}
 
         <button
           type="button"
@@ -959,13 +1072,87 @@ function GoogleMetricStrip({ metrics, compact = false }: { metrics?: GoogleAdsCa
 
 // ─── Post Card ───────────────────────────────────────────────────────────────
 
+function stringFromMetadata(metadata: Record<string, unknown> | null, keys: string[]) {
+  for (const key of keys) {
+    const value = metadata?.[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function mediaReadinessState(value: Post["media_readiness"]) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return value.state || "";
+}
+
+function mediaReadinessReason(value: Post["media_readiness"]) {
+  if (!value || typeof value === "string") return "";
+  return value.reason || "";
+}
+
+function mediaReadinessItems(value: Post["media_readiness"]) {
+  if (!value || typeof value === "string") return [];
+  return value.items || [];
+}
+
+function mediaReadinessForPost(post: Post) {
+  const metadata = post.ai_metadata || {};
+  const readinessItems = mediaReadinessItems(post.media_readiness);
+  const readinessUrls = readinessItems.map((item) => item.url).filter(Boolean);
+  const urls = readinessUrls.length
+    ? readinessUrls
+    : post.media_public_urls?.length
+    ? post.media_public_urls
+    : post.media_public_url
+      ? [post.media_public_url]
+      : post.media_urls || [];
+  const firstUrl = urls[0] || "";
+  const normalizedUrl = firstUrl ? mediaUrl(firstUrl) : "";
+  const explicitStatus = mediaReadinessState(post.media_readiness) || stringFromMetadata(metadata, ["media_readiness", "media_status", "media_state"]);
+  const reason = post.media_readiness_reason
+    || post.media_missing_reason
+    || mediaReadinessReason(post.media_readiness)
+    || stringFromMetadata(metadata, ["media_readiness_reason", "media_missing_reason", "media_error", "media_note"]);
+  const localOnly = post.media_local_only
+    || explicitStatus === "local-only"
+    || readinessItems.some((item) => item.backend === "local" || item.public === false)
+    || Boolean(firstUrl && !/^https:\/\//i.test(firstUrl));
+  const previewReady = Boolean(normalizedUrl && !["missing", "failed", "unsupported"].includes(explicitStatus));
+  const publishReady = explicitStatus === "ready"
+    || post.media_ready === true
+    || readinessItems.some((item) => item.publish_ready === true)
+    || Boolean(normalizedUrl && !localOnly && !["missing", "failed", "unsupported", "local-only"].includes(explicitStatus));
+  const status = publishReady || previewReady
+    ? localOnly ? "local-only" : "ready"
+    : explicitStatus || (normalizedUrl ? "failed" : "missing");
+
+  return {
+    url: normalizedUrl,
+    rawUrl: firstUrl,
+    ready: previewReady,
+    publishReady,
+    localOnly,
+    status,
+    reason: reason || (
+      status === "missing"
+        ? "Media is missing for this item."
+        : status === "local-only"
+          ? "Media is available only as a local/static file, not a durable public URL."
+          : status === "unsupported"
+            ? "This content type does not support media preview here."
+            : "Media is not ready."
+    ),
+  };
+}
+
 function PostCard({
   post, suiteId, onApprove, onReject, onRegenerate, onPublish,
 }: {
   post: Post;
   suiteId: string;
   onApprove: () => Promise<void>;
-  onReject: () => Promise<void>;
+  onReject: (reason: string) => Promise<void>;
   onRegenerate: (feedback?: string) => Promise<void>;
   onPublish: () => Promise<void>;
 }) {
@@ -975,16 +1162,20 @@ function PostCard({
   const [draftTags, setDraftTags] = useState((post.hashtags || []).join(" "));
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [publishAt, setPublishAt] = useState("");
   const [publishResult, setPublishResult] = useState<Record<string, string> | null>(null);
   const [publishWarning, setPublishWarning] = useState("");
+  const [actionNotice, setActionNotice] = useState("");
+  const [actionError, setActionError] = useState("");
   const isPending = post.status === "pending";
   const isApproved = post.status === "approved";
   const isPublished = post.status === "published";
   const fmt = post.format;
-  const firstMedia = post.media_urls?.[0];
-  const firstMediaUrl = firstMedia ? mediaUrl(firstMedia) : "";
+  const media = mediaReadinessForPost(post);
+  const firstMediaUrl = media.url;
   const [mediaFailed, setMediaFailed] = useState(false);
   const [mediaLoadState, setMediaLoadState] = useState<"idle" | "loaded" | "failed">("idle");
   const FormatIcon = fmt === "carousel" ? LayoutList : fmt === "video" ? Video : ImageIcon;
@@ -1001,18 +1192,32 @@ function PostCard({
 
   async function act(fn: () => Promise<void>) {
     setBusy(true);
-    try { await fn(); } finally { setBusy(false); }
+    setActionError("");
+    setActionNotice("");
+    try {
+      await fn();
+      return true;
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Action failed");
+      return false;
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handlePublish() {
     setBusy(true);
+    setActionError("");
+    setActionNotice("");
     try {
       const res = await api.content.publish(suiteId, post.id);
       setPublishResult(res.results);
       if (res.results.warnings) setPublishWarning(res.results.warnings as unknown as string);
+      setActionNotice("Publish request completed.");
       await onPublish();
     } catch (e: unknown) {
       setPublishWarning(e instanceof Error ? e.message : "Publish failed");
+      setActionError(e instanceof Error ? e.message : "Publish failed");
     } finally {
       setBusy(false);
     }
@@ -1020,13 +1225,18 @@ function PostCard({
 
   async function handleSaveEdit() {
     setBusy(true);
+    setActionError("");
+    setActionNotice("");
     try {
       await api.content.update(suiteId, post.id, {
         caption: draftCaption,
         hashtags: draftTags.split(/\s+/).filter(Boolean).map((tag) => tag.startsWith("#") ? tag : `#${tag}`),
       });
       setEditing(false);
+      setActionNotice("Content saved.");
       await onPublish();
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Save failed");
     } finally {
       setBusy(false);
     }
@@ -1035,40 +1245,70 @@ function PostCard({
   async function handleSchedule() {
     if (!publishAt) return;
     setBusy(true);
+    setActionError("");
+    setActionNotice("");
     try {
       await api.content.schedule(suiteId, post.id, new Date(publishAt).toISOString());
       setScheduleOpen(false);
+      setActionNotice("Post scheduled.");
       await onPublish();
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Schedule failed");
     } finally {
       setBusy(false);
     }
   }
 
   async function copyCaption() {
-    await navigator.clipboard.writeText([post.caption, ...(post.hashtags || [])].filter(Boolean).join("\n\n"));
+    setActionError("");
+    setActionNotice("");
+    try {
+      await navigator.clipboard.writeText([post.caption, ...(post.hashtags || [])].filter(Boolean).join("\n\n"));
+      setActionNotice("Caption copied.");
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Copy failed");
+    }
   }
 
   async function markUsed() {
     setBusy(true);
+    setActionError("");
+    setActionNotice("");
     try {
       await api.content.markUsed(suiteId, post.id);
+      setActionNotice("Marked as used outside app.");
       await onPublish();
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Failed to mark as used");
     } finally {
       setBusy(false);
     }
   }
 
-  const mediaErrorText = !firstMedia
-    ? "No media was generated for this post."
-    : fmt === "video"
+  async function submitReject() {
+    const reason = rejectReason.trim();
+    if (!reason) return;
+    const ok = await act(() => onReject(reason));
+    if (ok) {
+      setRejectOpen(false);
+      setRejectReason("");
+      setActionNotice("Content rejected.");
+    }
+  }
+
+  const mediaErrorText = mediaFailed
+    ? fmt === "video"
       ? "Video preview failed. Open the media URL to verify the file."
-      : "Image preview failed. Open the media URL to verify the file.";
+      : "Image preview failed. Open the media URL to verify the file."
+    : media.reason;
+  const canPreviewMedia = Boolean(firstMediaUrl && media.ready && !mediaFailed);
+  const canDownloadMedia = Boolean(firstMediaUrl && media.ready && !mediaFailed);
 
   return (
     <Card className="bg-zinc-900 border-zinc-800 flex flex-col overflow-hidden">
       {/* Media preview */}
       <div className="relative bg-zinc-800 aspect-square w-full overflow-hidden" dir="ltr">
-        {firstMedia && !mediaFailed && fmt === "video" ? (
+        {canPreviewMedia && fmt === "video" ? (
           <video
             src={firstMediaUrl}
             controls
@@ -1082,7 +1322,7 @@ function PostCard({
               setMediaFailed(true);
             }}
           />
-        ) : firstMedia && !mediaFailed ? (
+        ) : canPreviewMedia ? (
           <img
             src={firstMediaUrl}
             alt={post.topic || "post"}
@@ -1097,7 +1337,7 @@ function PostCard({
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
             <FormatIcon size={32} className="text-zinc-600" />
             <span className="text-xs text-zinc-500">{mediaErrorText}</span>
-            {firstMediaUrl && (
+            {firstMediaUrl && media.ready && (
               <a
                 href={firstMediaUrl}
                 target="_blank"
@@ -1109,7 +1349,7 @@ function PostCard({
             )}
           </div>
         )}
-        {firstMedia && !mediaFailed && mediaLoadState === "idle" && (
+        {canPreviewMedia && mediaLoadState === "idle" && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-zinc-950/30">
             <Loader2 size={18} className="animate-spin text-zinc-500" />
           </div>
@@ -1122,6 +1362,13 @@ function PostCard({
         {post.media_urls && post.media_urls.length > 1 && (
           <div className="absolute top-2 right-2 bg-zinc-900/80 text-zinc-300 text-xs px-1.5 py-0.5 rounded">
             {post.media_urls.length} slides
+          </div>
+        )}
+        {media.status !== "ready" && (
+          <div className="absolute bottom-2 left-2 right-2">
+            <Badge className="max-w-full truncate border-amber-900 bg-amber-950/80 text-amber-300 text-xs" variant="outline">
+              Media {media.status.replace(/_/g, " ")}
+            </Badge>
           </div>
         )}
       </div>
@@ -1190,7 +1437,7 @@ function PostCard({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => act(onReject)}
+              onClick={() => setRejectOpen((value) => !value)}
               disabled={busy}
               className="border-zinc-700 text-zinc-400 hover:text-red-400 hover:border-red-900 gap-1 text-xs h-8"
             >
@@ -1208,6 +1455,21 @@ function PostCard({
             </Button>
             <Button size="sm" variant="outline" onClick={() => setEditing(true)} className="border-zinc-700 text-zinc-400 hover:text-zinc-200 gap-1 text-xs h-8 px-2">
               <Pencil size={12} />
+            </Button>
+          </div>
+        )}
+        {rejectOpen && (
+          <div className="space-y-2 rounded-lg border border-red-950 bg-red-950/20 p-2">
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={3}
+              placeholder="Why are you rejecting this content?"
+              className="w-full resize-none rounded border border-red-950 bg-black px-2 py-1.5 text-xs text-zinc-200 outline-none"
+              dir="auto"
+            />
+            <Button size="sm" disabled={busy || rejectReason.trim().length === 0} onClick={submitReject} className="h-8 w-full bg-red-700 text-xs hover:bg-red-600">
+              Submit rejection reason
             </Button>
           </div>
         )}
@@ -1230,6 +1492,18 @@ function PostCard({
         {/* Publish warning */}
         {publishWarning && (
           <p className="text-xs text-amber-400 bg-amber-950/40 border border-amber-900 rounded px-2 py-1">{publishWarning}</p>
+        )}
+        {(actionNotice || actionError) && (
+          <p
+            className={`rounded border px-2 py-1 text-xs ${
+              actionError
+                ? "border-red-900 bg-red-950/40 text-red-300"
+                : "border-emerald-900 bg-emerald-950/30 text-emerald-300"
+            }`}
+            dir="auto"
+          >
+            {actionError || actionNotice}
+          </p>
         )}
 
         {/* Approved — show Publish button */}
@@ -1256,7 +1530,7 @@ function PostCard({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => act(onReject)}
+              onClick={() => setRejectOpen((value) => !value)}
               disabled={busy}
               className="border-zinc-700 text-zinc-400 hover:text-red-400 hover:border-red-900 gap-1 text-xs h-8"
             >
@@ -1282,15 +1556,23 @@ function PostCard({
           <Button size="sm" variant="outline" onClick={copyCaption} className="h-8 border-zinc-800 px-2 text-xs text-zinc-400">
             <Copy size={12} /> Copy
           </Button>
-          {firstMediaUrl && (
+          {canDownloadMedia ? (
             <a href={firstMediaUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1 rounded-md border border-zinc-800 px-2 text-xs text-zinc-400 hover:text-zinc-200">
               <ImageIcon size={12} /> Open media
             </a>
+          ) : (
+            <span className="inline-flex h-8 items-center gap-1 rounded-md border border-zinc-800 px-2 text-xs text-zinc-600" title={mediaErrorText}>
+              <ImageIcon size={12} /> Preview unavailable
+            </span>
           )}
-          {firstMediaUrl && (
+          {canDownloadMedia ? (
             <a href={firstMediaUrl} download target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1 rounded-md border border-zinc-800 px-2 text-xs text-zinc-400 hover:text-zinc-200">
               <Download size={12} /> Download
             </a>
+          ) : (
+            <span className="inline-flex h-8 items-center gap-1 rounded-md border border-zinc-800 px-2 text-xs text-zinc-600" title={mediaErrorText}>
+              <Download size={12} /> Download unavailable
+            </span>
           )}
           {(isPending || isApproved) && (
             <Button size="sm" variant="outline" onClick={markUsed} disabled={busy} className="h-8 border-zinc-800 px-2 text-xs text-zinc-400">
