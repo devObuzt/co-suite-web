@@ -19,6 +19,7 @@ type CreateChoice = {
   content_type: GenerateContentRequest["content_type"];
   mode: GenerateContentRequest["mode"];
   icon: React.ReactNode;
+  accent: string;
 };
 
 const choices: CreateChoice[] = [
@@ -27,24 +28,28 @@ const choices: CreateChoice[] = [
     content_type: "mixed",
     mode: "quick",
     icon: <Sparkles size={17} />,
+    accent: "from-[#f8d84a]/30 to-[#ff4fa3]/20",
   },
   {
     key: "image",
     content_type: "image",
     mode: "image",
     icon: <ImageIcon size={17} />,
+    accent: "from-[#2f80ff]/25 to-[#35d6b5]/15",
   },
   {
     key: "video",
     content_type: "video",
     mode: "video",
     icon: <Video size={17} />,
+    accent: "from-[#ff4fa3]/25 to-[#f8d84a]/15",
   },
   {
     key: "carousel",
     content_type: "carousel",
     mode: "carousel",
     icon: <Layers size={17} />,
+    accent: "from-[#35d6b5]/25 to-[#2f80ff]/15",
   },
 ];
 
@@ -188,8 +193,8 @@ export default function LandingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground" dir={dir}>
-      <nav className="sticky top-0 z-30 border-b border-border bg-background/88 px-4 py-4 backdrop-blur-xl sm:px-8">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_12%_10%,rgba(248,216,74,0.18),transparent_28%),radial-gradient(circle_at_88%_20%,rgba(47,128,255,0.13),transparent_30%),linear-gradient(180deg,var(--background),var(--background))] text-foreground dark:bg-[radial-gradient(circle_at_12%_10%,rgba(248,216,74,0.08),transparent_30%),radial-gradient(circle_at_88%_18%,rgba(47,128,255,0.1),transparent_34%),linear-gradient(180deg,var(--background),var(--background))]" dir={dir}>
+      <nav className="sticky top-0 z-30 border-b border-border bg-background/84 px-4 py-4 backdrop-blur-xl sm:px-8">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
           <BrandMark />
           <div className="flex items-center gap-2 sm:gap-3">
@@ -209,7 +214,7 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      <section className="mx-auto grid min-h-[calc(100vh-73px)] max-w-7xl items-center gap-10 px-4 py-10 sm:px-8 lg:grid-cols-[1.02fr_0.98fr]">
+      <section className="mx-auto grid min-h-[calc(100vh-73px)] max-w-7xl items-center gap-8 px-4 py-6 sm:px-8 sm:py-10 lg:grid-cols-[1.02fr_0.98fr]">
         <div className="space-y-8">
           <div className="space-y-5">
             <Badge variant="outline" className="border-[#f8d84a]/50 bg-[#f8d84a]/10 text-foreground">
@@ -233,31 +238,32 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div className="rounded-[1.75rem] border border-border bg-card p-3 shadow-[0_28px_90px_rgba(0,0,0,0.12)] dark:shadow-[0_28px_90px_rgba(0,0,0,0.45)]">
-          <div className="rounded-[1.35rem] border border-border/70 bg-background p-4 sm:p-5">
-            <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="rounded-[1.75rem] border border-border bg-card/88 p-2.5 shadow-[0_28px_90px_rgba(0,0,0,0.12)] backdrop-blur dark:shadow-[0_28px_90px_rgba(0,0,0,0.45)] sm:p-3">
+          <div className="rounded-[1.35rem] border border-border/70 bg-background/92 p-3 sm:p-5">
+            <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">{copy.promptKicker}</p>
                 <h2 className="text-xl font-semibold tracking-normal">{copy.promptTitle}</h2>
               </div>
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground">
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground shadow-[0_10px_35px_rgba(248,216,74,0.18)]">
                 <Wand2 size={20} />
               </span>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-2">
               {choices.map((item) => (
                 <button
                   key={item.key}
                   type="button"
                   onClick={() => setChoice(item)}
-                  className={`min-h-24 rounded-xl border p-3 text-start transition ${
+                  className={`relative min-h-20 overflow-hidden rounded-xl border p-3 text-start transition sm:min-h-24 ${
                     choice.key === item.key
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-card hover:bg-accent"
+                      ? "border-primary/70 bg-primary text-primary-foreground shadow-[0_12px_32px_rgba(0,0,0,0.13)]"
+                      : "border-border bg-card/88 hover:border-foreground/20 hover:bg-accent"
                   }`}
                 >
-                  <span className="mb-3 inline-flex items-center gap-2 text-sm font-semibold">
+                  <span className={`pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${item.accent}`} />
+                  <span className="mb-2 inline-flex items-center gap-2 text-sm font-semibold sm:mb-3">
                     {item.icon}
                     {copy.choices[item.key][0]}
                   </span>
@@ -272,7 +278,7 @@ export default function LandingPage() {
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               placeholder={copy.placeholder}
-              className="mt-4 min-h-44 w-full resize-y rounded-2xl border border-input bg-background px-4 py-4 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-4 focus:ring-ring/20"
+              className="mt-3 min-h-36 w-full resize-y rounded-2xl border border-input bg-background/95 px-4 py-4 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-4 focus:ring-ring/20 sm:mt-4 sm:min-h-44"
             />
 
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
