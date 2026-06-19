@@ -196,6 +196,16 @@ export const api = {
         headers: {},
       });
     },
+    uploadAccountQuickAsset: (kind: "logo" | "product" | "style" | "character" | "icon", file: File) => {
+      const form = new FormData();
+      form.append("kind", kind);
+      form.append("file", file);
+      return request<QuickAssetUploadResult>("/content/account/quick-assets", {
+        method: "POST",
+        body: form,
+        headers: {},
+      });
+    },
     generationStatus: (suiteId: string) =>
       request<GenerationStatus>(`/content/${suiteId}/generation-status`),
     list: (suiteId: string, status?: string) =>

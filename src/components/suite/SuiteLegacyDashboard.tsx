@@ -278,7 +278,7 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
 
   return (
     <section className="space-y-4">
-      <CreateCommandCenter suiteId={suiteId} onGenerate={handleGenerate} generating={generating} />
+      <CreateCommandCenter suiteId={suiteId} onGenerate={handleGenerate} generating={generating} generationStatus={generationStatus} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -320,6 +320,8 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
           </div>
         </div>
       </div>
+
+      <CreationProductCards suiteId={suiteId} />
 
       {generationVisible && (
         <div
@@ -410,6 +412,31 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
       )}
 
     </section>
+  );
+}
+
+function CreationProductCards({ suiteId }: { suiteId: string }) {
+  const cards = [
+    { title: "Social Content Builder", description: "Build a recurring social plan, cadence, and content mix.", href: `/suite/${suiteId}/loops`, icon: Calendar, tone: "os-product-card-blue" },
+    { title: "Campaign Builder", description: "Plan sponsored campaigns for Meta and Google Ads.", href: `/suite/${suiteId}`, icon: Megaphone, tone: "os-product-card-pink" },
+    { title: "Content Set", description: "Generate a coordinated batch from one strategic prompt.", href: `#create`, icon: Layers, tone: "os-product-card-yellow" },
+    { title: "Product Bulk Studio", description: "Excel + ZIP production for product catalogs.", href: `/suite/${suiteId}/product-bulk`, icon: PackageOpen, tone: "os-product-card-blue" },
+  ];
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {cards.map((card) => {
+        const Icon = card.icon;
+        return (
+          <Link key={card.title} href={card.href} className={`rounded-xl border p-3 transition-colors hover:-translate-y-0.5 hover:border-[color:var(--brand-accent)] ${card.tone}`}>
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-background/70 text-foreground">
+              <Icon size={15} />
+            </span>
+            <span className="mt-3 block text-sm font-semibold text-foreground">{card.title}</span>
+            <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{card.description}</span>
+          </Link>
+        );
+      })}
+    </div>
   );
 }
 
@@ -588,10 +615,12 @@ function CreateCommandCenter({
   suiteId,
   onGenerate,
   generating,
+  generationStatus,
 }: {
   suiteId: string;
   onGenerate: (request: GenerateContentRequest) => Promise<void>;
   generating: boolean;
+  generationStatus?: GenerationStatus | null;
 }) {
   const [mode, setMode] = useState<CreateMode>("quick");
   const [useBrand, setUseBrand] = useState(false);
@@ -602,7 +631,7 @@ function CreateCommandCenter({
   const [requiredSizes, setRequiredSizes] = useState<string[]>(["image_all"]);
   const [aspectRatio, setAspectRatio] = useState("Auto");
   const [prompt, setPrompt] = useState("");
-  const [destination, setDestination] = useState("social");
+  const [destination, setDestination] = useState("both");
   const [modelTier, setModelTier] = useState("auto");
   const [quickOptionsOpen, setQuickOptionsOpen] = useState(true);
   const [selectedLogo, setSelectedLogo] = useState("brand_default");
@@ -623,7 +652,7 @@ function CreateCommandCenter({
       setSuiteBrand(suite.brand || null);
       setBrandReadiness(readiness);
       setUseBrand(readiness.ready);
-      setLogoEnabled(Boolean(suite.brand?.logo_url || (suite.brand?.brand_logos || []).length));
+      setLogoEnabled(true);
       const brandColors = suite.brand?.colors;
       if (brandColors?.primary || brandColors?.secondary || brandColors?.accent) {
         setColorsEnabled(true);
@@ -762,23 +791,18 @@ function CreateCommandCenter({
   const modes: {
     id: CreateMode;
     title: string;
-    description: string;
     icon: typeof Zap;
-    status?: string;
   }[] = [
-    { id: "quick", title: "Quick Post/Ad", description: "One clean post or ad from a short direction.", icon: Wand2 },
-    { id: "anything", title: "Create anything", description: "Open prompt for any creative direction.", icon: Sparkles },
-    { id: "campaign", title: "Campaign Builder", description: "Creatives, copy, budget, and launch plan.", icon: Megaphone, status: "next" },
-    { id: "product_bulk", title: "Product Bulk Studio", description: "Excel + ZIP product creative production.", icon: PackageOpen },
-    { id: "set", title: "Content Set", description: "A batch of branded posts from one prompt.", icon: Layers },
-    { id: "image", title: "Create Image", description: "A single image creative with copy direction.", icon: ImageIcon },
-    { id: "video", title: "Create Video", description: "A short video concept and generated asset.", icon: Video },
-    { id: "carousel", title: "Carousel", description: "Multi-slide educational or promotional content.", icon: LayoutList },
+    { id: "quick", title: "Quick Post/Ad", icon: Wand2 },
+    { id: "video", title: "Video", icon: Video },
+    { id: "image", title: "Image", icon: ImageIcon },
+    { id: "carousel", title: "Carousel", icon: LayoutList },
   ];
-  const modeUnavailable = mode === "campaign";
+  const modeUnavailable = false;
+  const compactStatusVisible = generationStatus && generationStatus.status !== "idle";
 
   return (
-    <section className="os-surface rounded-xl p-4 sm:p-5">
+    <section id="create" className="os-surface rounded-xl p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-2">
           <span className="os-accent-icon flex h-8 w-8 items-center justify-center rounded-lg">
@@ -810,7 +834,7 @@ function CreateCommandCenter({
         <p className="mt-2 text-xs text-muted-foreground" dir="auto">{brandReadiness.detail}</p>
       )}
 
-      <div className="os-create-grid mt-3 grid gap-2 sm:mt-4 sm:gap-3">
+      <div className="mt-3 flex max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-card/70 p-1 sm:mt-4">
         {modes.map((item) => {
           const Icon = item.icon;
           const active = mode === item.id;
@@ -820,46 +844,37 @@ function CreateCommandCenter({
               type="button"
               onClick={() => {
                 setMode(item.id);
-                if (item.id === "product_bulk") window.location.href = `/suite/${suiteId}/product-bulk`;
+                setContentType(item.id === "quick" ? "mixed" : item.id as "image" | "video" | "carousel");
               }}
-              className={`min-h-24 rounded-lg p-3 text-start transition-colors sm:min-h-32 ${
+              className={`inline-flex min-h-9 shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                 active
-                  ? "os-mode-button-active"
-                  : "os-mode-button"
+                  ? "bg-foreground text-background shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >
-              <div className="flex items-start justify-between gap-2">
-                <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${active ? "bg-[color:var(--brand-accent)] text-white" : "os-accent-icon"}`}>
-                  <Icon size={15} />
-                </span>
-                {item.status && (
-                  <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    {item.status}
-                  </span>
-                )}
-              </div>
-              <p className="mt-3 text-sm font-semibold text-foreground">{item.title}</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
+              <Icon size={14} />
+              {item.title}
             </button>
           );
         })}
       </div>
 
-      <Link
-        href={`/suite/${suiteId}/product-bulk`}
-        className="os-soft-panel mt-3 flex flex-col gap-2 rounded-xl p-3 transition-colors hover:border-[color:var(--brand-accent)] sm:flex-row sm:items-center sm:justify-between"
-      >
-        <span className="min-w-0">
-          <span className="block text-sm font-semibold text-foreground">Product bulk studio</span>
-          <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
-            Upload Excel + ZIP, approve one template, then generate the full product catalog.
-          </span>
-        </span>
-        <span className="inline-flex w-fit items-center gap-2 rounded-full border border-blue-500/30 px-3 py-1 text-xs text-[color:var(--brand-accent-strong)] dark:text-blue-300">
-          <PackageOpen size={13} />
-          Bulk products
-        </span>
-      </Link>
+      {compactStatusVisible && (
+        <div className={`mt-3 rounded-lg border px-3 py-2 text-xs ${jobStatusTone(generationStatus?.status)}`} aria-live={generating ? "polite" : "off"}>
+          <div className="flex items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-2 font-medium">
+              {generating ? <Loader2 size={13} className="animate-spin" /> : generationStatus?.status === "completed" ? <CheckCircle2 size={13} /> : generationStatus?.status === "failed" ? <XCircle size={13} /> : <Clock3 size={13} />}
+              Generation status: {jobStatusLabel(generationStatus?.status)}
+            </span>
+            <span>{Math.max(0, Math.min(100, generationStatus?.progress || 0))}%</span>
+          </div>
+          {(generating || typeof generationStatus?.progress === "number") && (
+            <div className="os-progress-track mt-2 h-1.5 overflow-hidden rounded-full">
+              <div className="os-progress-fill h-full rounded-full transition-all" style={{ width: `${Math.max(5, Math.min(100, generationStatus?.progress || (generating ? 10 : 100)))}%` }} />
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-3 rounded-xl border border-border bg-background p-3 sm:mt-4">
         <textarea
@@ -941,7 +956,10 @@ function CreateCommandCenter({
                           key={option.id}
                           type="button"
                           onClick={() => setRequiredSizes((current) => {
-                            const next = active ? current.filter((id) => id !== option.id) : [...current, option.id];
+                            const allIds = new Set(["image_all", "google_ads_all"]);
+                            if (allIds.has(option.id)) return [option.id];
+                            const withoutAll = current.filter((id) => !allIds.has(id));
+                            const next = active ? withoutAll.filter((id) => id !== option.id) : [...withoutAll, option.id];
                             return next.length ? next : [option.id];
                           })}
                           className={`min-h-14 rounded-lg border px-3 py-2 text-start transition-colors ${active ? "border-[color:var(--brand-accent)] bg-blue-500/10 text-[color:var(--brand-accent-strong)] dark:text-blue-300" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"}`}
@@ -999,14 +1017,17 @@ function CreateCommandCenter({
                   <label className="space-y-1">
                     <span className="flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground">Hook · 30 chars <span title="Large text, max 15% of the image area."><HelpCircle size={12} /></span></span>
                     <input value={hook} maxLength={30} onChange={(e) => setHook(trimText(e.target.value, 30))} className="h-9 w-full rounded-lg border border-input bg-card px-2 text-xs text-foreground outline-none" placeholder="Big promise" dir="auto" />
+                    <span className="block text-end text-[10px] text-muted-foreground">{hook.length}/30</span>
                   </label>
                   <label className="space-y-1">
                     <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Short text · 60 chars</span>
                     <input value={shortDescription} maxLength={60} onChange={(e) => setShortDescription(trimText(e.target.value, 60))} className="h-9 w-full rounded-lg border border-input bg-card px-2 text-xs text-foreground outline-none" placeholder="Small supporting line" dir="auto" />
+                    <span className="block text-end text-[10px] text-muted-foreground">{shortDescription.length}/60</span>
                   </label>
                   <label className="space-y-1">
                     <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Terms · 25 chars</span>
                     <input value={terms} maxLength={25} onChange={(e) => setTerms(trimText(e.target.value, 25))} className="h-9 w-full rounded-lg border border-input bg-card px-2 text-xs text-foreground outline-none" placeholder="Limited offer" dir="auto" />
+                    <span className="block text-end text-[10px] text-muted-foreground">{terms.length}/25</span>
                   </label>
                 </div>
               </div>
@@ -1070,21 +1091,7 @@ function CreateCommandCenter({
           <ChevronDown size={13} className={`transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
         </button>
         {advancedOpen && (
-          <div className="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-3">
-            <label className="space-y-1">
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Aspect ratio</span>
-              <select
-                value={aspectRatio}
-                onChange={(e) => setAspectRatio(e.target.value)}
-                className="h-9 w-full rounded-lg border border-input bg-card px-2 text-xs text-foreground outline-none"
-              >
-                <option>Auto</option>
-                <option>1:1</option>
-                <option>4:5</option>
-                <option>9:16</option>
-                <option>16:9</option>
-              </select>
-            </label>
+          <div className="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
             <label className="space-y-1">
               <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Destination</span>
               <select
@@ -1092,9 +1099,9 @@ function CreateCommandCenter({
                 onChange={(e) => setDestination(e.target.value)}
                 className="h-9 w-full rounded-lg border border-input bg-card px-2 text-xs text-foreground outline-none"
               >
+                <option value="both">Both</option>
                 <option value="social">Social media</option>
                 <option value="ads">Ads</option>
-                <option value="both">Both</option>
               </select>
             </label>
             <label className="space-y-1">
