@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd, MetaCampaign, GoogleAdsCampaign, GenerateContentRequest, GenerationStatus, StorageStatus, StorageTestResult } from "@/lib/api";
+import { api, Suite, Post, Connections, AnalyticsData, InsightPoint, MarketingStrategy, AudiencePersona, CompetitorEntry, MetaAd, MetaCampaign, GoogleAdsCampaign, GenerateContentRequest, GenerationStatus, StorageStatus, StorageTestResult, paymentGateDetail, PaymentGateDetail } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   Loader2, CheckCircle2, XCircle, RefreshCw, Hash, ImageIcon, LayoutList, Video,
   Link2, Link2Off, CreditCard, Target, ChevronDown, Layers, Wand2, SlidersHorizontal,
   Clock3, Megaphone, Sparkles, Copy, Download, Pencil, PackageOpen,
+  HelpCircle, Palette, UploadCloud, Plus, X,
 } from "lucide-react";
 
 const API_MEDIA = process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") || "http://localhost:8000";
@@ -100,11 +101,11 @@ function isGenerationActive(status?: GenerationStatus | null) {
 type ContentStatusFilter = "all" | "pending" | "approved" | "rejected" | "published";
 
 function jobStatusTone(status?: string) {
-  if (!status || status === "idle") return "border-zinc-800 bg-zinc-900/70 text-zinc-400";
-  if (["completed"].includes(status)) return "border-emerald-900 bg-emerald-950/40 text-emerald-300";
-  if (["failed", "cancelled", "timeout"].includes(status)) return "border-red-900 bg-red-950/40 text-red-300";
-  if (["waiting_capacity", "waiting_provider_limit", "retrying"].includes(status)) return "border-amber-900 bg-amber-950/40 text-amber-300";
-  return "border-indigo-900 bg-indigo-950/40 text-indigo-300";
+  if (!status || status === "idle") return "border-border bg-muted/40 text-muted-foreground";
+  if (["completed"].includes(status)) return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+  if (["failed", "cancelled", "timeout"].includes(status)) return "border-destructive/40 bg-destructive/10 text-destructive";
+  if (["waiting_capacity", "waiting_provider_limit", "retrying"].includes(status)) return "os-warning-panel";
+  return "border-blue-500/30 bg-blue-500/10 text-[color:var(--brand-accent-strong)] dark:text-blue-300";
 }
 
 function jobStatusLabel(status?: string) {
@@ -144,28 +145,45 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
   const [generating, setGenerating] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
   const [generationError, setGenerationError] = useState("");
+  const [paymentGate, setPaymentGate] = useState<PaymentGateDetail | null>(null);
   const [filter, setFilter] = useState<ContentStatusFilter>("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "post" | "image" | "video" | "carousel" | "set" | "bulk" | "campaign">("all");
   const [showAllPosts, setShowAllPosts] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const data = await api.content.list(suiteId, filter === "all" ? undefined : filter);
     setPosts(data);
-  };
+  }, [suiteId, filter]);
 
-  const syncGenerationStatus = async () => {
+  const syncGenerationStatus = useCallback(async () => {
     const status = await api.content.generationStatus(suiteId);
     setGenerationStatus(status);
     const active = isGenerationActive(status);
     setGenerating(active);
     return status;
-  };
+  }, [suiteId]);
 
   useEffect(() => {
-    load();
-    syncGenerationStatus().catch(() => setGenerating(false));
-    setShowAllPosts(false);
+    let cancelled = false;
+    async function refresh() {
+      try {
+        const [data, status] = await Promise.all([
+          api.content.list(suiteId, filter === "all" ? undefined : filter),
+          api.content.generationStatus(suiteId),
+        ]);
+        if (cancelled) return;
+        setPosts(data);
+        setGenerationStatus(status);
+        setGenerating(isGenerationActive(status));
+      } catch {
+        if (!cancelled) setGenerating(false);
+      }
+    }
+    void refresh();
+    return () => {
+      cancelled = true;
+    };
   }, [suiteId, filter]);
 
   // Poll status and posts while the backend job is active.
@@ -182,17 +200,24 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
       if (pollRef.current) clearInterval(pollRef.current);
     }
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [generating, filter]);
+  }, [generating, filter, load, syncGenerationStatus]);
 
   async function handleGenerate(request: GenerateContentRequest) {
     setGenerating(true);
     setGenerationError("");
+    setPaymentGate(null);
     try {
       const status = await api.content.generate(suiteId, request);
       setGenerationStatus(status);
       setGenerating(isGenerationActive(status));
     } catch (e: unknown) {
       setGenerating(false);
+      const gate = paymentGateDetail(e);
+      if (gate) {
+        setPaymentGate(gate);
+        setGenerationError(gate.message || "Generation tokens are exhausted.");
+        return;
+      }
       setGenerationError(e instanceof Error ? e.message : "Content generation request failed");
     }
   }
@@ -257,11 +282,11 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-white">Recent content</h2>
-          <p className="text-xs text-zinc-500 mt-1">Review, approve, schedule, or publish generated work.</p>
+          <h2 className="text-sm font-semibold text-foreground">Recent content</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Review, approve, schedule, or publish generated work.</p>
         </div>
         <div className="flex flex-col gap-2">
-          <div className="flex max-w-full gap-1 overflow-x-auto bg-zinc-900 border border-zinc-800 p-1 rounded-lg">
+          <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg border border-border bg-card p-1">
             {(["all", "post", "image", "video", "carousel", "set", "bulk", "campaign"] as const).map((f) => (
               <button
                 key={f}
@@ -270,20 +295,23 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
                   setShowAllPosts(false);
                 }}
                 className={`shrink-0 px-3 py-1.5 rounded text-xs font-medium capitalize transition-colors ${
-                  typeFilter === f ? "bg-indigo-600 text-white" : "text-zinc-500 hover:text-zinc-300"
+                  typeFilter === f ? "bg-[color:var(--brand-accent)] text-white" : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 }`}
               >
                 {f}
               </button>
             ))}
           </div>
-          <div className="flex max-w-full gap-1 overflow-x-auto bg-zinc-900 border border-zinc-800 p-1 rounded-lg">
+          <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg border border-border bg-card p-1">
             {(["all", "pending", "approved", "rejected", "published"] as const).map((f) => (
               <button
                 key={f}
-                onClick={() => setFilter(f)}
+                onClick={() => {
+                  setFilter(f);
+                  setShowAllPosts(false);
+                }}
                 className={`shrink-0 px-3 py-1.5 rounded text-xs font-medium capitalize transition-colors ${
-                  filter === f ? "bg-zinc-700 text-white" : "text-zinc-500 hover:text-zinc-300"
+                  filter === f ? "bg-foreground text-background" : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 }`}
               >
                 {f}
@@ -294,7 +322,10 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
       </div>
 
       {generationVisible && (
-        <div className={`space-y-2 rounded-lg border px-4 py-3 text-sm ${jobStatusTone(generationStatus.status)}`}>
+        <div
+          className={`space-y-2 rounded-lg border px-4 py-3 text-sm ${jobStatusTone(generationStatus.status)}`}
+          aria-live={generating ? "polite" : "off"}
+        >
           <div className="flex flex-wrap items-center gap-2">
             {generating ? <Loader2 size={14} className="animate-spin" /> : generationStatus.status === "completed" ? <CheckCircle2 size={14} /> : generationStatus.status === "failed" ? <XCircle size={14} /> : <Clock3 size={14} />}
             <span className="font-medium">{jobStatusLabel(generationStatus.status)}</span>
@@ -303,9 +334,9 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
           </div>
           <div>{generationMessage}</div>
           {(generating || typeof generationStatus.progress === "number") && (
-            <div className="h-1.5 overflow-hidden rounded-full bg-black/30">
+            <div className="os-progress-track h-1.5 overflow-hidden rounded-full">
               <div
-                className="h-full rounded-full bg-current transition-all"
+                className="os-progress-fill h-full rounded-full transition-all"
                 style={{ width: `${Math.max(5, Math.min(100, generationStatus.progress || (generating ? 10 : 100)))}%` }}
               />
             </div>
@@ -321,17 +352,31 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
       )}
 
       {generationError && (
-        <div className="flex items-start gap-2 rounded-lg border border-red-900/70 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+        <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <XCircle size={15} className="mt-0.5 shrink-0" />
-          <span dir="auto">{generationError}</span>
+          <div className="space-y-2">
+            <span dir="auto">{generationError}</span>
+            {paymentGate && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-red-100/80">
+                  Required {paymentGate.required_tokens ?? 0} tokens, available {paymentGate.token_balance ?? 0}.
+                </span>
+                <Link href={`/suite/${suiteId}/billing`}>
+                  <Button size="sm" variant="outline" className="h-8">
+                    Upgrade or buy tokens
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* Post grid */}
       {filtered.length === 0 && !generating ? (
-        <div className="border border-dashed border-zinc-800 rounded-xl p-12 text-center">
-          <Zap size={32} className="text-zinc-600 mx-auto mb-3" />
-          <p className="text-zinc-400 text-sm">
+        <div className="rounded-xl border border-dashed border-border p-12 text-center">
+          <Zap size={32} className="mx-auto mb-3 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">
             {filter === "all" ? "Create content above to fill this review queue." : `No ${filter} content yet`}
           </p>
         </div>
@@ -355,7 +400,7 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
               <Button
                 variant="outline"
                 onClick={() => setShowAllPosts(true)}
-                className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                className="border-border"
               >
                 Show more ({hiddenPostCount})
               </Button>
@@ -369,6 +414,148 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
 }
 
 type CreateMode = "quick" | "anything" | "campaign" | "product_bulk" | "set" | "image" | "video" | "carousel";
+
+type QuickAssetKind = "product" | "style" | "character" | "icon";
+
+type QuickSavedAsset = {
+  id: string;
+  kind: QuickAssetKind | "logo";
+  name: string;
+  dataUrl: string;
+  createdAt: string;
+  url?: string;
+  status?: "uploading" | "uploaded" | "failed" | "local";
+  error?: string;
+  storageBackend?: string;
+};
+
+type QuickCreativeBrief = {
+  logo?: { enabled: boolean; source: "brand_default" | "brand_alt" | "uploaded" | "none"; name?: string; url?: string };
+  colors?: { enabled: boolean; values: string[] };
+  output_type?: "mixed" | "image" | "video" | "carousel";
+  required_sizes?: { ids: string[]; labels: string[]; aspect_ratios: string[]; notes: string[] };
+  reference_assets?: { kind: QuickAssetKind; names: string[]; urls: string[]; count: number; instruction: string }[];
+  hook?: string;
+  short_description?: string;
+  terms?: string;
+  text_limits?: { hook_max_chars: number; hook_max_area_percent: number; short_description_max_chars: number; short_description_max_area_percent: number; terms_max_chars: number; terms_max_area_percent: number; terms_max_font_px: number };
+};
+
+type QuickSizeFormat = "image" | "video" | "carousel";
+
+type QuickSizeOption = {
+  id: string;
+  label: string;
+  helper: string;
+  formats: QuickSizeFormat[];
+  aspectRatios: string[];
+  note: string;
+};
+
+const QUICK_ASSET_KINDS: { id: QuickAssetKind; label: string; helper: string; multiple: boolean; instruction: string }[] = [
+  { id: "product", label: "Product photos", helper: "Keep the product shape unchanged as much as possible.", multiple: true, instruction: "Use as product references. Preserve product shape, proportions, colors, packaging, and key details. Do not redesign the product." },
+  { id: "style", label: "Similar style", helper: "A visual style or concept to follow.", multiple: false, instruction: "Use as style or concept reference only. Do not copy protected marks or exact layout." },
+  { id: "character", label: "Character / element", helper: "A person, mascot, object, or element to use.", multiple: true, instruction: "Use these as character, presenter, object, or element references where relevant." },
+  { id: "icon", label: "Icons", helper: "Icons or small visual elements for the design.", multiple: true, instruction: "Use as icon or supporting graphic references." },
+];
+
+const QUICK_SIZE_OPTIONS: QuickSizeOption[] = [
+  {
+    id: "image_all",
+    label: "All image sizes",
+    helper: "Prepare all supported image placements.",
+    formats: ["image", "carousel"],
+    aspectRatios: ["4:5", "1:1", "9:16", "16:9", "1.91:1"],
+    note: "Generate or adapt the image concept for Instagram 4:5, Meta square 1:1, vertical story 9:16, wide 16:9, and Google Ads image requirements.",
+  },
+  {
+    id: "instagram_post_4_5",
+    label: "4:5 Instagram post",
+    helper: "Portrait feed creative.",
+    formats: ["image", "carousel"],
+    aspectRatios: ["4:5"],
+    note: "Optimize for Instagram feed portrait posts at 4:5.",
+  },
+  {
+    id: "meta_square_1_1",
+    label: "1:1 Meta square ad",
+    helper: "Square ad creative.",
+    formats: ["image", "carousel"],
+    aspectRatios: ["1:1"],
+    note: "Optimize for Meta square ads at 1:1.",
+  },
+  {
+    id: "vertical_story_9_16",
+    label: "9:16 vertical / story",
+    helper: "Stories and vertical placements.",
+    formats: ["image", "video"],
+    aspectRatios: ["9:16"],
+    note: "Optimize for vertical story placements at 9:16.",
+  },
+  {
+    id: "wide_16_9",
+    label: "16:9 wide",
+    helper: "Landscape placements.",
+    formats: ["image", "video"],
+    aspectRatios: ["16:9"],
+    note: "Optimize for wide landscape placements at 16:9.",
+  },
+  {
+    id: "google_ads_all",
+    label: "Google Ads image sizes",
+    helper: "All Google image ad requirements.",
+    formats: ["image"],
+    aspectRatios: ["1:1", "1.91:1", "4:5", "9:16", "16:9"],
+    note: "Plan responsive Google Ads image assets and crops, including square, landscape, portrait, and vertical variants.",
+  },
+  {
+    id: "video_story_reel_9_16",
+    label: "9:16 video / story / reel",
+    helper: "Vertical reel or story video.",
+    formats: ["video"],
+    aspectRatios: ["9:16"],
+    note: "Generate video for vertical reels and stories at 9:16.",
+  },
+  {
+    id: "video_wide_16_9",
+    label: "16:9 video wide",
+    helper: "Landscape video creative.",
+    formats: ["video"],
+    aspectRatios: ["16:9"],
+    note: "Generate video for wide landscape placements at 16:9.",
+  },
+];
+
+function quickSizeMatchesContentType(option: QuickSizeOption, contentType: QuickCreativeBrief["output_type"]) {
+  if (!contentType || contentType === "mixed") return true;
+  if (contentType === "carousel") return option.formats.includes("carousel") || option.formats.includes("image");
+  return option.formats.includes(contentType);
+}
+
+function quickAssetStorageKey(suiteId: string) {
+  return `oneshare.quickAssets.${suiteId}`;
+}
+
+function trimText(value: string, max: number) {
+  return value.slice(0, max);
+}
+
+async function fileToSavedAsset(file: File, kind: QuickSavedAsset["kind"]): Promise<QuickSavedAsset> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+  return {
+    id: `${kind}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    kind,
+    name: file.name,
+    dataUrl,
+    createdAt: new Date().toISOString(),
+    status: "uploading",
+  };
+}
 
 function evaluateBrandReadiness(brand?: Suite["brand"] | null) {
   const services = [...(brand?.services || []), ...(brand?.products || [])].filter(Boolean);
@@ -409,20 +596,39 @@ function CreateCommandCenter({
   const [mode, setMode] = useState<CreateMode>("quick");
   const [useBrand, setUseBrand] = useState(false);
   const [brandReadiness, setBrandReadiness] = useState(evaluateBrandReadiness(null));
+  const [suiteBrand, setSuiteBrand] = useState<Suite["brand"] | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [contentType, setContentType] = useState<"mixed" | "image" | "video" | "carousel">("mixed");
+  const [requiredSizes, setRequiredSizes] = useState<string[]>(["image_all"]);
   const [aspectRatio, setAspectRatio] = useState("Auto");
   const [prompt, setPrompt] = useState("");
   const [destination, setDestination] = useState("social");
   const [modelTier, setModelTier] = useState("auto");
+  const [quickOptionsOpen, setQuickOptionsOpen] = useState(true);
+  const [selectedLogo, setSelectedLogo] = useState("brand_default");
+  const [logoEnabled, setLogoEnabled] = useState(true);
+  const [savedAssets, setSavedAssets] = useState<QuickSavedAsset[]>([]);
+  const [assetUploadError, setAssetUploadError] = useState("");
+  const [colorsEnabled, setColorsEnabled] = useState(false);
+  const [briefColors, setBriefColors] = useState<string[]>(["#0a0a0a", "#f8d84a", "#ff4fa3"]);
+  const [hook, setHook] = useState("");
+  const [shortDescription, setShortDescription] = useState("");
+  const [terms, setTerms] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     api.suites.get(suiteId).then((suite) => {
       if (cancelled) return;
       const readiness = evaluateBrandReadiness(suite.brand);
+      setSuiteBrand(suite.brand || null);
       setBrandReadiness(readiness);
       setUseBrand(readiness.ready);
+      setLogoEnabled(Boolean(suite.brand?.logo_url || (suite.brand?.brand_logos || []).length));
+      const brandColors = suite.brand?.colors;
+      if (brandColors?.primary || brandColors?.secondary || brandColors?.accent) {
+        setColorsEnabled(true);
+        setBriefColors([brandColors.primary, brandColors.secondary, brandColors.accent].filter(Boolean).slice(0, 3) as string[]);
+      }
     }).catch(() => {
       if (!cancelled) {
         setBrandReadiness({ ready: false, label: "Brand unknown", detail: "Brand readiness could not be checked; generated content will use the prompt only." });
@@ -431,6 +637,127 @@ function CreateCommandCenter({
     });
     return () => { cancelled = true; };
   }, [suiteId]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(quickAssetStorageKey(suiteId));
+      if (raw) {
+        const parsed = JSON.parse(raw) as QuickSavedAsset[];
+        setSavedAssets(parsed.map((asset) => ({ ...asset, status: asset.url ? (asset.status || "uploaded") : (asset.status === "failed" ? "failed" : "local") })));
+      }
+    } catch {
+      setSavedAssets([]);
+    }
+  }, [suiteId]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(quickAssetStorageKey(suiteId), JSON.stringify(savedAssets.slice(-40)));
+    } catch {
+      // Local asset cache is best-effort; generation should still work.
+    }
+  }, [suiteId, savedAssets]);
+
+  useEffect(() => {
+    setRequiredSizes((current) => {
+      const validIds = new Set(QUICK_SIZE_OPTIONS.filter((option) => quickSizeMatchesContentType(option, contentType)).map((option) => option.id));
+      const next = current.filter((id) => validIds.has(id));
+      if (next.length > 0) return next;
+      const fallback = QUICK_SIZE_OPTIONS.find((option) => validIds.has(option.id));
+      return fallback ? [fallback.id] : current;
+    });
+  }, [contentType]);
+
+  async function addQuickAssets(files: FileList | null, kind: QuickSavedAsset["kind"]) {
+    if (!files?.length) return;
+    setAssetUploadError("");
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
+    const entries = await Promise.all(imageFiles.map(async (file) => ({ file, asset: await fileToSavedAsset(file, kind) })));
+    const next = entries.map((entry) => entry.asset);
+    setSavedAssets((current) => [...current, ...next].slice(-40));
+    if (kind === "logo" && next[0]) {
+      setSelectedLogo(next[0].id);
+      setLogoEnabled(true);
+    }
+
+    await Promise.all(entries.map(async ({ file, asset }) => {
+      try {
+        const uploaded = await api.content.uploadQuickAsset(suiteId, kind, file);
+        setSavedAssets((current) => current.map((item) => item.id === asset.id ? {
+          ...item,
+          name: uploaded.name || item.name,
+          url: uploaded.url,
+          status: "uploaded",
+          error: undefined,
+          storageBackend: uploaded.storage?.backend,
+        } : item));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Upload failed";
+        setAssetUploadError(message);
+        setSavedAssets((current) => current.map((item) => item.id === asset.id ? { ...item, status: "failed", error: message } : item));
+      }
+    }));
+  }
+
+  function removeQuickAsset(assetId: string) {
+    setSavedAssets((current) => current.filter((asset) => asset.id !== assetId));
+    if (selectedLogo === assetId) setSelectedLogo("brand_default");
+  }
+
+  const brandLogos = suiteBrand?.brand_logos || [];
+  const uploadedLogos = savedAssets.filter((asset) => asset.kind === "logo");
+  const selectedLogoAsset = uploadedLogos.find((asset) => asset.id === selectedLogo);
+  const referenceGroups = QUICK_ASSET_KINDS.map((kind) => ({ ...kind, assets: savedAssets.filter((asset) => asset.kind === kind.id) }));
+  const visibleSizeOptions = QUICK_SIZE_OPTIONS.filter((option) => quickSizeMatchesContentType(option, contentType));
+  const selectedSizeOptions = QUICK_SIZE_OPTIONS.filter((option) => requiredSizes.includes(option.id));
+  const selectedAspectRatios = Array.from(new Set(selectedSizeOptions.flatMap((option) => option.aspectRatios)));
+  const selectedLogoAssetName = selectedLogoAsset?.name;
+  const uploadedAssetCount = savedAssets.filter((asset) => asset.status === "uploaded" && asset.url).length;
+  const quickAssetUploading = savedAssets.some((asset) => asset.status === "uploading");
+  const quickAssetFailed = savedAssets.some((asset) => asset.status === "failed");
+  const quickCreateBlocked = mode === "quick" && (quickAssetUploading || quickAssetFailed);
+  const brandDefaultLogoUrl = suiteBrand?.logo_url;
+  let selectedLogoMeta: QuickCreativeBrief["logo"] = { enabled: logoEnabled, source: "none" };
+  if (selectedLogoAssetName && selectedLogoAsset?.url) {
+    selectedLogoMeta = { enabled: logoEnabled, source: "uploaded", name: selectedLogoAssetName, url: selectedLogoAsset.url };
+  } else if (selectedLogo === "brand_default" && brandDefaultLogoUrl) {
+    selectedLogoMeta = { enabled: logoEnabled, source: "brand_default", url: brandDefaultLogoUrl };
+  } else if (selectedLogo.startsWith("brand_logo:")) {
+    selectedLogoMeta = { enabled: logoEnabled, source: "brand_alt", url: selectedLogo.replace("brand_logo:", "") };
+  }
+  const quickCreativeBrief: QuickCreativeBrief = {
+    logo: selectedLogoMeta,
+    colors: { enabled: colorsEnabled, values: briefColors.filter(Boolean).slice(0, 3) },
+    output_type: contentType,
+    required_sizes: {
+      ids: selectedSizeOptions.map((option) => option.id),
+      labels: selectedSizeOptions.map((option) => option.label),
+      aspect_ratios: selectedAspectRatios,
+      notes: selectedSizeOptions.map((option) => option.note),
+    },
+    reference_assets: referenceGroups
+      .map((group) => ({ ...group, assets: group.assets.filter((asset) => asset.status === "uploaded" && asset.url) }))
+      .filter((group) => group.assets.length > 0)
+      .map((group) => ({
+        kind: group.id,
+        names: group.assets.map((asset) => asset.name),
+        urls: group.assets.map((asset) => asset.url as string),
+        count: group.assets.length,
+        instruction: group.instruction,
+      })),
+    hook: hook.trim() || undefined,
+    short_description: shortDescription.trim() || undefined,
+    terms: terms.trim() || undefined,
+    text_limits: {
+      hook_max_chars: 30,
+      hook_max_area_percent: 15,
+      short_description_max_chars: 60,
+      short_description_max_area_percent: 5,
+      terms_max_chars: 25,
+      terms_max_area_percent: 5,
+      terms_max_font_px: 10,
+    },
+  };
 
   const modes: {
     id: CreateMode;
@@ -451,15 +778,15 @@ function CreateCommandCenter({
   const modeUnavailable = mode === "campaign";
 
   return (
-    <section className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
+    <section className="os-surface rounded-xl p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-300">
+          <span className="os-accent-icon flex h-8 w-8 items-center justify-center rounded-lg">
             <Sparkles size={16} />
           </span>
           <div>
-            <h2 className="text-base font-semibold text-white">Create & generate</h2>
-            <p className="text-xs text-zinc-500">Choose the job first. Details stay quiet until needed.</p>
+            <h2 className="text-base font-semibold text-foreground">Create & generate</h2>
+            <p className="text-xs text-muted-foreground">Choose the job first. Details stay quiet until needed.</p>
           </div>
         </div>
         <button
@@ -469,21 +796,21 @@ function CreateCommandCenter({
           title={brandReadiness.detail}
           className={`flex h-9 items-center justify-between gap-3 rounded-full border px-3 text-xs font-medium transition-colors ${
             useBrand
-              ? "border-emerald-800 bg-emerald-950/60 text-emerald-200"
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
               : brandReadiness.ready
-                ? "border-zinc-800 bg-zinc-900 text-zinc-500"
-                : "border-amber-900 bg-amber-950/30 text-amber-300"
+                ? "border-border bg-card text-muted-foreground"
+                : "os-warning-panel"
           } disabled:cursor-not-allowed`}
         >
-          <span className={`h-2 w-2 rounded-full ${useBrand ? "bg-emerald-400" : "bg-zinc-600"}`} />
+          <span className={`h-2 w-2 rounded-full ${useBrand ? "bg-emerald-500" : "bg-muted-foreground"}`} />
           {useBrand ? "Use brand" : brandReadiness.label}
         </button>
       </div>
       {!brandReadiness.ready && (
-        <p className="mt-2 text-xs text-amber-300">{brandReadiness.detail}</p>
+        <p className="mt-2 text-xs text-muted-foreground" dir="auto">{brandReadiness.detail}</p>
       )}
 
-      <div className="mt-4 grid gap-3 md:grid-cols-4">
+      <div className="os-create-grid mt-3 grid gap-2 sm:mt-4 sm:gap-3">
         {modes.map((item) => {
           const Icon = item.icon;
           const active = mode === item.id;
@@ -495,24 +822,24 @@ function CreateCommandCenter({
                 setMode(item.id);
                 if (item.id === "product_bulk") window.location.href = `/suite/${suiteId}/product-bulk`;
               }}
-              className={`min-h-32 rounded-xl border p-3 text-left transition-colors ${
+              className={`min-h-24 rounded-lg p-3 text-start transition-colors sm:min-h-32 ${
                 active
-                  ? "border-indigo-500 bg-indigo-500/10"
-                  : "border-zinc-800 bg-zinc-900 hover:border-zinc-700"
+                  ? "os-mode-button-active"
+                  : "os-mode-button"
               }`}
             >
               <div className="flex items-start justify-between gap-2">
-                <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${active ? "bg-indigo-500 text-white" : "bg-zinc-800 text-zinc-400"}`}>
+                <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${active ? "bg-[color:var(--brand-accent)] text-white" : "os-accent-icon"}`}>
                   <Icon size={15} />
                 </span>
                 {item.status && (
-                  <span className="rounded-full border border-zinc-700 px-2 py-0.5 text-[10px] uppercase tracking-wide text-zinc-500">
+                  <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                     {item.status}
                   </span>
                 )}
               </div>
-              <p className="mt-3 text-sm font-semibold text-zinc-100">{item.title}</p>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-500">{item.description}</p>
+              <p className="mt-3 text-sm font-semibold text-foreground">{item.title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
             </button>
           );
         })}
@@ -520,67 +847,215 @@ function CreateCommandCenter({
 
       <Link
         href={`/suite/${suiteId}/product-bulk`}
-        className="mt-3 flex flex-col gap-2 rounded-xl border border-zinc-800 bg-zinc-900 p-3 transition-colors hover:border-indigo-500 hover:bg-indigo-500/10 sm:flex-row sm:items-center sm:justify-between"
+        className="os-soft-panel mt-3 flex flex-col gap-2 rounded-xl p-3 transition-colors hover:border-[color:var(--brand-accent)] sm:flex-row sm:items-center sm:justify-between"
       >
         <span className="min-w-0">
-          <span className="block text-sm font-semibold text-zinc-100">Product bulk studio</span>
-          <span className="mt-1 block text-xs leading-relaxed text-zinc-500">
+          <span className="block text-sm font-semibold text-foreground">Product bulk studio</span>
+          <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
             Upload Excel + ZIP, approve one template, then generate the full product catalog.
           </span>
         </span>
-        <span className="inline-flex w-fit items-center gap-2 rounded-full border border-zinc-700 px-3 py-1 text-xs text-indigo-200">
+        <span className="inline-flex w-fit items-center gap-2 rounded-full border border-blue-500/30 px-3 py-1 text-xs text-[color:var(--brand-accent-strong)] dark:text-blue-300">
           <PackageOpen size={13} />
           Bulk products
         </span>
       </Link>
 
-      <div className="mt-4 rounded-xl border border-zinc-800 bg-black/30 p-3">
+      <div className="mt-3 rounded-xl border border-border bg-background p-3 sm:mt-4">
         <textarea
           rows={6}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          className="min-h-40 w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-indigo-700"
+          className="min-h-40 w-full resize-none rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-[color:var(--brand-accent)] focus:ring-4 focus:ring-blue-500/10"
           placeholder={mode === "campaign" ? "Describe the campaign offer, objective, and audience..." : mode === "image" ? "Describe the image you want..." : mode === "video" ? "Describe the video scene, rhythm, and message..." : mode === "carousel" ? "Describe the carousel topic and learning points..." : "What should we create?"}
           dir="auto"
         />
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap gap-2">
+        {mode === "quick" && (
+          <div className="mt-3 space-y-3 rounded-xl border border-border bg-card/60 p-3">
+            <button
+              type="button"
+              onClick={() => setQuickOptionsOpen((value) => !value)}
+              className="flex w-full items-center justify-between gap-2 text-start text-xs font-medium text-foreground"
+            >
+              <span className="flex items-center gap-2"><SlidersHorizontal size={14} /> Optional ad details</span>
+              <ChevronDown size={13} className={`transition-transform ${quickOptionsOpen ? "rotate-180" : ""}`} />
+            </button>
+            {quickOptionsOpen && (
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border border-border bg-background p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-foreground">Logo</span>
+                      <button type="button" onClick={() => setLogoEnabled((value) => !value)} className={`rounded-full px-2 py-0.5 text-[11px] ${logoEnabled ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>{logoEnabled ? "On" : "Off"}</button>
+                    </div>
+                    <div className="mt-2 grid gap-2">
+                      <select value={selectedLogo} onChange={(e) => setSelectedLogo(e.target.value)} disabled={!logoEnabled} className="h-9 rounded-lg border border-input bg-card px-2 text-xs text-foreground outline-none disabled:opacity-50">
+                        <option value="brand_default">Brand default logo</option>
+                        {brandLogos.map((logo, index) => <option key={logo.url || index} value={`brand_logo:${logo.url}`}>Brand logo {index + 1}</option>)}
+                        {uploadedLogos.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
+                        {!suiteBrand?.logo_url && brandLogos.length === 0 && uploadedLogos.length === 0 && <option value="none">No logo yet</option>}
+                      </select>
+                      <label className="inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border px-3 text-xs text-muted-foreground hover:text-foreground">
+                        <UploadCloud size={13} /> Upload logo
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => addQuickAssets(e.target.files, "logo")} />
+                      </label>
+                      {uploadedLogos.length > 0 && (
+                        <p className="text-[11px] text-muted-foreground">{uploadedLogos.filter((asset) => asset.url).length}/{uploadedLogos.length} uploaded</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-background p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground"><Palette size={13} /> Colors</span>
+                      <button type="button" onClick={() => brandReadiness.ready && setColorsEnabled((value) => !value)} disabled={!brandReadiness.ready} className={`rounded-full px-2 py-0.5 text-[11px] disabled:opacity-50 ${colorsEnabled ? "bg-blue-500/10 text-blue-600 dark:text-blue-300" : "bg-muted text-muted-foreground"}`}>{colorsEnabled ? "On" : "Off"}</button>
+                    </div>
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      {[0, 1, 2].map((index) => (
+                        <label key={index} className="space-y-1">
+                          <span className="text-[10px] text-muted-foreground">#{index + 1}</span>
+                          <input type="color" value={briefColors[index] || "#000000"} disabled={!colorsEnabled} onChange={(e) => setBriefColors((current) => { const next = [...current]; next[index] = e.target.value; return next; })} className="h-9 w-full rounded border border-input bg-card disabled:opacity-40" />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-xs font-semibold text-foreground">Output type</span>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {(["mixed", "image", "video", "carousel"] as const).map((type) => (
+                      <button key={type} type="button" onClick={() => setContentType(type)} className={`min-h-9 rounded-full border px-3 py-1 text-xs capitalize transition-colors ${contentType === type ? "border-[color:var(--brand-accent)] bg-blue-500/10 text-[color:var(--brand-accent-strong)] dark:text-blue-300" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
+                        {type === "mixed" ? "Mix: video + image + carousel" : type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-xs font-semibold text-foreground">Required size</span>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {visibleSizeOptions.map((option) => {
+                      const active = requiredSizes.includes(option.id);
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => setRequiredSizes((current) => {
+                            const next = active ? current.filter((id) => id !== option.id) : [...current, option.id];
+                            return next.length ? next : [option.id];
+                          })}
+                          className={`min-h-14 rounded-lg border px-3 py-2 text-start transition-colors ${active ? "border-[color:var(--brand-accent)] bg-blue-500/10 text-[color:var(--brand-accent-strong)] dark:text-blue-300" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"}`}
+                        >
+                          <span className="block text-xs font-semibold">{option.label}</span>
+                          <span className="mt-1 block text-[11px] leading-relaxed opacity-80">{option.helper}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedAspectRatios.length > 0 && (
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      Selected ratios: {selectedAspectRatios.join(", ")}
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {referenceGroups.map((group) => (
+                    <div key={group.id} className="rounded-lg border border-border bg-background p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">{group.label}</p>
+                          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{group.helper}</p>
+                        </div>
+                        <label className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-lg border border-border px-2 text-[11px] text-muted-foreground hover:text-foreground">
+                          <Plus size={12} /> Add
+                          <input type="file" accept="image/*" multiple={group.multiple} className="hidden" onChange={(e) => addQuickAssets(e.target.files, group.id)} />
+                        </label>
+                      </div>
+                      {group.assets.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {group.assets.slice(-6).map((asset) => (
+                            <span key={asset.id} className="group relative inline-flex h-12 w-12 overflow-hidden rounded-lg border border-border bg-card">
+                              <img src={asset.dataUrl} alt={asset.name} className="h-full w-full object-cover" />
+                              <span className={`absolute bottom-0.5 left-0.5 h-2 w-2 rounded-full ${asset.status === "uploaded" ? "bg-emerald-500" : asset.status === "failed" ? "bg-destructive" : "bg-amber-400"}`} title={asset.status === "uploaded" ? "Uploaded" : asset.status === "failed" ? asset.error || "Upload failed" : "Uploading"} />
+                              <button type="button" onClick={() => removeQuickAsset(asset.id)} className="absolute right-0.5 top-0.5 hidden h-5 w-5 items-center justify-center rounded-full bg-background/90 text-muted-foreground group-hover:flex"><X size={11} /></button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {(quickAssetUploading || quickAssetFailed || uploadedAssetCount > 0) && (
+                  <div className={`rounded-lg border px-3 py-2 text-xs ${quickAssetFailed ? "border-destructive/40 bg-destructive/10 text-destructive" : quickAssetUploading ? "os-warning-panel" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"}`}>
+                    {quickAssetUploading && "Uploading reference assets before generation..."}
+                    {quickAssetFailed && (assetUploadError || "Some reference assets failed to upload. Remove them or upload again before creating.")}
+                    {!quickAssetUploading && !quickAssetFailed && `${uploadedAssetCount} reference asset${uploadedAssetCount === 1 ? "" : "s"} ready for generation.`}
+                  </div>
+                )}
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label className="space-y-1">
+                    <span className="flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground">Hook · 30 chars <span title="Large text, max 15% of the image area."><HelpCircle size={12} /></span></span>
+                    <input value={hook} maxLength={30} onChange={(e) => setHook(trimText(e.target.value, 30))} className="h-9 w-full rounded-lg border border-input bg-card px-2 text-xs text-foreground outline-none" placeholder="Big promise" dir="auto" />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Short text · 60 chars</span>
+                    <input value={shortDescription} maxLength={60} onChange={(e) => setShortDescription(trimText(e.target.value, 60))} className="h-9 w-full rounded-lg border border-input bg-card px-2 text-xs text-foreground outline-none" placeholder="Small supporting line" dir="auto" />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Terms · 25 chars</span>
+                    <input value={terms} maxLength={25} onChange={(e) => setTerms(trimText(e.target.value, 25))} className="h-9 w-full rounded-lg border border-input bg-card px-2 text-xs text-foreground outline-none" placeholder="Limited offer" dir="auto" />
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {mode !== "quick" && (
+          <div className="mt-3 flex flex-wrap gap-2">
             {(["mixed", "image", "video", "carousel"] as const).map((type) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => setContentType(type)}
-                className={`rounded-full border px-3 py-1 text-xs capitalize transition-colors ${
+                className={`min-h-9 rounded-full border px-3 py-1 text-xs capitalize transition-colors ${
                   contentType === type
-                    ? "border-indigo-600 bg-indigo-500/15 text-indigo-200"
-                    : "border-zinc-800 text-zinc-500 hover:text-zinc-300"
+                    ? "border-[color:var(--brand-accent)] bg-blue-500/10 text-[color:var(--brand-accent-strong)] dark:text-blue-300"
+                    : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
                 }`}
               >
                 {type}
               </button>
             ))}
           </div>
+        )}
+
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
           <Button
             onClick={() => onGenerate({
               mode,
               prompt,
               content_type: mode === "image" || mode === "video" || mode === "carousel" ? mode : contentType,
-              aspect_ratio: aspectRatio,
+              aspect_ratio: mode === "quick" && selectedAspectRatios.length === 1 ? selectedAspectRatios[0] : aspectRatio,
               destination,
               model_tier: modelTier,
               use_brand: useBrand,
+              creative_brief: mode === "quick" ? quickCreativeBrief : undefined,
               count: mode === "quick" || mode === "image" || mode === "video" || mode === "carousel" ? 1 : 3,
             })}
-            disabled={generating || modeUnavailable}
-            title={modeUnavailable ? "Campaign Builder is being prepared. Use Quick Post/Ad or Create anything for now." : undefined}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 gap-2 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500 sm:w-auto"
+            disabled={generating || modeUnavailable || quickCreateBlocked}
+            title={quickCreateBlocked ? "Wait for uploads to finish or remove failed assets before creating." : modeUnavailable ? "Campaign Builder is being prepared. Use Quick Post/Ad or Create anything for now." : undefined}
+            className="min-h-11 w-full gap-2 bg-[color:var(--brand-accent)] hover:bg-[color:var(--brand-accent-strong)] disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground sm:w-auto"
           >
             {generating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
             {generating ? "Generating…" : mode === "quick" ? "Create post" : mode === "campaign" ? "Build campaign draft" : mode === "image" ? "Create image" : mode === "video" ? "Create video" : mode === "carousel" ? "Create carousel" : "Generate"}
           </Button>
         </div>
         {modeUnavailable && (
-          <p className="mt-2 text-xs text-amber-300">
+          <p className="mt-2 text-xs text-muted-foreground">
             Campaign Builder is visible for planning, but full campaign creation is not active yet. Use Quick Post/Ad, Content Set, Image, Video, or Carousel for production generation.
           </p>
         )}
@@ -588,20 +1063,20 @@ function CreateCommandCenter({
         <button
           type="button"
           onClick={() => setAdvancedOpen((value) => !value)}
-          className="mt-3 flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-300"
+          className="mt-3 flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
         >
           <SlidersHorizontal size={13} />
           Advanced settings
           <ChevronDown size={13} className={`transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
         </button>
         {advancedOpen && (
-          <div className="mt-3 grid gap-3 border-t border-zinc-800 pt-3 sm:grid-cols-3">
+          <div className="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-3">
             <label className="space-y-1">
-              <span className="text-[11px] uppercase tracking-wide text-zinc-600">Aspect ratio</span>
+              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Aspect ratio</span>
               <select
                 value={aspectRatio}
                 onChange={(e) => setAspectRatio(e.target.value)}
-                className="h-9 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-2 text-xs text-zinc-300 outline-none"
+                className="h-9 w-full rounded-lg border border-input bg-card px-2 text-xs text-foreground outline-none"
               >
                 <option>Auto</option>
                 <option>1:1</option>
@@ -611,11 +1086,11 @@ function CreateCommandCenter({
               </select>
             </label>
             <label className="space-y-1">
-              <span className="text-[11px] uppercase tracking-wide text-zinc-600">Destination</span>
+              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Destination</span>
               <select
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
-                className="h-9 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-2 text-xs text-zinc-300 outline-none"
+                className="h-9 w-full rounded-lg border border-input bg-card px-2 text-xs text-foreground outline-none"
               >
                 <option value="social">Social media</option>
                 <option value="ads">Ads</option>
@@ -623,11 +1098,11 @@ function CreateCommandCenter({
               </select>
             </label>
             <label className="space-y-1">
-              <span className="text-[11px] uppercase tracking-wide text-zinc-600">Model</span>
+              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Model</span>
               <select
                 value={modelTier}
                 onChange={(e) => setModelTier(e.target.value)}
-                className="h-9 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-2 text-xs text-zinc-300 outline-none"
+                className="h-9 w-full rounded-lg border border-input bg-card px-2 text-xs text-foreground outline-none"
               >
                 <option value="auto">Auto</option>
                 <option value="fast">Fast draft</option>
@@ -1875,7 +2350,7 @@ export function AnalyticsTab({ suiteId }: { suiteId: string }) {
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(28);
 
-  async function load(d = days) {
+  const load = useCallback(async (d = days) => {
     setLoading(true);
     try {
       const res = await api.analytics.get(suiteId, d);
@@ -1883,9 +2358,11 @@ export function AnalyticsTab({ suiteId }: { suiteId: string }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [days, suiteId]);
 
-  useEffect(() => { load(); }, [suiteId]);
+  useEffect(() => {
+    void Promise.resolve().then(() => load());
+  }, [load]);
 
   if (loading) return (
     <div className="flex items-center gap-2 text-zinc-400 py-12 justify-center">

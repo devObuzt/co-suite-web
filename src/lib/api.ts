@@ -1,5 +1,33 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
+export type PaymentGateDetail = {
+  code?: string;
+  message?: string;
+  required_tokens?: number;
+  token_balance?: number;
+  free_trial_remaining?: number;
+  allowed_actions?: string[];
+};
+
+export class ApiError extends Error {
+  status: number;
+  detail: unknown;
+
+  constructor(message: string, status: number, detail: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+export function paymentGateDetail(err: unknown): PaymentGateDetail | null {
+  if (!(err instanceof ApiError) || err.status !== 402) return null;
+  if (!err.detail || typeof err.detail !== "object") return null;
+  const detail = err.detail as PaymentGateDetail;
+  return detail.code === "generation_tokens_exhausted" ? detail : null;
+}
+
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("cosuite_token");
@@ -32,7 +60,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Request failed" }));
     const detail = err.detail || err.message || "Request failed";
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    const message =
+      typeof detail === "string"
+        ? detail
+        : typeof detail === "object" && detail && "message" in detail
+          ? String((detail as { message?: unknown }).message || JSON.stringify(detail))
+          : JSON.stringify(detail);
+    throw new ApiError(message, res.status, detail);
   }
 
   return res.json();
@@ -70,7 +104,9 @@ export const api = {
     storageTest: (suiteId: string) =>
       request<StorageTestResult>(`/suites/${suiteId}/storage-test`, { method: "POST", body: "{}" }),
     loops: (suiteId: string) =>
-      request<{ loops: SocialLoop[]; suggestions: SocialLoopSuggestions }>(`/suites/${suiteId}/loops`),
+      request<{ loops: SocialLoop[]; suggestions: SocialLoopSuggestions; generated_plan: SocialLoop }>(
+        `/suites/${suiteId}/loops`
+      ),
     saveLoop: (suiteId: string, data: SocialLoop) =>
       request<{ ok: boolean; loop: SocialLoop; loops: SocialLoop[] }>(`/suites/${suiteId}/loops`, {
         method: "POST",
@@ -150,6 +186,16 @@ export const api = {
       request<Post[]>("/content/account"),
     generate: (suiteId: string, data: GenerateContentRequest = {}) =>
       request<GenerationStatus>(`/content/${suiteId}/generate`, { method: "POST", body: JSON.stringify(data) }),
+    uploadQuickAsset: (suiteId: string, kind: "logo" | "product" | "style" | "character" | "icon", file: File) => {
+      const form = new FormData();
+      form.append("kind", kind);
+      form.append("file", file);
+      return request<QuickAssetUploadResult>(`/content/${suiteId}/quick-assets`, {
+        method: "POST",
+        body: form,
+        headers: {},
+      });
+    },
     generationStatus: (suiteId: string) =>
       request<GenerationStatus>(`/content/${suiteId}/generation-status`),
     list: (suiteId: string, status?: string) =>
@@ -334,6 +380,9 @@ export interface Subscription {
   status: "active" | "frozen" | "cancelled";
   seat_count: number;
   credit_balance: number;
+  generation_token_balance: number;
+  marketing_budget_balance_usd: number;
+  monthly_generation_token_grant: number;
   auto_pay_enabled: boolean;
   monthly_total: number;
   price_per_seat: number;
@@ -343,8 +392,17 @@ export interface Subscription {
 export interface UsageEvent {
   id: string;
   event_type: string;
+  ledger_account?: string;
+  billing_event_type?: string;
+  amount_tokens?: number;
+  balance_after_tokens?: number | null;
+  amount_usd?: number;
+  balance_after_usd?: number | null;
   actual_cost_usd: number;
   billed_amount: number;
+  external_ref?: string | null;
+  idempotency_key?: string | null;
+  event_data?: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -549,6 +607,22 @@ export interface GenerateContentRequest {
   model_tier?: string;
   use_brand?: boolean;
   language?: string;
+  creative_brief?: Record<string, unknown>;
+}
+
+export interface QuickAssetUploadResult {
+  id: string;
+  kind: "logo" | "product" | "style" | "character" | "icon";
+  name: string;
+  url: string;
+  size: number;
+  storage: {
+    url: string;
+    backend: string;
+    key?: string | null;
+    public: boolean;
+    content_type: string;
+  };
 }
 
 export interface ProductBulkAsset {
@@ -658,10 +732,15 @@ export interface SocialLoop {
   id?: string;
   name: string;
   status?: string;
+  content_pillars?: Array<{ name: string; percentage?: number; notes?: string }>;
   content_mix?: Array<{ type: string; label?: string; percentage: number }>;
   divisions?: string[];
   formats?: Array<{ type: string; label?: string; enabled: boolean }>;
   cadence?: Record<string, unknown> | null;
+  platforms?: string[];
+  languages?: string[];
+  approval_flow?: Record<string, unknown> | null;
+  scheduling_handoff?: Record<string, unknown> | null;
   notes?: string | null;
 }
 
