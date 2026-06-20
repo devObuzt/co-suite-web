@@ -297,6 +297,8 @@ export const api = {
   marketingPlans: {
     get: (suiteId: string) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan`),
+    status: (suiteId: string) =>
+      request<GenerationStatus>(`/suites/${suiteId}/marketing-plan/generation-status`),
     generate: (suiteId: string, data?: { language?: string; near_term_focus?: string; upcoming_campaigns?: string[]; planning_notes?: string }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/generate`, {
         method: "POST",
@@ -465,6 +467,7 @@ export interface MarketingPlanResponse {
   suite_id: string;
   language?: string;
   deck: MarketingPlanDeck | null;
+  generation_status?: GenerationStatus | null;
 }
 
 export interface PublicMarketingPlanResponse {
@@ -856,6 +859,7 @@ export interface GenerationStatus {
   message?: string;
   progress?: number;
   error?: string;
+  safe_error?: string;
   provider?: string | null;
   model?: string | null;
   retry_count?: number;

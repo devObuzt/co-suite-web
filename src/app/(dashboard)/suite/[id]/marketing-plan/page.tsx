@@ -10,6 +10,11 @@ import { MarketingPlanView } from "@/components/marketing-plan/MarketingPlanView
 import { SuitePageShell } from "@/components/suite/SuitePageShell";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
+function isPlanGenerationActive(status?: GenerationStatus | null) {
+  if (!status) return false;
+  return Boolean(status.is_active || ["queued", "waiting_capacity", "waiting_provider_limit", "running", "retrying"].includes(status.status));
+}
+
 const copy = {
   ar: {
     title: "عرض الخطة التسويقية",
@@ -31,6 +36,8 @@ const copy = {
     copied: "تم النسخ",
     open: "فتح الرابط",
     generationQueued: "تم إرسال المحتوى للتوليد",
+    planQueued: "تم إرسال الخطة للتوليد. يمكنك مغادرة الصفحة والرجوع لاحقاً.",
+    planStatus: "حالة توليد الخطة",
   },
   he: {
     title: "מצגת התכנית השיווקית",
@@ -52,6 +59,8 @@ const copy = {
     copied: "הועתק",
     open: "פתח קישור",
     generationQueued: "התוכן נשלח ליצירה",
+    planQueued: "התכנית נשלחה ליצירה. אפשר לצאת מהעמוד ולחזור מאוחר יותר.",
+    planStatus: "סטטוס יצירת התכנית",
   },
   en: {
     title: "Marketing Plan Deck",
@@ -73,6 +82,8 @@ const copy = {
     copied: "Copied",
     open: "Open link",
     generationQueued: "Content sent to generation",
+    planQueued: "The plan was queued. You can leave this page and come back later.",
+    planStatus: "Plan generation status",
   },
 };
 
@@ -94,25 +105,45 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
   const [generationMessage, setGenerationMessage] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (options?: { quiet?: boolean }) => {
+    if (!options?.quiet) setLoading(true);
     setError("");
     try {
       const res = await api.marketingPlans.get(id);
       setDeck(res.deck);
+      setGenerationStatus(res.generation_status || null);
       if (res.deck?.share?.token && typeof window !== "undefined") {
         setShareUrl(`${window.location.origin}/marketing-plans/share/${res.deck.share.token}`);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
     } finally {
-      setLoading(false);
+      if (!options?.quiet) setLoading(false);
     }
   }, [id]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!isPlanGenerationActive(generationStatus)) return;
+    const timer = window.setInterval(async () => {
+      try {
+        const status = await api.marketingPlans.status(id);
+        setGenerationStatus(status);
+        if (status.status === "completed") {
+          await load({ quiet: true });
+        }
+        if (status.status === "failed" || status.status === "timeout") {
+          setError(status.safe_error || status.error || "Request failed");
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Request failed");
+      }
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [generationStatus, id, load]);
 
   async function generate() {
     setGenerating(true);
@@ -125,6 +156,7 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
         planning_notes: planningNotes.trim() || undefined,
       });
       setDeck(res.deck);
+      setGenerationStatus(res.generation_status || null);
       if (res.deck?.share?.token && typeof window !== "undefined") {
         setShareUrl(`${window.location.origin}/marketing-plans/share/${res.deck.share.token}`);
       }
@@ -176,6 +208,10 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
     }
   }
 
+  const planGenerationActive = isPlanGenerationActive(generationStatus);
+  const planProgress = Math.max(0, Math.min(100, Number(generationStatus?.progress || 0)));
+  const planStatusText = generationStatus?.message || (planGenerationActive ? text.planQueued : "");
+
   return (
     <SuitePageShell title={text.title} description={text.desc}>
       <div className="marketing-plan-controls space-y-4" dir={dir}>
@@ -208,9 +244,9 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-3">
-          <Button onClick={generate} disabled={generating} className="gap-2">
-            {generating ? <Loader2 size={16} className="animate-spin" /> : deck ? <RefreshCw size={16} /> : <FileDown size={16} />}
-            {generating ? text.generating : deck ? text.regenerate : text.generate}
+          <Button onClick={generate} disabled={generating || planGenerationActive} className="gap-2">
+            {generating || planGenerationActive ? <Loader2 size={16} className="animate-spin" /> : deck ? <RefreshCw size={16} /> : <FileDown size={16} />}
+            {generating || planGenerationActive ? text.generating : deck ? text.regenerate : text.generate}
           </Button>
           {deck && (
             <>
@@ -242,6 +278,20 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
             </>
           )}
         </div>
+        {generationStatus && generationStatus.status !== "idle" && (
+          <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-800 dark:text-blue-100" dir="auto">
+            <div className="flex items-center justify-between gap-3">
+              <span>
+                <strong>{text.planStatus}:</strong> {generationStatus.status}
+                {planStatusText ? ` · ${planStatusText}` : ""}
+              </span>
+              <span>{planProgress}%</span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-blue-500/15">
+              <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${planProgress}%` }} />
+            </div>
+          </div>
+        )}
         {error && <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200" dir="auto">{error}</div>}
         {generationMessage && (
           <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-200" dir="auto">
@@ -262,9 +312,9 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
           <FileDown size={34} className="mx-auto text-muted-foreground" />
           <h2 className="mt-3 text-xl font-bold text-foreground">{text.missingTitle}</h2>
           <p className="mx-auto mt-2 max-w-2xl text-sm text-muted-foreground">{text.missingDesc}</p>
-          <Button onClick={generate} disabled={generating} className="mt-5 gap-2">
-            {generating ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
-            {generating ? text.generating : text.generate}
+          <Button onClick={generate} disabled={generating || planGenerationActive} className="mt-5 gap-2">
+            {generating || planGenerationActive ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+            {generating || planGenerationActive ? text.generating : text.generate}
           </Button>
         </div>
       )}
