@@ -31,6 +31,74 @@ const PLATFORMS = [
   { id: "other",     label: "Other",     placeholder: "Any other relevant link",            hint: "Other link" },
 ];
 
+const RTL_LANGS = new Set(["ar", "he", "fa", "ur"]);
+
+function isRtlLanguage(lang: string, dir?: string) {
+  return dir === "rtl" || RTL_LANGS.has(lang);
+}
+
+function platformPlaceholder(platform: string, lang: string) {
+  const rtl = RTL_LANGS.has(lang);
+  const he = lang === "he";
+  const labels: Record<string, { ar: string; he: string; en: string }> = {
+    website: {
+      ar: "رابط الموقع الرئيسي",
+      he: "קישור לאתר הראשי",
+      en: "https://your-website.com",
+    },
+    instagram: {
+      ar: "رابط صفحة إنستغرام",
+      he: "קישור לעמוד אינסטגרם",
+      en: "https://instagram.com/yourpage",
+    },
+    facebook: {
+      ar: "رابط صفحة فيسبوك",
+      he: "קישור לעמוד פייסבוק",
+      en: "https://facebook.com/yourpage",
+    },
+    tiktok: {
+      ar: "رابط صفحة تيك توك",
+      he: "קישור לעמוד טיקטוק",
+      en: "https://tiktok.com/@yourhandle",
+    },
+    linkedin: {
+      ar: "رابط صفحة لينكدإن",
+      he: "קישור לעמוד לינקדאין",
+      en: "https://linkedin.com/company/yours",
+    },
+    other: {
+      ar: "أي رابط مهم آخر",
+      he: "כל קישור חשוב נוסף",
+      en: "Any other relevant link",
+    },
+  };
+  if (he) return labels[platform]?.he || labels.other.he;
+  if (rtl) return labels[platform]?.ar || labels.other.ar;
+  return labels[platform]?.en || labels.other.en;
+}
+
+function createWithoutSuiteCopy(lang: string) {
+  if (lang === "he") {
+    return {
+      title: "יצירה בלי Suite",
+      desc: "אפשר להתחיל ליצור פוסט, תמונה או וידאו גם לפני שמקימים פרופיל עסק מלא.",
+      cta: "התחל יצירה מהירה",
+    };
+  }
+  if (lang === "ar") {
+    return {
+      title: "إنشاء بدون سوت",
+      desc: "ابدأ توليد بوست، صورة أو فيديو حتى قبل تجهيز بروفايل كامل للمصلحة.",
+      cta: "ابدأ إنشاء سريع",
+    };
+  }
+  return {
+    title: "Create without a Suite",
+    desc: "Start generating a post, image, or video before building a full business profile.",
+    cta: "Start quick create",
+  };
+}
+
 
 const LANG_TO_DIALECT: Record<string, string> = {
   "ar": "Palestinian Arabic", "he": "Hebrew", "en": "English",
@@ -299,7 +367,8 @@ export default function NewSuitePage() {
   const router = useRouter();
   const t = useT();
   const { lang, dir } = useLanguage();
-  const isRtl = dir === "rtl";
+  const isRtl = isRtlLanguage(lang, dir);
+  const quickCreateCopy = createWithoutSuiteCopy(lang);
   const ForwardIcon = isRtl ? ChevronLeft : ChevronRight;
   const BackIcon = isRtl ? ChevronRight : ChevronLeft;
   const suggestions = getSuggestions(lang);
@@ -750,31 +819,47 @@ export default function NewSuitePage() {
 
       {/* ── Step 1: Name ── */}
       {step === "name" && (
-        <Card className="border-border bg-card text-card-foreground shadow-sm">
-          <CardHeader>
-            <CardTitle>{t("suite.new.nameQuestion")}</CardTitle>
-            <CardDescription className="text-muted-foreground">{t("suite.new.nameHint")}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreateSuite} className="space-y-4">
-              <div className="space-y-2">
-                <Label>{t("suite.new.nameLabel")}</Label>
-                <Input
-                  value={suiteName}
-                  onChange={(e) => setSuiteName(e.target.value)}
-                  placeholder={t("suite.new.namePlaceholder")}
-                  required
-                  className="bg-background text-lg font-semibold"
-                  dir="auto"
-                />
-              </div>
-              {error && <p className="text-destructive text-sm">{error}</p>}
-              <Button type="submit" className="bg-foreground text-background hover:bg-foreground/90 gap-2">
-                {t("suite.new.continue")} <ForwardIcon size={16} />
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Card className="border-border bg-card text-card-foreground shadow-sm">
+            <CardHeader>
+              <CardTitle>{t("suite.new.nameQuestion")}</CardTitle>
+              <CardDescription className="text-muted-foreground">{t("suite.new.nameHint")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleCreateSuite} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>{t("suite.new.nameLabel")}</Label>
+                  <Input
+                    value={suiteName}
+                    onChange={(e) => setSuiteName(e.target.value)}
+                    placeholder={t("suite.new.namePlaceholder")}
+                    required
+                    className="bg-background text-lg font-semibold"
+                    dir="auto"
+                  />
+                </div>
+                {error && <p className="text-destructive text-sm">{error}</p>}
+                <Button type="submit" className="bg-foreground text-background hover:bg-foreground/90 gap-2">
+                  {t("suite.new.continue")} <ForwardIcon size={16} />
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <button
+            type="button"
+            onClick={() => router.push("/create")}
+            className="group flex w-full items-center justify-between gap-4 rounded-2xl border border-dashed border-[#2f80ff]/50 bg-[#2f80ff]/5 p-5 text-start transition hover:border-[#2f80ff] hover:bg-[#2f80ff]/10"
+          >
+            <div className="min-w-0">
+              <p className="text-base font-bold text-foreground" dir="auto">{quickCreateCopy.title}</p>
+              <p className="mt-1 text-sm text-muted-foreground" dir="auto">{quickCreateCopy.desc}</p>
+            </div>
+            <span className="inline-flex shrink-0 items-center gap-2 rounded-full bg-foreground px-3 py-2 text-sm font-semibold text-background">
+              {quickCreateCopy.cta} <ForwardIcon size={15} />
+            </span>
+          </button>
+        </div>
       )}
 
       {/* ── Step 2: Links ── */}
@@ -821,9 +906,9 @@ export default function NewSuitePage() {
                     <Input
                       value={link.url}
                       onChange={(e) => setLinkUrl(i, e.target.value)}
-                      placeholder={PLATFORMS.find((p) => p.id === link.platform)?.placeholder || "https://..."}
+                      placeholder={platformPlaceholder(link.platform, lang)}
                       className="bg-background text-sm flex-1"
-                      dir="ltr"
+                      dir={isRtl ? "rtl" : "ltr"}
                     />
 
                     {/* Remove button */}
@@ -988,6 +1073,7 @@ export default function NewSuitePage() {
                   onChange={(e) => setCustomNiche(e.target.value)}
                   placeholder={t("suite.new.nichePlaceholder")}
                   className="bg-background text-foreground"
+                  dir="auto"
                   autoFocus
                 />
               )}
@@ -1183,12 +1269,14 @@ export default function NewSuitePage() {
                       onChange={(e) => setCustomCountries(e.target.value)}
                       placeholder={t("suite.new.customCountriesPlaceholder")}
                       className="bg-background text-foreground text-sm"
+                      dir="auto"
                     />
                     <Input
                       value={customCities}
                       onChange={(e) => setCustomCities(e.target.value)}
                       placeholder={t("suite.new.customCitiesPlaceholder")}
                       className="bg-background text-foreground text-sm"
+                      dir="auto"
                     />
                   </div>
                 )}

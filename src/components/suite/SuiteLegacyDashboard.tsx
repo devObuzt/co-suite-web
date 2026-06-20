@@ -140,6 +140,15 @@ function jobStatusMessage(status?: GenerationStatus | null) {
   return status.message || "";
 }
 
+function isRecentTerminalGenerationStatus(status?: GenerationStatus | null) {
+  if (!status || !status.is_terminal) return false;
+  const timestamp = status.finished_at || status.updated_at || status.created_at;
+  if (!timestamp) return false;
+  const time = new Date(timestamp).getTime();
+  if (!Number.isFinite(time)) return false;
+  return Date.now() - time < 15 * 60 * 1000;
+}
+
 export function ContentTab({ suiteId }: { suiteId: string }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [generating, setGenerating] = useState(false);
@@ -274,10 +283,12 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
   const visiblePosts = showAllPosts ? filtered : filtered.slice(0, 3);
   const hiddenPostCount = Math.max(0, filtered.length - visiblePosts.length);
   const generationMessage = jobStatusMessage(generationStatus);
-  const generationVisible = generationStatus && generationStatus.status !== "idle";
+  const generationVisible = generationStatus && generationStatus.status !== "idle" && (generating || isGenerationActive(generationStatus) || isRecentTerminalGenerationStatus(generationStatus));
 
   return (
     <section className="space-y-4">
+      <CreationProductCards suiteId={suiteId} />
+
       <CreateCommandCenter suiteId={suiteId} onGenerate={handleGenerate} generating={generating} generationStatus={generationStatus} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -320,8 +331,6 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
           </div>
         </div>
       </div>
-
-      <CreationProductCards suiteId={suiteId} />
 
       {generationVisible && (
         <div
@@ -423,24 +432,32 @@ function CreationProductCards({ suiteId }: { suiteId: string }) {
     { title: "Product Bulk Studio", description: "Excel + ZIP production for product catalogs.", href: `/suite/${suiteId}/product-bulk`, icon: PackageOpen, tone: "os-product-card-blue" },
   ];
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="max-h-[20vh] overflow-y-auto pr-1 sm:max-h-none sm:overflow-visible sm:pr-0">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
       {cards.map((card) => {
         const Icon = card.icon;
         return (
-          <Link key={card.title} href={card.href} className={`rounded-xl border p-3 transition-colors hover:-translate-y-0.5 hover:border-[color:var(--brand-accent)] ${card.tone}`}>
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-background/70 text-foreground">
+          <Link key={card.title} href={card.href} className={`rounded-xl border p-2.5 transition-colors hover:-translate-y-0.5 hover:border-[color:var(--brand-accent)] sm:p-3 ${card.tone}`}>
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-background/70 text-foreground sm:h-8 sm:w-8">
               <Icon size={15} />
             </span>
-            <span className="mt-3 block text-sm font-semibold text-foreground">{card.title}</span>
-            <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{card.description}</span>
+            <span className="mt-2 block text-xs font-semibold leading-tight text-foreground sm:mt-3 sm:text-sm">{card.title}</span>
+            <span className="mt-1 line-clamp-2 block text-[11px] leading-snug text-muted-foreground sm:text-xs sm:leading-relaxed">{card.description}</span>
           </Link>
         );
       })}
+      </div>
     </div>
   );
 }
 
 type CreateMode = "quick" | "anything" | "campaign" | "product_bulk" | "set" | "image" | "video" | "carousel";
+
+function generationCountForCreateMode(mode: CreateMode, contentType?: GenerateContentRequest["content_type"]) {
+  if (mode === "quick" && contentType === "mixed") return 3;
+  if (mode === "set" || mode === "anything") return 3;
+  return 1;
+}
 
 type QuickAssetKind = "product" | "style" | "character" | "icon";
 
@@ -799,7 +816,7 @@ function CreateCommandCenter({
     { id: "carousel", title: "Carousel", icon: LayoutList },
   ];
   const modeUnavailable = false;
-  const compactStatusVisible = generationStatus && generationStatus.status !== "idle";
+  const compactStatusVisible = generationStatus && generationStatus.status !== "idle" && (generating || isGenerationActive(generationStatus) || isRecentTerminalGenerationStatus(generationStatus));
 
   return (
     <section id="create" className="os-surface rounded-xl p-4 sm:p-5">
@@ -1065,7 +1082,10 @@ function CreateCommandCenter({
               model_tier: modelTier,
               use_brand: useBrand,
               creative_brief: mode === "quick" ? quickCreativeBrief : undefined,
-              count: mode === "quick" || mode === "image" || mode === "video" || mode === "carousel" ? 1 : 3,
+              count: generationCountForCreateMode(
+                mode,
+                mode === "image" || mode === "video" || mode === "carousel" ? mode : contentType,
+              ),
             })}
             disabled={generating || modeUnavailable || quickCreateBlocked}
             title={quickCreateBlocked ? "Wait for uploads to finish or remove failed assets before creating." : modeUnavailable ? "Campaign Builder is being prepared. Use Quick Post/Ad or Create anything for now." : undefined}

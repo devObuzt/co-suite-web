@@ -294,6 +294,28 @@ export const api = {
       }),
   },
 
+  marketingPlans: {
+    get: (suiteId: string) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan`),
+    generate: (suiteId: string, data?: { language?: string; near_term_focus?: string; upcoming_campaigns?: string[]; planning_notes?: string }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/generate`, {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }),
+    share: (suiteId: string, data: { enabled?: boolean; password?: string }) =>
+      request<{ ok: boolean; share: MarketingPlanShare }>(`/suites/${suiteId}/marketing-plan/share`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    publicGet: (token: string) =>
+      request<PublicMarketingPlanResponse>(`/marketing-plans/share/${token}`),
+    unlock: (token: string, password: string) =>
+      request<PublicMarketingPlanResponse>(`/marketing-plans/share/${token}/unlock`, {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      }),
+  },
+
   analytics: {
     get: (suiteId: string, days = 28) =>
       request<AnalyticsData>(`/analytics/${suiteId}?days=${days}`),
@@ -339,6 +361,118 @@ export const api = {
       request<{ campaigns: GoogleAdsCampaign[]; warning?: string }>(`/connections/${suiteId}/google/campaigns`),
   },
 };
+
+
+export interface MarketingPlanMetric {
+  label: string;
+  value: string;
+}
+
+export interface MarketingPlanCard {
+  title: string;
+  body?: string;
+  points?: string[];
+}
+
+export interface MarketingPlanDeckSection {
+  id: string;
+  title: string;
+  summary?: string;
+  bullets: string[];
+  cards?: MarketingPlanCard[];
+  metrics?: MarketingPlanMetric[];
+}
+
+export interface MarketingPlanShare {
+  enabled: boolean;
+  token?: string;
+  password_required?: boolean;
+}
+
+export interface MarketingPlanDeck {
+  version: string;
+  status: "ready" | "missing" | string;
+  language: string;
+  generated_at?: string;
+  planning_inputs?: {
+    near_term_focus?: string;
+    upcoming_campaigns?: string[];
+    planning_notes?: string;
+    [key: string]: unknown;
+  };
+  cover: {
+    title: string;
+    subtitle?: string;
+    chips?: string[];
+    image_url?: string;
+    image_prompt?: string;
+  };
+  research_summary?: {
+    sources_used?: string[];
+    confidence?: string;
+    limitations?: string[];
+    [key: string]: unknown;
+  };
+  monthly_work_plan?: {
+    client_focus_questions?: string[];
+    calendar_context?: {
+      countries?: string[];
+      religions_considered?: string[];
+      seasonal_notes?: string[];
+      [key: string]: unknown;
+    };
+    content_mix?: Array<{ type: string; percentage: number }>;
+    daily_story_direction?: string[];
+    items?: MarketingPlanWorkItem[];
+  };
+  paid_funnel?: {
+    stages?: MarketingPlanFunnelStage[];
+  };
+  sections: MarketingPlanDeckSection[];
+  share?: MarketingPlanShare;
+}
+
+export interface MarketingPlanWorkItem {
+  id: string;
+  title: string;
+  objective?: string;
+  platforms?: string[];
+  placement?: string;
+  recommended_output?: { format?: string; production_mode?: string; [key: string]: unknown };
+  prompt?: string;
+  needs_user_asset?: boolean;
+  notes?: string;
+  generation_request?: GenerateContentRequest;
+}
+
+export interface MarketingPlanFunnelStage {
+  stage: string;
+  goal?: string;
+  audience?: string;
+  budget_direction?: string;
+  content_ideas?: Array<{
+    id: string;
+    title: string;
+    recommended_outputs?: string[];
+    prompt?: string;
+    notes?: string;
+    generation_request?: GenerateContentRequest;
+  }>;
+}
+
+export interface MarketingPlanResponse {
+  status: "missing" | "ready" | string;
+  suite_id: string;
+  language?: string;
+  deck: MarketingPlanDeck | null;
+}
+
+export interface PublicMarketingPlanResponse {
+  locked: boolean;
+  suite_name?: string;
+  deck?: MarketingPlanDeck;
+  share?: MarketingPlanShare;
+}
 
 export interface InsightPoint { date: string; value: number }
 
@@ -760,6 +894,12 @@ export interface SocialLoopSuggestions {
   formats: Array<{ type: string; label: string; enabled: boolean }>;
 }
 
+export interface BrandReferenceLink {
+  label?: string;
+  url: string;
+  source?: string;
+}
+
 export interface Brand {
   account_type?: "business" | "creator" | "agency" | string;
   name?: string;
@@ -771,6 +911,7 @@ export interface Brand {
   tone?: string;
   industry?: string;
   location?: string;
+  website?: string | null;
   logo_url?: string;
   logo_description?: string;
   brand_logos?: BrandLogo[];
@@ -801,7 +942,8 @@ export interface Brand {
     fonts_generated?: boolean;
   };
   dialect?: string;
-  social_links?: { instagram?: string; facebook?: string; tiktok?: string };
+  social_links?: { instagram?: string; facebook?: string; tiktok?: string; linkedin?: string; [key: string]: string | undefined };
+  reference_links?: BrandReferenceLink[];
   // AI suggestions
   color_palette?: { primary: string; secondary: string; accent: string; reasoning?: string };
   font_suggestions?: string[];

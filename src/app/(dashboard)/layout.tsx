@@ -4,12 +4,13 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Settings, LogOut, Plus, Menu, X, Sparkles } from "lucide-react";
+import { LayoutDashboard, Settings, LogOut, Plus, Menu, X, Sparkles, Layers } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { BrandMark } from "@/components/BrandMark";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { SuiteNav } from "@/components/suite/SuiteNav";
+import { api, Suite } from "@/lib/api";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, _hasHydrated } = useAuthStore();
@@ -17,13 +18,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const t = useT();
   const [mobileSuiteOpen, setMobileSuiteOpen] = useState(false);
+  const [suites, setSuites] = useState<Suite[]>([]);
   const suiteMatch = pathname.match(/^\/suite\/([^/]+)/);
   const activeSuiteId = suiteMatch?.[1] && suiteMatch[1] !== "new" ? suiteMatch[1] : null;
+  const hasSuites = suites.length > 0;
+  const suitesNavHref = hasSuites ? "/suites" : "/suite/new";
+  const suitesNavLabel = hasSuites ? "My Suites" : t("nav.newSuite");
+  const suitesNavActive = hasSuites ? pathname === "/suites" : pathname === "/suite/new";
+  const suitesNavIcon = hasSuites ? <Layers size={16} /> : <Plus size={16} />;
+  const mobileSuitesNavIcon = hasSuites ? <Layers size={17} /> : <Plus size={17} />;
 
   useEffect(() => {
     // Wait for Zustand to finish reading localStorage before redirecting
     if (_hasHydrated && !user) router.push("/login");
   }, [_hasHydrated, user, router]);
+
+  useEffect(() => {
+    if (!_hasHydrated || !user) return;
+    api.suites.list().then(setSuites).catch(() => setSuites([]));
+  }, [_hasHydrated, user]);
 
   // Show spinner while auth state is loading from localStorage
   if (!_hasHydrated) {
@@ -43,9 +56,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="mb-8 px-2"><BrandMark size="sm" /></div>
         <nav className="flex-1 space-y-1">
           <div className="px-3 pb-2 text-[11px] uppercase tracking-wide text-muted-foreground">Account</div>
-          <SideLink href="/suites" icon={<LayoutDashboard size={16} />} label={t("nav.dashboard")} active={pathname === "/suites"} />
+          <SideLink href="/suites" icon={<LayoutDashboard size={16} />} label={t("nav.dashboard")} active={!hasSuites && pathname === "/suites"} />
           <SideLink href="/create" icon={<Sparkles size={16} />} label={t("nav.create")} active={pathname === "/create"} />
-          <SideLink href="/suite/new" icon={<Plus size={16} />} label={t("nav.newSuite")} active={pathname === "/suite/new"} />
+          <SideLink href={suitesNavHref} icon={suitesNavIcon} label={suitesNavLabel} active={suitesNavActive} />
           <SideLink href="/settings" icon={<Settings size={16} />} label={t("nav.settings")} active={pathname === "/settings"} />
           {activeSuiteId && <SuiteNav suiteId={activeSuiteId} />}
         </nav>
@@ -85,9 +98,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {mobileSuiteOpen ? <X size={17} /> : <Menu size={17} />}
                 </Button>
               )}
-              <IconLink href="/suites" icon={<LayoutDashboard size={17} />} active={pathname === "/suites"} />
+              <IconLink href="/suites" icon={<LayoutDashboard size={17} />} active={!hasSuites && pathname === "/suites"} />
               <IconLink href="/create" icon={<Sparkles size={17} />} active={pathname === "/create"} />
-              <IconLink href="/suite/new" icon={<Plus size={17} />} active={pathname === "/suite/new"} />
+              <IconLink href={suitesNavHref} icon={mobileSuitesNavIcon} active={suitesNavActive} />
               <IconLink href="/settings" icon={<Settings size={17} />} active={pathname === "/settings"} />
               <Button
                 variant="ghost"
@@ -106,7 +119,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div className="mb-2 grid grid-cols-3 gap-1">
                 <MobileScopeLink href="/suites" label="Suites" active={pathname === "/suites"} />
                 <MobileScopeLink href="/create" label={t("nav.create")} active={pathname === "/create"} />
-                <MobileScopeLink href="/suite/new" label={t("nav.newSuite")} active={pathname === "/suite/new"} />
+                <MobileScopeLink href={suitesNavHref} label={suitesNavLabel} active={suitesNavActive} />
               </div>
               <SuiteNav suiteId={activeSuiteId} onNavigate={() => setMobileSuiteOpen(false)} />
             </div>
@@ -122,8 +135,8 @@ function SideLink({ href, icon, label, active }: { href: string; icon: React.Rea
   return (
     <Link
       href={href}
-      className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
-        active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent"
+      className={`flex min-h-10 items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
+        active ? "os-nav-active" : "os-nav-link"
       }`}
     >
       {icon}
@@ -137,7 +150,7 @@ function IconLink({ href, icon, active }: { href: string; icon: React.ReactNode;
     <Link
       href={href}
       className={`grid h-9 w-9 place-items-center rounded-md transition-colors ${
-        active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"
+        active ? "os-nav-active" : "os-nav-link"
       }`}
     >
       {icon}
@@ -150,7 +163,7 @@ function MobileScopeLink({ href, label, active }: { href: string; label: string;
     <Link
       href={href}
       className={`rounded-md px-2 py-2 text-center text-xs transition-colors ${
-        active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"
+        active ? "os-nav-active" : "os-nav-link"
       }`}
     >
       {label}

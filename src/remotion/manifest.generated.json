@@ -1,0 +1,214 @@
+{
+  "fps": 30,
+  "width": 1080,
+  "height": 1920,
+  "source": {
+    "publicPath": "/remotion/inputs/BebRKg5D4i9pDK1Js3pZN_output.webm",
+    "originalPath": "/Users/wisamsholy/Downloads/BebRKg5D4i9pDK1Js3pZN_output.webm",
+    "durationSeconds": 37.766,
+    "hasAlpha": true,
+    "framesPublicPath": "/remotion/inputs/BebRKg5D4i9pDK1Js3pZN_output-frames",
+    "framePattern": "frame_%05d.png"
+  },
+  "audio": {
+    "sourcePublicPath": "/remotion/inputs/BebRKg5D4i9pDK1Js3pZN_output-audio.m4a",
+    "backgroundMusic": {
+      "publicPath": "/remotion/sound/marketing-upbeat-bed.wav",
+      "volume": 0.42
+    },
+    "soundEffects": [
+      {
+        "publicPath": "/remotion/sound/soft-whoosh.wav",
+        "at": 4.62,
+        "volume": 0.42
+      },
+      {
+        "publicPath": "/remotion/sound/soft-whoosh.wav",
+        "at": 6.94,
+        "volume": 0.42
+      },
+      {
+        "publicPath": "/remotion/sound/soft-whoosh.wav",
+        "at": 10.26,
+        "volume": 0.42
+      },
+      {
+        "publicPath": "/remotion/sound/soft-whoosh.wav",
+        "at": 15.78,
+        "volume": 0.42
+      },
+      {
+        "publicPath": "/remotion/sound/soft-whoosh.wav",
+        "at": 19.47,
+        "volume": 0.42
+      },
+      {
+        "publicPath": "/remotion/sound/soft-whoosh.wav",
+        "at": 22.56,
+        "volume": 0.42
+      },
+      {
+        "publicPath": "/remotion/sound/soft-whoosh.wav",
+        "at": 26.75,
+        "volume": 0.42
+      },
+      {
+        "publicPath": "/remotion/sound/soft-whoosh.wav",
+        "at": 30.45,
+        "volume": 0.42
+      },
+      {
+        "publicPath": "/remotion/sound/soft-whoosh.wav",
+        "at": 32.58,
+        "volume": 0.42
+      }
+    ]
+  },
+  "style": {
+    "fontFamily": "ConnecAssistant",
+    "arabicFontFamily": "ConnecCairo"
+  },
+  "scenes": [
+    {
+      "id": "scene-01",
+      "sourceStart": 0,
+      "sourceEnd": 4.62,
+      "caption": "هيك فيك تجيب كتير ليدز وزباين جداد لمصلحتك وبسهولة",
+      "behindText": "ليدم جداد",
+      "backgroundPrompt": "Vertical editorial background inspired by this spoken line: هيك فيك تجيب كتير ليدز وزباين جداد لمصلحتك وبسهولة",
+      "palette": [
+        "#07111f",
+        "#2f80ed",
+        "#e8f3ff"
+      ],
+      "backgroundImagePublicPath": "/remotion/backgrounds/scene-01.png"
+    },
+    {
+      "id": "scene-02",
+      "sourceStart": 4.82,
+      "sourceEnd": 7.14,
+      "caption": "فيش حاجة تضيّع وقتك وميزانيتك",
+      "behindText": "وقتك ميزانيتك",
+      "backgroundPrompt": "Vertical editorial background inspired by this spoken line: فيش حاجة تضيّع وقتك وميزانيتك",
+      "palette": [
+        "#15120f",
+        "#e6aa3b",
+        "#fff2cf"
+      ],
+      "backgroundImagePublicPath": "/remotion/backgrounds/scene-02.png"
+    },
+    {
+      "id": "scene-03",
+      "sourceStart": 7.3,
+      "sourceEnd": 10.62,
+      "caption": "إحنا بكونيك اشتغلنا مع كتير مصالح وأصحاب مهن حرة",
+      "behindText": "مصالح حرة",
+      "backgroundPrompt": "Vertical editorial background inspired by this spoken line: إحنا بكونيك اشتغلنا مع كتير مصالح وأصحاب مهن حرة",
+      "palette": [
+        "#102018",
+        "#28c76f",
+        "#e6fff1"
+      ],
+      "backgroundImagePublicPath": "/remotion/backgrounds/scene-03.png"
+    },
+    {
+      "id": "scene-04",
+      "sourceStart": 10.93,
+      "sourceEnd": 16.45,
+      "caption": "من كل مجال ممكن تتخيلوه، والنتائج بتحكي لأنه إحنا ما منوعد، إحنا منفرجي نتائج",
+      "behindText": "نتائج بتحكي",
+      "backgroundPrompt": "Vertical editorial background inspired by this spoken line: من كل مجال ممكن تتخيلوه، والنتائج بتحكي لأنه إحنا ما منوعد، إحنا منفرجي نتائج",
+      "palette": [
+        "#201225",
+        "#d85cff",
+        "#ffe9ff"
+      ],
+      "backgroundImagePublicPath": "/remotion/backgrounds/scene-04.png"
+    },
+    {
+      "id": "scene-05",
+      "sourceStart": 16.77,
+      "sourceEnd": 20.46,
+      "caption": "وإنتو كمان بطلعلكم تسويق صح لتزيدوا من مبيعاتكم",
+      "behindText": "تسويق صح",
+      "backgroundPrompt": "Vertical editorial background inspired by this spoken line: وإنتو كمان بطلعلكم تسويق صح لتزيدوا من مبيعاتكم",
+      "palette": [
+        "#1c1d21",
+        "#ff5f45",
+        "#fff0ec"
+      ],
+      "backgroundImagePublicPath": "/remotion/backgrounds/scene-05.png"
+    },
+    {
+      "id": "scene-06",
+      "sourceStart": 20.55,
+      "sourceEnd": 23.64,
+      "caption": "اتركوا تفاصيلكم وتعالوا نشتغل بجد على مصلحتكم",
+      "behindText": "نشتغل بجد",
+      "backgroundPrompt": "Vertical editorial background inspired by this spoken line: اتركوا تفاصيلكم وتعالوا نشتغل بجد على مصلحتكم",
+      "palette": [
+        "#07111f",
+        "#2f80ed",
+        "#e8f3ff"
+      ],
+      "backgroundImagePublicPath": "/remotion/backgrounds/scene-06.png"
+    },
+    {
+      "id": "scene-07",
+      "sourceStart": 23.91,
+      "sourceEnd": 28.1,
+      "caption": "ونخليه ينجح بكامبين وفيديوهات تسويقية بروفيشنال",
+      "behindText": "فيديوهات بروفيشنال",
+      "backgroundPrompt": "Vertical editorial background inspired by this spoken line: ونخليه ينجح بكامبين وفيديوهات تسويقية بروفيشنال",
+      "palette": [
+        "#15120f",
+        "#e6aa3b",
+        "#fff2cf"
+      ],
+      "backgroundImagePublicPath": "/remotion/backgrounds/scene-07.png"
+    },
+    {
+      "id": "scene-08",
+      "sourceStart": 28.28,
+      "sourceEnd": 31.98,
+      "caption": "رح تجيبلكم مئات الليدز وتوصلكم للزباين الصح",
+      "behindText": "زباين صح",
+      "backgroundPrompt": "Vertical editorial background inspired by this spoken line: رح تجيبلكم مئات الليدز وتوصلكم للزباين الصح",
+      "palette": [
+        "#102018",
+        "#28c76f",
+        "#e6fff1"
+      ],
+      "backgroundImagePublicPath": "/remotion/backgrounds/scene-08.png"
+    },
+    {
+      "id": "scene-09",
+      "sourceStart": 32.25,
+      "sourceEnd": 34.38,
+      "caption": "اللي مهتمين فعلياً بخدماتكم",
+      "behindText": "مهتمين فعليا",
+      "backgroundPrompt": "Vertical editorial background inspired by this spoken line: اللي مهتمين فعلياً بخدماتكم",
+      "palette": [
+        "#201225",
+        "#d85cff",
+        "#ffe9ff"
+      ],
+      "backgroundImagePublicPath": "/remotion/backgrounds/scene-09.png"
+    },
+    {
+      "id": "scene-10",
+      "sourceStart": 34.85,
+      "sourceEnd": 37.56,
+      "caption": "وجاهزين يحكوا، يتفاعلوا ويدفعوا",
+      "behindText": "يتفاعلوا يدفعوا",
+      "backgroundPrompt": "Vertical editorial background inspired by this spoken line: وجاهزين يحكوا، يتفاعلوا ويدفعوا",
+      "palette": [
+        "#1c1d21",
+        "#ff5f45",
+        "#fff0ec"
+      ],
+      "backgroundImagePublicPath": "/remotion/backgrounds/scene-10.png"
+    }
+  ],
+  "durationSeconds": 35.29
+}

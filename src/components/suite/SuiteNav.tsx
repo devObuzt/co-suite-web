@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   CircleGauge,
+  FileText,
   GalleryHorizontalEnd,
   Link2,
   PackageOpen,
@@ -13,10 +14,11 @@ import {
   UserSquare2,
 } from "lucide-react";
 import { api, Connections, StorageStatus, Suite } from "@/lib/api";
-import { useT } from "@/lib/i18n/LanguageContext";
+import { useLanguage, useT } from "@/lib/i18n/LanguageContext";
 
 export function SuiteNav({ suiteId, onNavigate }: { suiteId: string; onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { dir } = useLanguage();
   const t = useT();
   const [suite, setSuite] = useState<Suite | null>(null);
   const [connections, setConnections] = useState<Connections>({});
@@ -36,6 +38,7 @@ export function SuiteNav({ suiteId, onNavigate }: { suiteId: string; onNavigate?
     { href: `${base}/create`, label: t("suite.nav.create"), icon: Sparkles },
     { href: `${base}/content`, label: t("suite.nav.content"), icon: GalleryHorizontalEnd },
     { href: `${base}/analytics`, label: t("suite.nav.analytics"), icon: BarChart3 },
+    { href: `${base}/marketing-plan`, label: suiteNavLabel(t("suite.nav.marketingPlan")), icon: FileText },
     { href: `${base}/product-bulk`, label: t("suite.nav.productBulk"), icon: PackageOpen },
   ], [base, t]);
 
@@ -46,7 +49,7 @@ export function SuiteNav({ suiteId, onNavigate }: { suiteId: string; onNavigate?
   };
 
   return (
-    <div className="mt-6 border-t border-border pt-4">
+    <div className="mt-6 border-t border-border pt-4" dir={dir}>
       <div className="px-3 pb-2">
         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("suite.current")}</p>
         <p className="mt-1 truncate text-sm font-semibold text-foreground" dir="auto">
@@ -62,14 +65,14 @@ export function SuiteNav({ suiteId, onNavigate }: { suiteId: string; onNavigate?
               key={item.href}
               href={item.href}
               onClick={onNavigate}
-              className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
-                active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              className={`flex min-h-10 items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
+                active ? "os-nav-active" : "os-nav-link"
               }`}
             >
               <Icon size={15} />
               <span className="min-w-0 flex-1 truncate">{item.label}</span>
               {item.status === "connections" && (
-                <span className="flex items-center gap-1" aria-label="Connection readiness">
+                <span className="flex items-center gap-1" aria-label={t("suite.nav.connectionReadiness")}>
                   <span className={`h-1.5 w-1.5 rounded-full ${dots.meta ? "bg-emerald-400" : "bg-muted"}`} title="Meta" />
                   <span className={`h-1.5 w-1.5 rounded-full ${dots.google ? "bg-emerald-400" : "bg-muted"}`} title="Google Ads" />
                   <span className={`h-1.5 w-1.5 rounded-full ${dots.storage ? "bg-emerald-400" : "bg-muted"}`} title="Storage" />
@@ -81,4 +84,8 @@ export function SuiteNav({ suiteId, onNavigate }: { suiteId: string; onNavigate?
       </nav>
     </div>
   );
+}
+
+function suiteNavLabel(value: string) {
+  return value === "suite.nav.marketingPlan" ? "Marketing plan" : value;
 }

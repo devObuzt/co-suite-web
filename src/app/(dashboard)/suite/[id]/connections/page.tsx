@@ -7,11 +7,13 @@ import { api, Connections, StorageStatus } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BarChart3, Cloud, Link2, Loader2, RefreshCw, Share2 } from "lucide-react";
+import { useT } from "@/lib/i18n/LanguageContext";
 
 type Readiness = "connected" | "not_connected" | "needs_attention" | "unavailable";
 
 export default function ConnectionsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const t = useT();
   const [connections, setConnections] = useState<Connections>({});
   const [storage, setStorage] = useState<StorageStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,11 +30,11 @@ export default function ConnectionsPage({ params }: { params: Promise<{ id: stri
       setConnections(nextConnections);
       setStorage(nextStorage);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Connection status is unavailable");
+      setError(e instanceof Error ? e.message : t("suite.connections.statusUnavailable"));
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void load(); }, 0);
@@ -40,8 +42,8 @@ export default function ConnectionsPage({ params }: { params: Promise<{ id: stri
   }, [load]);
 
   const metaItems = [
-    { label: "Facebook page", value: connections.facebook?.page_name, ready: !!connections.facebook?.connected },
-    { label: "Instagram account", value: connections.instagram?.username ? `@${connections.instagram.username}` : "", ready: !!connections.instagram?.connected },
+    { label: t("suite.connections.facebookPage"), value: connections.facebook?.page_name, ready: !!connections.facebook?.connected },
+    { label: t("suite.connections.instagramAccount"), value: connections.instagram?.username ? `@${connections.instagram.username}` : "", ready: !!connections.instagram?.connected },
     { label: "Meta Ads", value: connections.meta_ads?.ad_account_name || connections.meta_ads?.ad_account_id, ready: !!connections.meta_ads?.connected },
   ];
   const metaReadyCount = metaItems.filter((item) => item.ready).length;
@@ -58,15 +60,15 @@ export default function ConnectionsPage({ params }: { params: Promise<{ id: stri
       : "needs_attention";
 
   return (
-    <SuitePageShell title="Connections" description="Provider readiness for publishing, analytics, campaigns, and durable media storage.">
+    <SuitePageShell title={t("suite.connections.title")} description={t("suite.connections.description")}>
       <div className="space-y-5">
         <div className="flex items-center justify-between gap-3">
           <div className="text-sm text-muted-foreground">
-            {loading ? "Checking provider status..." : "Current Suite connection state"}
+            {loading ? t("suite.connections.checking") : t("suite.connections.currentState")}
           </div>
           <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-2">
             {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            Refresh
+            {t("suite.connections.refresh")}
           </Button>
         </div>
 
@@ -81,35 +83,35 @@ export default function ConnectionsPage({ params }: { params: Promise<{ id: stri
             icon={<Share2 size={16} />}
             title="Meta"
             status={metaStatus}
-            detail={metaStatus === "connected" ? "Facebook, Instagram, and Meta Ads are ready." : "Connect or complete Meta setup for publishing, campaigns, and analytics."}
-            rows={metaItems.map((item) => ({ label: item.label, value: item.ready ? item.value || "Connected" : "Not connected", ready: item.ready }))}
+            detail={metaStatus === "connected" ? t("suite.connections.metaReady") : t("suite.connections.metaSetup")}
+            rows={metaItems.map((item) => ({ label: item.label, value: item.ready ? item.value || t("suite.connections.connected") : t("suite.connections.notConnected"), ready: item.ready }))}
           />
           <StatusCard
             icon={<BarChart3 size={16} />}
             title="Google Ads"
             status={googleStatus}
-            detail={googleStatus === "connected" ? "Google Ads campaign read access is configured." : "Connect Google Ads before campaign analytics can load."}
+            detail={googleStatus === "connected" ? t("suite.connections.googleReady") : t("suite.connections.googleSetup")}
             rows={[{
-              label: "Ads account",
-              value: connections.google_ads?.customer_name || connections.google_ads?.customer_id || "Not connected",
+              label: t("suite.connections.adsAccount"),
+              value: connections.google_ads?.customer_name || connections.google_ads?.customer_id || t("suite.connections.notConnected"),
               ready: !!connections.google_ads?.connected,
             }]}
           />
           <StatusCard
             icon={<Cloud size={16} />}
-            title="Media Storage"
+            title={t("suite.connections.mediaStorage")}
             status={storageStatus}
-            detail={storageStatus === "connected" ? "Durable public media storage is ready." : "Generated images/videos may be local-only until storage config is complete."}
+            detail={storageStatus === "connected" ? t("suite.connections.storageReady") : t("suite.connections.storageSetup")}
             rows={[
-              { label: "Backend", value: storage?.backend || "Unknown", ready: !!storage },
-              { label: "Public URLs", value: storage?.public ? "Configured" : "Needs attention", ready: !!storage?.public },
-              ...(storage?.missing || []).slice(0, 4).map((name) => ({ label: "Missing config", value: name, ready: false })),
+              { label: t("suite.connections.backend"), value: storage?.backend || t("suite.connections.unknown"), ready: !!storage },
+              { label: t("suite.connections.publicUrls"), value: storage?.public ? t("suite.connections.configured") : t("suite.connections.needsAttention"), ready: !!storage?.public },
+              ...(storage?.missing || []).slice(0, 4).map((name) => ({ label: t("suite.connections.missingConfig"), value: name, ready: false })),
             ]}
           />
         </div>
 
         <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-          Missing configuration names are shown for diagnostics. Secret values are never displayed.
+          {t("suite.connections.diagnostics")}
         </div>
 
         <ConnectionsPanel suiteId={id} />
@@ -145,7 +147,7 @@ function StatusCard({
         {rows.map((row, index) => (
           <div key={`${row.label}-${index}`} className="flex items-center justify-between gap-3 text-xs">
             <span className="text-muted-foreground">{row.label}</span>
-            <span className={`min-w-0 truncate text-right ${row.ready ? "text-foreground" : "text-amber-700 dark:text-amber-300"}`} dir="auto">
+            <span className={`min-w-0 truncate text-end ${row.ready ? "text-foreground" : "text-amber-700 dark:text-amber-300"}`} dir="auto">
               {row.value}
             </span>
           </div>
@@ -156,11 +158,12 @@ function StatusCard({
 }
 
 function ReadinessBadge({ status }: { status: Readiness }) {
+  const t = useT();
   const label = {
-    connected: "Connected",
-    not_connected: "Not connected",
-    needs_attention: "Needs attention",
-    unavailable: "Unavailable",
+    connected: t("suite.connections.connected"),
+    not_connected: t("suite.connections.notConnected"),
+    needs_attention: t("suite.connections.needsAttention"),
+    unavailable: t("suite.connections.unavailable"),
   }[status];
   const className = {
     connected: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
@@ -170,7 +173,7 @@ function ReadinessBadge({ status }: { status: Readiness }) {
   }[status];
   return (
     <Badge variant="outline" className={className}>
-      <Link2 size={11} className="mr-1" />
+      <Link2 size={11} className="me-1" />
       {label}
     </Badge>
   );

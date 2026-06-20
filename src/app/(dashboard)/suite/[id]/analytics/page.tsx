@@ -7,11 +7,13 @@ import { SuitePageShell } from "@/components/suite/SuitePageShell";
 import { api, AnalyticsData, Connections, InsightPoint } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, BarChart3, Link2, Loader2, RefreshCw } from "lucide-react";
+import { useT } from "@/lib/i18n/LanguageContext";
 
 type AnalyticsState = "loading" | "no_connections" | "needs_attention" | "no_data" | "ready";
 
 export default function AnalyticsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const t = useT();
   const [connections, setConnections] = useState<Connections>({});
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,12 +32,12 @@ export default function AnalyticsPage({ params }: { params: Promise<{ id: string
         setAnalytics(null);
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Analytics status is unavailable");
+      setError(e instanceof Error ? e.message : t("suite.analytics.statusUnavailable"));
       setAnalytics(null);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void load(); }, 0);
@@ -51,15 +53,15 @@ export default function AnalyticsPage({ params }: { params: Promise<{ id: string
   }, [analytics, connections, error, loading]);
 
   return (
-    <SuitePageShell title="Analytics" description="Read-only campaign and channel performance, shown only when providers return usable data.">
+    <SuitePageShell title={t("suite.analytics.title")} description={t("suite.analytics.description")}>
       <div className="space-y-5">
         <div className="flex items-center justify-between gap-3">
           <div className="text-sm text-muted-foreground">
-            {loading ? "Checking analytics prerequisites..." : analyticsStateLabel(state)}
+            {loading ? t("suite.analytics.checking") : analyticsStateLabel(state, t)}
           </div>
           <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-2">
             {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            Refresh
+            {t("suite.connections.refresh")}
           </Button>
         </div>
 
@@ -78,9 +80,9 @@ export default function AnalyticsPage({ params }: { params: Promise<{ id: string
         ) : (
           <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center">
             <BarChart3 size={30} className="mx-auto text-muted-foreground" />
-            <p className="mt-3 text-sm font-medium text-foreground">Metric dashboard is waiting for provider data</p>
+            <p className="mt-3 text-sm font-medium text-foreground">{t("suite.analytics.waitingTitle")}</p>
             <p className="mx-auto mt-1 max-w-xl text-sm text-muted-foreground">
-              This avoids showing an all-zero dashboard when the true state is missing connection, missing permission, provider error, or no returned metrics.
+              {t("suite.analytics.waitingDesc")}
             </p>
           </div>
         )}
@@ -90,10 +92,11 @@ export default function AnalyticsPage({ params }: { params: Promise<{ id: string
 }
 
 function AnalyticsNotice({ state, suiteId, errors }: { state: AnalyticsState; suiteId: string; errors: string[] }) {
+  const t = useT();
   if (state === "loading") {
     return (
       <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
-        Loading analytics readiness...
+        {t("suite.analytics.loadingReadiness")}
       </div>
     );
   }
@@ -104,16 +107,16 @@ function AnalyticsNotice({ state, suiteId, errors }: { state: AnalyticsState; su
         <div className="flex items-start gap-3">
           <Link2 size={18} className="mt-0.5 text-amber-700 dark:text-amber-200" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground">Analytics needs a connected provider</p>
+            <p className="text-sm font-medium text-foreground">{t("suite.analytics.needsProviderTitle")}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Connect Meta or Google Ads before analytics can show real campaign or channel data.
+              {t("suite.analytics.needsProviderDesc")}
             </p>
           </div>
           <Link
             href={`/suite/${suiteId}/connections`}
             className="inline-flex h-7 shrink-0 items-center justify-center rounded-lg border border-border bg-background px-2.5 text-[0.8rem] font-medium hover:bg-muted hover:text-foreground"
           >
-            Open Connections
+            {t("suite.analytics.openConnections")}
           </Link>
         </div>
       </div>
@@ -126,9 +129,9 @@ function AnalyticsNotice({ state, suiteId, errors }: { state: AnalyticsState; su
         <div className="flex items-start gap-3">
           <AlertTriangle size={18} className="mt-0.5 text-amber-700 dark:text-amber-200" />
           <div>
-            <p className="text-sm font-medium text-foreground">Analytics needs attention</p>
+            <p className="text-sm font-medium text-foreground">{t("suite.analytics.needsAttentionTitle")}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Provider permissions, account access, or API availability prevented a trustworthy dashboard.
+              {t("suite.analytics.needsAttentionDesc")}
             </p>
             {errors.length > 0 && (
               <div className="mt-2 space-y-1 text-xs text-amber-800 dark:text-amber-100">
@@ -143,21 +146,21 @@ function AnalyticsNotice({ state, suiteId, errors }: { state: AnalyticsState; su
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <p className="text-sm font-medium text-foreground">No analytics data returned yet</p>
+      <p className="text-sm font-medium text-foreground">{t("suite.analytics.noDataTitle")}</p>
       <p className="mt-1 text-sm text-muted-foreground">
-        The provider connection exists, but no insights, campaigns, posts, or media metrics were returned for the selected period.
+        {t("suite.analytics.noDataDesc")}
       </p>
     </div>
   );
 }
 
-function analyticsStateLabel(state: AnalyticsState) {
+function analyticsStateLabel(state: AnalyticsState, t: (key: string) => string) {
   return {
-    loading: "Checking analytics prerequisites...",
-    no_connections: "No analytics provider connected",
-    needs_attention: "Analytics provider needs attention",
-    no_data: "Connected, but no metrics returned",
-    ready: "Analytics data is available",
+    loading: t("suite.analytics.checking"),
+    no_connections: t("suite.analytics.noProvider"),
+    needs_attention: t("suite.analytics.providerAttention"),
+    no_data: t("suite.analytics.noMetrics"),
+    ready: t("suite.analytics.ready"),
   }[state];
 }
 

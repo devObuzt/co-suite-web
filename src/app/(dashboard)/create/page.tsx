@@ -61,6 +61,10 @@ function trimText(value: string, max: number) {
   return value.slice(0, max);
 }
 
+function quickGenerationCount(mode?: GenerateContentRequest["mode"], contentType?: GenerateContentRequest["content_type"]) {
+  return mode === "quick" && contentType === "mixed" ? 3 : 1;
+}
+
 async function fileToSavedAsset(file: File, kind: QuickSavedAsset["kind"]): Promise<QuickSavedAsset> {
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -247,7 +251,7 @@ export default function AccountCreatePage() {
     setPaymentGate(null);
     try {
       const next = await api.content.generateAccount({
-        count: 1,
+        count: quickGenerationCount(choice.mode, choice.content_type),
         prompt: cleanPrompt,
         mode: choice.mode,
         content_type: choice.content_type,

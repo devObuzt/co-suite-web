@@ -53,6 +53,10 @@ const choices: CreateChoice[] = [
   },
 ];
 
+function generationCountForChoice(choice: CreateChoice) {
+  return choice.mode === "quick" && choice.content_type === "mixed" ? 3 : 1;
+}
+
 export default function LandingPage() {
   const router = useRouter();
   const t = useT();
@@ -175,7 +179,7 @@ export default function LandingPage() {
     setShowAuthGate(false);
     try {
       const next = await api.content.generateAccount({
-        count: 1,
+        count: generationCountForChoice(choice),
         prompt: cleanPrompt,
         mode: choice.mode,
         content_type: choice.content_type,

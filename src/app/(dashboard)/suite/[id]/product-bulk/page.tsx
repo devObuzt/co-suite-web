@@ -18,7 +18,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { api, GenerationStatus, ProductBulkAsset, ProductBulkBatch, ProductBulkItem, ProductTemplateDirection } from "@/lib/api";
+import { api, GenerationStatus, paymentGateDetail, PaymentGateDetail, ProductBulkAsset, ProductBulkBatch, ProductBulkItem, ProductTemplateDirection } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,6 +85,7 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<BusyAction | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [paymentGate, setPaymentGate] = useState<PaymentGateDetail | null>(null);
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
   const [pollingRequested, setPollingRequested] = useState(false);
   const [feedbackByAsset, setFeedbackByAsset] = useState<Record<string, string>>({});
@@ -104,14 +105,15 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
     });
   }, [id]);
 
+  const activeBatchId = batch?.id || "";
   const refreshBatch = useCallback(async (options?: { settleIfIdle?: boolean }) => {
-    if (!batch?.id) {
+    if (!activeBatchId) {
       await loadBatches();
       return null;
     }
     const [next, job] = await Promise.all([
-      api.productBulk.get(id, batch.id),
-      api.productBulk.generationStatus(id, batch.id),
+      api.productBulk.get(id, activeBatchId),
+      api.productBulk.generationStatus(id, activeBatchId),
     ]);
     setBatch(next);
     setGenerationStatus(job.status === "idle" ? null : job);
@@ -124,12 +126,12 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
       setBusyAction(null);
     }
     return next;
-  }, [batch?.id, id, loadBatches]);
+  }, [activeBatchId, id, loadBatches]);
 
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
-    loadBatches()
+    Promise.resolve()
+      .then(loadBatches)
       .catch((err) => {
         if (mounted) setError(friendlyError(err));
       })
@@ -163,14 +165,6 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
     };
   }, [batch, generationStatus, pollingRequested, refreshBatch]);
 
-  useEffect(() => {
-    if (!batch) return;
-    if (!isBatchRunning(batch) && !isJobRunning(generationStatus)) {
-      setPollingRequested(false);
-      setBusyAction(null);
-    }
-  }, [batch, generationStatus]);
-
   const stats = useMemo(() => {
     const total = batch?.total_products || batch?.items.length || 0;
     const matched = batch?.items.filter((item) => Boolean(item.image_url)).length || 0;
@@ -193,15 +187,16 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
     [batch]
   );
   const firstProduct = batch?.items.slice().sort((a, b) => a.row_index - b.row_index)[0] || null;
+  const running = isBatchRunning(batch) || isJobRunning(generationStatus);
   const canGenerateFirst = Boolean(
     batch
     && batch.items.length > 0
-    && !isBatchRunning(batch)
-    && !isJobRunning(generationStatus)
+    && !running
     && Boolean(firstProduct?.image_url)
     && templateCards.length === 0
   );
-  const canGenerateAll = Boolean(batch && approvedTemplate && !isBatchRunning(batch) && !isJobRunning(generationStatus));
+  const hasStaleApprovedTemplate = Boolean(batch?.approved_template_id && !approvedTemplate);
+  const canGenerateAll = Boolean(batch && approvedTemplate && !running);
   const generateFirstBlocker = !batch
     ? "Import a batch first."
     : batch.items.length === 0
@@ -210,22 +205,35 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
         ? "Template directions already exist for this batch."
         : !firstProduct?.image_url
           ? "The first product needs a matched image before template generation."
-          : isBatchRunning(batch) || isJobRunning(generationStatus)
+          : running
             ? "Generation is already running."
             : "";
-  const generateAllBlocker = !approvedTemplate
-    ? "Approve one template direction before generating all products."
-    : stats.missing > 0
+  const generateAllBlocker = running
+    ? "Generation is already running."
+    : hasStaleApprovedTemplate
+      ? "Approved template direction is no longer available."
+      : !approvedTemplate
+        ? "Approve one template direction before generating all products."
+        : "";
+  const generateAllWarning =
+    approvedTemplate && stats.missing > 0
       ? `${stats.missing} product image${stats.missing === 1 ? " is" : "s are"} missing. Products without images will fail.`
       : "";
 
   async function runAction(action: BusyAction, task: () => Promise<void>, keepPolling = false) {
     setBusyAction(action);
     setError(null);
+    setPaymentGate(null);
     try {
       await task();
-      if (keepPolling) setPollingRequested(true);
+      if (keepPolling) {
+        setPollingRequested(true);
+      } else {
+        setBusyAction(null);
+      }
     } catch (err) {
+      const gate = paymentGateDetail(err);
+      if (gate) setPaymentGate(gate);
       setError(friendlyError(err));
       setBusyAction(null);
     }
@@ -378,7 +386,21 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
       {error && (
         <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-900 bg-red-950/40 px-4 py-3 text-sm text-red-200">
           <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-          <span className="min-w-0 break-words">{error}</span>
+          <div className="min-w-0 space-y-2">
+            <span className="block break-words">{error}</span>
+            {paymentGate && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-red-100/80">
+                  Required {paymentGate.required_tokens ?? 0} tokens, available {paymentGate.token_balance ?? 0}.
+                </span>
+                <Link href={`/suite/${id}/billing`}>
+                  <Button size="sm" variant="outline" className="h-8 border-red-700 text-red-100 hover:bg-red-900/40">
+                    Upgrade or buy tokens
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -406,7 +428,6 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
               <BatchProgress batch={batch} stats={stats} generationStatus={generationStatus} waitMessage={waitMessage} />
               <ImportPreview batch={batch} stats={stats} />
               <TemplateSection
-                batch={batch}
                 templates={templateCards}
                 assetById={assetById}
                 busyAction={busyAction}
@@ -418,7 +439,9 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
                 canGenerateAll={canGenerateAll}
                 generateFirstBlocker={generateFirstBlocker}
                 generateAllBlocker={generateAllBlocker}
+                generateAllWarning={generateAllWarning}
                 missingImages={stats.missing}
+                running={running}
               />
               <AssetsGrid
                 batch={batch}
@@ -428,6 +451,7 @@ export default function ProductBulkStudioPage({ params }: { params: Promise<{ id
                 onApprove={approveAsset}
                 onReject={rejectAsset}
                 onRegenerate={regenerateAsset}
+                running={running}
               />
             </>
           ) : (
@@ -631,6 +655,7 @@ function ImportPreview({
   stats: { total: number; matched: number; missing: number; generated: number; approved: number; failed: number };
 }) {
   const rows = batch.items.slice(0, 8);
+  const firstProduct = batch.items.slice().sort((a, b) => a.row_index - b.row_index)[0] || null;
   return (
     <Card className="border-border bg-card text-card-foreground">
       <CardHeader>
@@ -644,7 +669,20 @@ function ImportPreview({
           <StatusBadge status={batch.status} />
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
+        <div className="grid gap-2 text-xs sm:grid-cols-2">
+          <div className="rounded-lg border border-border bg-background px-3 py-2 text-muted-foreground">
+            <span className="font-medium text-foreground">Matched:</span> {stats.matched} product image{stats.matched === 1 ? "" : "s"} ready for generation.
+          </div>
+          <div className={`rounded-lg border px-3 py-2 ${stats.missing > 0 ? "border-amber-900 bg-amber-950/30 text-amber-200" : "border-border bg-background text-muted-foreground"}`}>
+            <span className="font-medium text-foreground">Missing:</span> {stats.missing} product image{stats.missing === 1 ? "" : "s"}. Missing-image products fail during full generation.
+          </div>
+        </div>
+        {firstProduct && !firstProduct.image_url && (
+          <div className="rounded-lg border border-amber-900 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
+            First product row {firstProduct.row_index} has no matched image. Generate first templates stays unavailable until that image is matched.
+          </div>
+        )}
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="min-w-[760px] w-full text-left text-sm">
             <thead className="bg-muted text-xs text-muted-foreground">
@@ -694,7 +732,6 @@ function ImportPreview({
 }
 
 function TemplateSection({
-  batch,
   templates,
   assetById,
   busyAction,
@@ -703,12 +740,13 @@ function TemplateSection({
   canGenerateAll,
   generateFirstBlocker,
   generateAllBlocker,
+  generateAllWarning,
   missingImages,
+  running,
   onGenerateFirst,
   onApproveTemplate,
   onGenerateAll,
 }: {
-  batch: ProductBulkBatch;
   templates: ProductTemplateDirection[];
   assetById: Map<string, ProductBulkAsset>;
   busyAction: BusyAction | null;
@@ -717,11 +755,14 @@ function TemplateSection({
   canGenerateAll: boolean;
   generateFirstBlocker: string;
   generateAllBlocker: string;
+  generateAllWarning: string;
   missingImages: number;
+  running: boolean;
   onGenerateFirst: () => void;
   onApproveTemplate: (templateId: string) => void;
   onGenerateAll: () => void;
 }) {
+  const approveTemplateBlocker = running ? "Template approval is unavailable while this batch job is running." : "";
   return (
     <section className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -751,10 +792,11 @@ function TemplateSection({
         </div>
       </div>
 
-      {(generateFirstBlocker || generateAllBlocker || missingImages > 0) && (
+      {(generateFirstBlocker || generateAllBlocker || generateAllWarning || missingImages > 0) && (
         <div className="rounded-lg border border-amber-900 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
           {generateFirstBlocker && templates.length === 0 ? <p>{generateFirstBlocker}</p> : null}
           {generateAllBlocker ? <p>{generateAllBlocker}</p> : null}
+          {generateAllWarning ? <p>{generateAllWarning}</p> : null}
         </div>
       )}
 
@@ -783,12 +825,16 @@ function TemplateSection({
                 </div>
                 <Button
                   onClick={() => onApproveTemplate(template.id)}
-                  disabled={Boolean(busyAction) || selected || isBatchRunning(batch)}
+                  disabled={Boolean(busyAction) || selected || running}
+                  title={selected ? "This template direction is approved." : approveTemplateBlocker || "Approve this template direction"}
                   className="w-full gap-2 bg-emerald-700 hover:bg-emerald-600"
                 >
                   {busyAction === "approve-template" ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                   {selected ? "Approved" : "Approve template"}
                 </Button>
+                {approveTemplateBlocker && !selected && (
+                  <p className="text-xs text-amber-300">{approveTemplateBlocker}</p>
+                )}
               </CardContent>
             </Card>
           );
@@ -812,6 +858,7 @@ function AssetsGrid({
   onApprove,
   onReject,
   onRegenerate,
+  running,
 }: {
   batch: ProductBulkBatch;
   busyAction: BusyAction | null;
@@ -820,6 +867,7 @@ function AssetsGrid({
   onApprove: (assetId: string) => void;
   onReject: (assetId: string) => void;
   onRegenerate: (assetId: string) => void;
+  running: boolean;
 }) {
   const itemById = useMemo(() => {
     const map = new Map<string, ProductBulkItem>();
@@ -828,6 +876,15 @@ function AssetsGrid({
   }, [batch.items]);
 
   const assets = batch.assets;
+  const regeneratedFromIds = useMemo(() => {
+    const ids = new Set<string>();
+    batch.assets.forEach((asset) => {
+      const originalId = typeof asset.ai_metadata?.regenerated_from_asset_id === "string" ? asset.ai_metadata.regenerated_from_asset_id : null;
+      if (originalId) ids.add(originalId);
+    });
+    return ids;
+  }, [batch.assets]);
+  const runningActionReason = running ? "Asset actions are unavailable while this batch job is running." : "";
 
   return (
     <section className="space-y-4">
@@ -846,7 +903,10 @@ function AssetsGrid({
           {assets.map((asset) => {
             const item = itemById.get(asset.item_id);
             const url = mediaUrl(asset.media_url);
+            const feedback = (feedbackByAsset[asset.id] || "").trim();
             const actionBusy = busyAction === `approve-${asset.id}` || busyAction === `reject-${asset.id}` || busyAction === `regenerate-${asset.id}`;
+            const actionDisabled = Boolean(busyAction) || running || asset.status === "generating";
+            const originalAssetId = typeof asset.ai_metadata?.regenerated_from_asset_id === "string" ? asset.ai_metadata.regenerated_from_asset_id : null;
             return (
               <Card key={asset.id} className="border-zinc-800 bg-zinc-900 text-white">
                 {url ? (
@@ -870,6 +930,16 @@ function AssetsGrid({
                       Previous feedback: {asset.feedback}
                     </p>
                   )}
+                  {originalAssetId && (
+                    <p className="rounded-lg border border-indigo-900 bg-indigo-950/30 px-3 py-2 text-xs text-indigo-200">
+                      Regenerated from asset {originalAssetId.slice(0, 8)}. The original asset remains in this review grid.
+                    </p>
+                  )}
+                  {regeneratedFromIds.has(asset.id) && (
+                    <p className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-400">
+                      Original kept after regeneration.
+                    </p>
+                  )}
 
                   <label className="block space-y-1">
                     <span className="text-xs text-zinc-500">Feedback for reject/regenerate</span>
@@ -884,15 +954,35 @@ function AssetsGrid({
                   </label>
 
                   <div className="grid grid-cols-2 gap-2">
-                    <Button size="sm" onClick={() => onApprove(asset.id)} disabled={Boolean(busyAction) || asset.status === "approved"} className="gap-1 bg-emerald-700 text-xs hover:bg-emerald-600">
+                    <Button
+                      size="sm"
+                      onClick={() => onApprove(asset.id)}
+                      disabled={actionDisabled || asset.status === "approved"}
+                      title={runningActionReason || (asset.status === "generating" ? "Wait for this asset to finish generating." : "Approve this asset")}
+                      className="gap-1 bg-emerald-700 text-xs hover:bg-emerald-600"
+                    >
                       {busyAction === `approve-${asset.id}` ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
                       Approve
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => onReject(asset.id)} disabled={Boolean(busyAction) || asset.status === "rejected"} className="gap-1 border-zinc-700 text-xs text-zinc-300 hover:bg-zinc-800">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onReject(asset.id)}
+                      disabled={actionDisabled || asset.status === "rejected"}
+                      title={runningActionReason || (feedback ? "Reject this asset with feedback" : "Add feedback before rejecting this asset.")}
+                      className="gap-1 border-zinc-700 text-xs text-zinc-300 hover:bg-zinc-800"
+                    >
                       {busyAction === `reject-${asset.id}` ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
                       Reject
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => onRegenerate(asset.id)} disabled={Boolean(busyAction) || !(feedbackByAsset[asset.id] || "").trim()} className="gap-1 border-zinc-700 text-xs text-zinc-300 hover:bg-zinc-800">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onRegenerate(asset.id)}
+                      disabled={actionDisabled || !feedback}
+                      title={runningActionReason || (feedback ? "Regenerate this asset and keep the original visible." : "Add feedback before regenerating this asset.")}
+                      className="gap-1 border-zinc-700 text-xs text-zinc-300 hover:bg-zinc-800"
+                    >
                       {busyAction === `regenerate-${asset.id}` ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
                       Regenerate
                     </Button>
@@ -923,6 +1013,10 @@ function AssetsGrid({
                   )}
 
                   {actionBusy && <p className="text-xs text-zinc-500">Updating asset...</p>}
+                  {!feedback && asset.status !== "generating" && (
+                    <p className="text-xs text-zinc-500">Reject and Regenerate require feedback.</p>
+                  )}
+                  {runningActionReason && <p className="text-xs text-amber-300">{runningActionReason}</p>}
                 </CardContent>
               </Card>
             );

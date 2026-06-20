@@ -279,3 +279,36 @@
     }
   }
 }
+
+
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+
+  .marketing-plan-controls,
+  aside,
+  nav,
+  header:has(.marketing-plan-controls) {
+    display: none !important;
+  }
+
+  .marketing-plan-deck {
+    max-width: none !important;
+    margin: 0 !important;
+  }
+
+  .marketing-plan-deck section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .marketing-plan-deck .bg-card,
+  .marketing-plan-deck .bg-background,
+  .marketing-plan-deck .bg-muted {
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+}

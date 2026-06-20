@@ -1,19 +1,25 @@
 "use client";
 
 import React, { use, useEffect, useMemo, useState } from "react";
-import { api, Brand, Suite } from "@/lib/api";
+import { api, Brand, BrandReferenceLink, Suite } from "@/lib/api";
 import { LANGUAGES } from "@/lib/i18n/translations";
-import { useT } from "@/lib/i18n/LanguageContext";
+import { useLanguage, useT } from "@/lib/i18n/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SuitePageShell } from "@/components/suite/SuitePageShell";
-import { ImagePlus, Loader2, Save, UserPlus, X } from "lucide-react";
+import { ExternalLink, ImagePlus, Loader2, Plus, Save, UserPlus, X } from "lucide-react";
 
 type ProfileForm = {
   name: string;
   category: string;
   audienceLanguages: string[];
+  website: string;
+  instagram: string;
+  facebook: string;
+  tiktok: string;
+  linkedin: string;
+  referenceLinks: BrandReferenceLink[];
   productsServices: string;
   audienceNotes: string;
   audienceInterests: string;
@@ -31,6 +37,12 @@ const emptyForm: ProfileForm = {
   name: "",
   category: "",
   audienceLanguages: [],
+  website: "",
+  instagram: "",
+  facebook: "",
+  tiktok: "",
+  linkedin: "",
+  referenceLinks: [],
   productsServices: "",
   audienceNotes: "",
   audienceInterests: "",
@@ -47,6 +59,8 @@ const emptyForm: ProfileForm = {
 export default function BusinessProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const t = useT();
+  const { lang, dir } = useLanguage();
+  const sourceLabels = getSourceLinkLabels(lang);
   const [suite, setSuite] = useState<Suite | null>(null);
   const [form, setForm] = useState<ProfileForm>(emptyForm);
   const [loading, setLoading] = useState(true);
@@ -61,9 +75,9 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
         setSuite(data);
         setForm(formFromBrand(data.brand || {}));
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load Suite profile"))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : t("suite.profile.loadFailed")))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, t]);
 
   const brand = suite?.brand || {};
   const logos = brand.brand_logos || [];
@@ -82,9 +96,9 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
       const nextBrand = brandFromForm(form, suite.brand || {});
       await api.suites.updateBrand(id, nextBrand);
       setSuite({ ...suite, brand: nextBrand });
-      setNotice("Profile saved.");
+      setNotice(t("suite.profile.saved"));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Profile save failed");
+      setError(e instanceof Error ? e.message : t("suite.profile.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -107,9 +121,9 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
         setSuite({ ...suite, brand: latestBrand });
         setForm(formFromBrand(latestBrand));
       }
-      setNotice(logoFiles.length === 1 ? "Logo uploaded." : `${logoFiles.length} logos uploaded and classified.`);
+      setNotice(logoFiles.length === 1 ? t("suite.profile.logoUploaded") : `${logoFiles.length} ${t("suite.profile.logosUploadedSuffix")}`);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Logo upload failed");
+      setError(e instanceof Error ? e.message : t("suite.profile.logoUploadFailed"));
     } finally {
       setUploading(null);
     }
@@ -123,9 +137,9 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
     try {
       await api.suites.updateBrand(id, nextBrand);
       setSuite({ ...suite, brand: nextBrand });
-      setNotice("Primary logo updated.");
+      setNotice(t("suite.profile.primaryLogoUpdated"));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Primary logo update failed");
+      setError(e instanceof Error ? e.message : t("suite.profile.primaryLogoFailed"));
     }
   }
 
@@ -135,7 +149,7 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
     if (personaFiles.length === 0) return;
     const personaName = form.personaName.trim();
     if (!personaName) {
-      setError("Enter a persona name before uploading reference images.");
+      setError(t("suite.profile.personaNameRequired"));
       return;
     }
     setUploading("persona");
@@ -151,9 +165,9 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
         setSuite({ ...suite, brand: latestBrand });
         setForm({ ...formFromBrand(latestBrand), personaName });
       }
-      setNotice(personaFiles.length === 1 ? "Persona reference uploaded." : `${personaFiles.length} persona references uploaded.`);
+      setNotice(personaFiles.length === 1 ? t("suite.profile.personaUploaded") : `${personaFiles.length} ${t("suite.profile.personasUploadedSuffix")}`);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Persona upload failed");
+      setError(e instanceof Error ? e.message : t("suite.profile.personaUploadFailed"));
     } finally {
       setUploading(null);
     }
@@ -177,21 +191,36 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
     )));
   }
 
+  function addReferenceLink() {
+    setForm({ ...form, referenceLinks: [...form.referenceLinks, { label: "", url: "", source: "manual" }] });
+  }
+
+  function updateReferenceLink(index: number, field: "label" | "url", value: string) {
+    setForm({
+      ...form,
+      referenceLinks: form.referenceLinks.map((link, i) => i === index ? { ...link, [field]: value } : link),
+    });
+  }
+
+  function removeReferenceLink(index: number) {
+    setForm({ ...form, referenceLinks: form.referenceLinks.filter((_, i) => i !== index) });
+  }
+
   if (loading) {
-    return <div className="p-8 text-sm text-muted-foreground">Loading...</div>;
+    return <div className="p-8 text-sm text-muted-foreground">{t("suite.status.loading")}</div>;
   }
 
   if (!suite) {
-    return <div className="p-8 text-sm text-muted-foreground">Suite not found.</div>;
+    return <div className="p-8 text-sm text-muted-foreground">{t("suite.status.notFound")}</div>;
   }
 
   return (
     <SuitePageShell
-      title="Brand/Profile"
-      description="Edit the current Suite's business, audience, message, assets, and feedback rules."
+      title={t("suite.nav.profile")}
+      description={t("suite.profile.description")}
       backHref={`/suite/${id}`}
     >
-      <div className="space-y-4">
+      <div className="space-y-4" dir={dir}>
         {(notice || error) && (
           <div
             className={`rounded-lg border px-3 py-2 text-sm ${
@@ -203,14 +232,58 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
           </div>
         )}
 
-        <ProfileSection title="Business">
+        <ProfileSection title={t("suite.profile.section.business")}>
           <div className="grid gap-3 md:grid-cols-2">
-            <TextField label="Business name" value={form.name} onChange={(name) => setForm({ ...form, name })} />
-            <TextField label="Category" value={form.category} onChange={(category) => setForm({ ...form, category })} />
+            <TextField label={t("suite.profile.field.businessName")} value={form.name} onChange={(name) => setForm({ ...form, name })} />
+            <TextField label={t("suite.profile.field.category")} value={form.category} onChange={(category) => setForm({ ...form, category })} />
           </div>
         </ProfileSection>
 
-        <ProfileSection title="Audience Languages">
+        <ProfileSection title={sourceLabels.title}>
+          <p className="mb-3 text-sm text-muted-foreground" dir="auto">{sourceLabels.description}</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <LinkField label={sourceLabels.website} value={form.website} onChange={(website) => setForm({ ...form, website })} placeholder="https://example.com" openLabel={sourceLabels.openLink} />
+            <LinkField label="Instagram" value={form.instagram} onChange={(instagram) => setForm({ ...form, instagram })} placeholder="https://instagram.com/..." openLabel={sourceLabels.openLink} />
+            <LinkField label="Facebook" value={form.facebook} onChange={(facebook) => setForm({ ...form, facebook })} placeholder="https://facebook.com/..." openLabel={sourceLabels.openLink} />
+            <LinkField label="TikTok" value={form.tiktok} onChange={(tiktok) => setForm({ ...form, tiktok })} placeholder="https://tiktok.com/@..." openLabel={sourceLabels.openLink} />
+            <LinkField label="LinkedIn" value={form.linkedin} onChange={(linkedin) => setForm({ ...form, linkedin })} placeholder="https://linkedin.com/company/..." openLabel={sourceLabels.openLink} />
+          </div>
+
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-medium text-muted-foreground">{sourceLabels.moreLinks}</span>
+              <button
+                type="button"
+                onClick={addReferenceLink}
+                className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <Plus size={13} /> {sourceLabels.addLink}
+              </button>
+            </div>
+            {form.referenceLinks.length === 0 && (
+              <p className="rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground" dir="auto">
+                {sourceLabels.emptyLinks}
+              </p>
+            )}
+            {form.referenceLinks.map((link, index) => (
+              <div key={index} className="grid gap-2 rounded-lg border border-border p-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.6fr)_auto] md:items-end">
+                <TextField label={sourceLabels.linkLabel} value={link.label || ""} onChange={(label) => updateReferenceLink(index, "label", label)} placeholder={sourceLabels.linkLabelPlaceholder} />
+                <LinkField label={sourceLabels.linkUrl} value={link.url || ""} onChange={(url) => updateReferenceLink(index, "url", url)} placeholder="https://..." openLabel={sourceLabels.openLink} />
+                <button
+                  type="button"
+                  onClick={() => removeReferenceLink(index)}
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-border px-3 text-muted-foreground transition-colors hover:bg-accent hover:text-red-400"
+                  aria-label={sourceLabels.removeLink}
+                  title={sourceLabels.removeLink}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </ProfileSection>
+
+        <ProfileSection title={t("suite.profile.section.languages")}>
           <div className="flex flex-wrap gap-2">
             {LANGUAGES.map((lang) => {
               const active = form.audienceLanguages.includes(lang.code);
@@ -231,46 +304,46 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
           </div>
           {selectedLanguages.length > 0 && (
             <p className="mt-2 text-xs text-muted-foreground">
-              Primary language: {selectedLanguages[0].label}
+              {t("suite.profile.field.primaryLanguage")} {selectedLanguages[0].label}
             </p>
           )}
         </ProfileSection>
 
-        <ProfileSection title="Products & Services">
+        <ProfileSection title={t("suite.profile.section.products")}>
           <TextareaField
-            label="One product or service per line"
+            label={t("suite.profile.field.products")}
             value={form.productsServices}
             onChange={(productsServices) => setForm({ ...form, productsServices })}
             rows={5}
           />
         </ProfileSection>
 
-        <ProfileSection title="Target Audience">
-          <TextareaField label="Audience note" value={form.audienceNotes} onChange={(audienceNotes) => setForm({ ...form, audienceNotes })} rows={4} />
+        <ProfileSection title={t("suite.profile.section.audience")}>
+          <TextareaField label={t("suite.profile.field.audienceNote")} value={form.audienceNotes} onChange={(audienceNotes) => setForm({ ...form, audienceNotes })} rows={4} />
           <div className="mt-3 grid gap-3 md:grid-cols-3">
-            <TextareaField label="Interests" value={form.audienceInterests} onChange={(audienceInterests) => setForm({ ...form, audienceInterests })} />
-            <TextareaField label="Behaviors" value={form.audienceBehaviors} onChange={(audienceBehaviors) => setForm({ ...form, audienceBehaviors })} />
-            <TextareaField label="Segments" value={form.audienceSegments} onChange={(audienceSegments) => setForm({ ...form, audienceSegments })} />
+            <TextareaField label={t("suite.profile.field.interests")} value={form.audienceInterests} onChange={(audienceInterests) => setForm({ ...form, audienceInterests })} />
+            <TextareaField label={t("suite.profile.field.behaviors")} value={form.audienceBehaviors} onChange={(audienceBehaviors) => setForm({ ...form, audienceBehaviors })} />
+            <TextareaField label={t("suite.profile.field.segments")} value={form.audienceSegments} onChange={(audienceSegments) => setForm({ ...form, audienceSegments })} />
           </div>
         </ProfileSection>
 
-        <ProfileSection title="USP / ESP">
+        <ProfileSection title={t("suite.profile.section.value")}>
           <div className="grid gap-3 md:grid-cols-2">
-            <TextareaField label="Unique selling proposition" value={form.uniqueValue} onChange={(uniqueValue) => setForm({ ...form, uniqueValue })} rows={4} />
-            <TextareaField label="Emotional selling proposition" value={form.esp} onChange={(esp) => setForm({ ...form, esp })} rows={4} />
-            <TextareaField label="USP points" value={form.uspPoints} onChange={(uspPoints) => setForm({ ...form, uspPoints })} rows={5} />
-            <TextareaField label="ESP points" value={form.espPoints} onChange={(espPoints) => setForm({ ...form, espPoints })} rows={5} />
+            <TextareaField label={t("suite.profile.field.uniqueValue")} value={form.uniqueValue} onChange={(uniqueValue) => setForm({ ...form, uniqueValue })} rows={4} />
+            <TextareaField label={t("suite.profile.field.esp")} value={form.esp} onChange={(esp) => setForm({ ...form, esp })} rows={4} />
+            <TextareaField label={t("suite.profile.field.uspPoints")} value={form.uspPoints} onChange={(uspPoints) => setForm({ ...form, uspPoints })} rows={5} />
+            <TextareaField label={t("suite.profile.field.espPoints")} value={form.espPoints} onChange={(espPoints) => setForm({ ...form, espPoints })} rows={5} />
           </div>
         </ProfileSection>
 
-        <ProfileSection title="Logos / Assets">
+        <ProfileSection title={t("suite.profile.section.assets")}>
           <div className="flex flex-wrap items-center gap-3">
-            {brand.logo_url && <LogoPreview url={brand.logo_url} label="Primary logo" isPrimary />}
+            {brand.logo_url && <LogoPreview url={brand.logo_url} label={t("suite.profile.field.primaryLogo")} isPrimary />}
             {logos.filter((logo) => logo.url !== brand.logo_url).map((logo, index) => (
               <LogoPreview
                 key={`${logo.url}-${index}`}
                 url={logo.url}
-                label={logo.shape || logo.name || "logo"}
+                label={logo.shape || logo.name || t("suite.profile.field.logoFallback")}
                 isPrimary={brand.logo_url === logo.url}
                 onSetPrimary={() => setPrimaryLogo(logo.url)}
                 primaryLabel={t("suite.new.primaryLogo")}
@@ -279,7 +352,7 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
             ))}
             <label className="inline-flex min-h-16 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">
               {uploading === "logo" ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
-              Upload logo
+              {t("suite.profile.field.uploadLogo")}
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/svg+xml,image/webp"
@@ -294,12 +367,12 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
           </div>
         </ProfileSection>
 
-        <ProfileSection title="Personas / Reference Images">
+        <ProfileSection title={t("suite.profile.section.personas")}>
           <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-            <TextField label="Persona name" value={form.personaName} onChange={(personaName) => setForm({ ...form, personaName })} />
+            <TextField label={t("suite.profile.field.personaName")} value={form.personaName} onChange={(personaName) => setForm({ ...form, personaName })} />
             <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
               {uploading === "persona" ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-              Upload reference
+              {t("suite.profile.field.uploadReference")}
               <input
                 type="file"
                 accept="image/*"
@@ -336,7 +409,7 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
                       <LogoPreview
                         key={`${persona.name}-${image.url}-${index}`}
                         url={image.url}
-                        label={image.shape || "reference"}
+                        label={image.shape || t("suite.profile.field.referenceFallback")}
                         onRemove={() => removePersonaImage(persona.name, image.url)}
                         removeLabel={t("suite.new.removeImage")}
                       />
@@ -348,20 +421,20 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
           )}
         </ProfileSection>
 
-        <ProfileSection title="Content Rules Learned From Feedback">
+        <ProfileSection title={t("suite.profile.section.rules")}>
           <TextareaField
-            label="One rule per line"
+            label={t("suite.profile.field.oneRulePerLine")}
             value={form.contentRules}
             onChange={(contentRules) => setForm({ ...form, contentRules })}
             rows={6}
-            placeholder="Avoid formal Arabic. Use short hooks. Never mention prices without approval."
+            placeholder={t("suite.profile.rulesPlaceholder")}
           />
         </ProfileSection>
 
         <div className="sticky bottom-3 z-10 flex justify-end">
           <Button onClick={saveProfile} disabled={saving} className="gap-2 shadow-lg">
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            {saving ? "Saving..." : "Save profile"}
+            {saving ? t("suite.profile.saving") : t("suite.profile.save")}
           </Button>
         </div>
       </div>
@@ -376,6 +449,12 @@ function formFromBrand(brand: Brand): ProfileForm {
     name: brand.name || "",
     category: brand.niche || brand.industry || "",
     audienceLanguages: brand.audience_languages || [],
+    website: brand.website || "",
+    instagram: brand.social_links?.instagram || "",
+    facebook: brand.social_links?.facebook || "",
+    tiktok: brand.social_links?.tiktok || "",
+    linkedin: brand.social_links?.linkedin || "",
+    referenceLinks: normalizeReferenceLinks(brand.reference_links || []),
     productsServices: toLines(services),
     audienceNotes: brand.audience_notes || brand.target_audience || "",
     audienceInterests: toLines(brand.audience_interests),
@@ -401,6 +480,15 @@ function brandFromForm(form: ProfileForm, current: Brand): Brand {
     niche: category,
     services: productsServices,
     products: current.products || [],
+    website: form.website.trim() || null,
+    social_links: {
+      ...(current.social_links || {}),
+      instagram: form.instagram.trim() || undefined,
+      facebook: form.facebook.trim() || undefined,
+      tiktok: form.tiktok.trim() || undefined,
+      linkedin: form.linkedin.trim() || undefined,
+    },
+    reference_links: normalizeReferenceLinks(form.referenceLinks),
     audience_languages: form.audienceLanguages,
     audience_language_names: form.audienceLanguages.map((code) => LANGUAGES.find((lang) => lang.code === code)?.label || code),
     target_audience: form.audienceNotes.trim(),
@@ -414,6 +502,69 @@ function brandFromForm(form: ProfileForm, current: Brand): Brand {
     usp_points: fromLines(form.uspPoints),
     esp_points: fromLines(form.espPoints),
     content_rules: fromLines(form.contentRules).map((text) => ({ text, source: "profile_edit" })),
+  };
+}
+
+function normalizeReferenceLinks(links: BrandReferenceLink[]): BrandReferenceLink[] {
+  const seen = new Set<string>();
+  return (links || [])
+    .map((link) => ({
+      label: (link.label || "").trim(),
+      url: (link.url || "").trim(),
+      source: link.source || "manual",
+    }))
+    .filter((link) => {
+      if (!link.url) return false;
+      const key = link.url.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function getSourceLinkLabels(lang: string) {
+  if (lang === "he") {
+    return {
+      title: "קישורי מקור",
+      description: "הקישורים שהלקוח הזין נשמרים כאן, ואפשר להוסיף עוד מקורות שנשתמש בהם להבנת העסק.",
+      website: "אתר ראשי",
+      moreLinks: "קישורים נוספים",
+      addLink: "הוסף קישור",
+      emptyLinks: "אין עדיין קישורים נוספים. אפשר להוסיף אתר, קטלוג, תיק עבודות או כל מקור חשוב.",
+      linkLabel: "שם הקישור",
+      linkLabelPlaceholder: "קטלוג / תיק עבודות / דף נחיתה",
+      linkUrl: "URL",
+      removeLink: "הסר קישור",
+      openLink: "פתח קישור",
+    };
+  }
+  if (lang === "ar") {
+    return {
+      title: "روابط المصادر",
+      description: "الروابط التي أدخلها العميل محفوظة هنا، ويمكن إضافة روابط أخرى نستخدمها كمرجع لفهم المصلحة.",
+      website: "الموقع الرئيسي",
+      moreLinks: "روابط إضافية",
+      addLink: "إضافة رابط",
+      emptyLinks: "لا توجد روابط إضافية بعد. يمكن إضافة كتالوج، صفحة هبوط، ملف أعمال أو أي مصدر مهم.",
+      linkLabel: "اسم الرابط",
+      linkLabelPlaceholder: "كتالوج / ملف أعمال / صفحة هبوط",
+      linkUrl: "الرابط",
+      removeLink: "حذف الرابط",
+      openLink: "فتح الرابط",
+    };
+  }
+  return {
+    title: "Source links",
+    description: "Client-provided links stay here, and you can add more sources for business research and references.",
+    website: "Main website",
+    moreLinks: "Additional links",
+    addLink: "Add link",
+    emptyLinks: "No additional links yet. Add a catalog, portfolio, landing page, or any useful source.",
+    linkLabel: "Link label",
+    linkLabelPlaceholder: "Catalog / portfolio / landing page",
+    linkUrl: "URL",
+    removeLink: "Remove link",
+    openLink: "Open link",
   };
 }
 
@@ -440,18 +591,60 @@ function ProfileSection({ title, children }: { title: string; children: React.Re
   );
 }
 
-function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function TextField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+}) {
   return (
     <label className="block space-y-1.5">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <input
+        type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+        placeholder={placeholder}
+        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
         dir="auto"
       />
     </label>
   );
+}
+
+function LinkField(props: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; openLabel?: string }) {
+  const href = normalizeExternalHref(props.value);
+  return (
+    <div className="relative">
+      <TextField {...props} type="url" />
+      {href && (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="absolute end-2 top-7 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          aria-label={props.openLabel || "Open link"}
+          title={props.openLabel || "Open link"}
+        >
+          <ExternalLink size={14} />
+        </a>
+      )}
+    </div>
+  );
+}
+
+function normalizeExternalHref(value: string) {
+  const url = value.trim();
+  if (!url) return "";
+  if (/^(https?:|mailto:|tel:)/i.test(url)) return url;
+  return `https://${url}`;
 }
 
 function TextareaField({
@@ -487,10 +680,10 @@ function LogoPreview({
   label,
   isPrimary = false,
   onSetPrimary,
-  primaryLabel = "Primary",
-  setPrimaryLabel = "Set primary",
+  primaryLabel,
+  setPrimaryLabel,
   onRemove,
-  removeLabel = "Remove image",
+  removeLabel,
 }: {
   url: string;
   label: string;
@@ -501,6 +694,10 @@ function LogoPreview({
   onRemove?: () => void;
   removeLabel?: string;
 }) {
+  const t = useT();
+  const resolvedPrimaryLabel = primaryLabel || t("suite.new.primaryLogo");
+  const resolvedSetPrimaryLabel = setPrimaryLabel || t("suite.new.setPrimaryLogo");
+  const resolvedRemoveLabel = removeLabel || t("suite.new.removeImage");
   return (
     <div className="group relative space-y-1">
       <div className="grid h-16 w-16 place-items-center rounded-lg border border-border bg-muted/40 p-2">
@@ -511,8 +708,8 @@ function LogoPreview({
           type="button"
           onClick={onRemove}
           className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:text-red-400"
-          aria-label={removeLabel}
-          title={removeLabel}
+          aria-label={resolvedRemoveLabel}
+          title={resolvedRemoveLabel}
         >
           <X size={12} />
         </button>
@@ -528,7 +725,7 @@ function LogoPreview({
               : "border-border text-muted-foreground hover:bg-background hover:text-foreground"
           }`}
         >
-          {isPrimary ? primaryLabel : setPrimaryLabel}
+          {isPrimary ? resolvedPrimaryLabel : resolvedSetPrimaryLabel}
         </button>
       )}
     </div>
