@@ -2,8 +2,29 @@
 "use client";
 
 import { use, useCallback, useEffect, useState } from "react";
-import { Copy, Eye, FileDown, Loader2, RefreshCw, Share2 } from "lucide-react";
-import { api, GenerateContentRequest, GenerationStatus, MarketingPlanDeck } from "@/lib/api";
+import {
+  CalendarDays,
+  Copy,
+  ExternalLink,
+  Eye,
+  FileDown,
+  Loader2,
+  Megaphone,
+  Play,
+  RefreshCw,
+  Search,
+  Share2,
+  Target,
+} from "lucide-react";
+import {
+  api,
+  GenerateContentRequest,
+  GenerationStatus,
+  MarketingActionItem,
+  MarketingActionPlan,
+  MarketingIntelligence,
+  MarketingPlanDeck,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MarketingPlanView } from "@/components/marketing-plan/MarketingPlanView";
@@ -38,6 +59,31 @@ const copy = {
     generationQueued: "تم إرسال المحتوى للتوليد",
     planQueued: "تم إرسال الخطة للتوليد. يمكنك مغادرة الصفحة والرجوع لاحقاً.",
     planStatus: "حالة توليد الخطة",
+    tabMarket: "السوق",
+    tabStrategy: "الخطة",
+    tabSocial: "السوشيال",
+    tabAds: "الإعلانات",
+    tabApply: "التطبيق",
+    marketTitle: "قراءة السوق والمنافسين",
+    marketDesc: "قبل ما نطبّق الخطة، نعرض المصادر، المنافسين، الطلب، العرض، والفرص.",
+    competitors: "المنافسون",
+    demand: "الطلب",
+    supply: "العرض",
+    opportunities: "الفرص",
+    sources: "المصادر",
+    warnings: "ملاحظات",
+    noCompetitors: "لم يتم توليد بحث منافسين خارجي بعد. هذه المنطقة جاهزة للـ Slice القادمة.",
+    socialTitle: "خطة السوشيال القابلة للتطبيق",
+    socialDesc: "كل عنصر يمكن تعديله، توليده، أو طلب ملف من العميل حسب الحاجة.",
+    adsTitle: "قمع الإعلانات القابل للتطبيق",
+    adsDesc: "أفكار الحملات موزعة حسب القمع التسويقي من الوعي حتى السفير.",
+    applyTitle: "تطبيق الخطة",
+    applyDesc: "اختر نطاق التطبيق. واجهة التنفيذ الكاملة ستفتح كمساحة عمل مستقلة في المرحلة التالية.",
+    applyFull: "تطبيق كامل الخطة",
+    applySocial: "تطبيق خطة السوشيال فقط",
+    applyAds: "تطبيق خطة الإعلانات فقط",
+    needsAssets: "يحتاج ملفات من العميل",
+    readyToGenerate: "جاهز للتوليد",
   },
   he: {
     title: "מצגת התכנית השיווקית",
@@ -61,6 +107,31 @@ const copy = {
     generationQueued: "התוכן נשלח ליצירה",
     planQueued: "התכנית נשלחה ליצירה. אפשר לצאת מהעמוד ולחזור מאוחר יותר.",
     planStatus: "סטטוס יצירת התכנית",
+    tabMarket: "שוק",
+    tabStrategy: "תכנית",
+    tabSocial: "סושיאל",
+    tabAds: "מודעות",
+    tabApply: "יישום",
+    marketTitle: "מחקר שוק ומתחרים",
+    marketDesc: "לפני יישום התכנית מציגים מקורות, מתחרים, ביקוש, היצע והזדמנויות.",
+    competitors: "מתחרים",
+    demand: "ביקוש",
+    supply: "היצע",
+    opportunities: "הזדמנויות",
+    sources: "מקורות",
+    warnings: "הערות",
+    noCompetitors: "עדיין לא נוצר מחקר מתחרים חיצוני. האזור מוכן לסלייס הבא.",
+    socialTitle: "תכנית סושיאל לביצוע",
+    socialDesc: "כל פריט ניתן לעריכה, יצירה, או בקשת קובץ מהלקוח.",
+    adsTitle: "משפך מודעות לביצוע",
+    adsDesc: "רעיונות קמפיינים מסודרים לפי המשפך השיווקי.",
+    applyTitle: "יישום התכנית",
+    applyDesc: "בחר היקף יישום. סביבת הביצוע המלאה תיפתח בשלב הבא.",
+    applyFull: "יישום כל התכנית",
+    applySocial: "יישום סושיאל בלבד",
+    applyAds: "יישום מודעות בלבד",
+    needsAssets: "דורש קבצים מהלקוח",
+    readyToGenerate: "מוכן ליצירה",
   },
   en: {
     title: "Marketing Plan Deck",
@@ -84,14 +155,44 @@ const copy = {
     generationQueued: "Content sent to generation",
     planQueued: "The plan was queued. You can leave this page and come back later.",
     planStatus: "Plan generation status",
+    tabMarket: "Market",
+    tabStrategy: "Strategy",
+    tabSocial: "Social",
+    tabAds: "Ads",
+    tabApply: "Apply",
+    marketTitle: "Market and competitor intelligence",
+    marketDesc: "Before applying the plan, show sources, competitors, demand, supply, and opportunities.",
+    competitors: "Competitors",
+    demand: "Demand",
+    supply: "Supply",
+    opportunities: "Opportunities",
+    sources: "Sources",
+    warnings: "Notes",
+    noCompetitors: "External competitor research has not been generated yet. This area is ready for the next slice.",
+    socialTitle: "Executable social plan",
+    socialDesc: "Each item can be edited, generated, or blocked until the client uploads the needed asset.",
+    adsTitle: "Executable ads funnel",
+    adsDesc: "Campaign ideas arranged by funnel stage from awareness to ambassador.",
+    applyTitle: "Apply plan",
+    applyDesc: "Choose the application scope. The full execution workspace will open in the next implementation slice.",
+    applyFull: "Apply full plan",
+    applySocial: "Apply social only",
+    applyAds: "Apply ads only",
+    needsAssets: "Needs client assets",
+    readyToGenerate: "Ready to generate",
   },
 };
+
+type PlanTab = "market" | "strategy" | "social" | "ads" | "apply";
 
 export default function MarketingPlanPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { lang, dir } = useLanguage();
   const text = copy[lang as keyof typeof copy] || copy.en;
   const [deck, setDeck] = useState<MarketingPlanDeck | null>(null);
+  const [intelligence, setIntelligence] = useState<MarketingIntelligence | null>(null);
+  const [actionPlan, setActionPlan] = useState<MarketingActionPlan | null>(null);
+  const [activeTab, setActiveTab] = useState<PlanTab>("market");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -111,6 +212,8 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
     try {
       const res = await api.marketingPlans.get(id);
       setDeck(res.deck);
+      setIntelligence(res.intelligence || null);
+      setActionPlan(res.action_plan || null);
       setGenerationStatus(res.generation_status || null);
       if (res.deck?.share?.token && typeof window !== "undefined") {
         setShareUrl(`${window.location.origin}/marketing-plans/share/${res.deck.share.token}`);
@@ -156,6 +259,8 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
         planning_notes: planningNotes.trim() || undefined,
       });
       setDeck(res.deck);
+      setIntelligence(res.intelligence || null);
+      setActionPlan(res.action_plan || null);
       setGenerationStatus(res.generation_status || null);
       if (res.deck?.share?.token && typeof window !== "undefined") {
         setShareUrl(`${window.location.origin}/marketing-plans/share/${res.deck.share.token}`);
@@ -311,7 +416,14 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
           <Loader2 className="mx-auto animate-spin" />
         </div>
       ) : deck ? (
-        <MarketingPlanView deck={deck} onGenerateItem={generatePlanItem} />
+        <div className="space-y-5">
+          <PlanTabs active={activeTab} setActive={setActiveTab} text={text} />
+          {activeTab === "market" && <MarketIntelligencePanel intelligence={intelligence} text={text} />}
+          {activeTab === "strategy" && <MarketingPlanView deck={deck} onGenerateItem={generatePlanItem} showExecutionSections={false} />}
+          {activeTab === "social" && <ActionItemsPanel title={text.socialTitle} description={text.socialDesc} items={actionPlan?.social_items || []} text={text} onGenerateItem={generatePlanItem} />}
+          {activeTab === "ads" && <ActionItemsPanel title={text.adsTitle} description={text.adsDesc} items={actionPlan?.ad_funnel_items || []} text={text} onGenerateItem={generatePlanItem} groupedByFunnel />}
+          {activeTab === "apply" && <ApplyPlanPanel actionPlan={actionPlan} text={text} />}
+        </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">
           <FileDown size={34} className="mx-auto text-muted-foreground" />
@@ -324,5 +436,275 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
         </div>
       )}
     </SuitePageShell>
+  );
+}
+
+function PlanTabs({
+  active,
+  setActive,
+  text,
+}: {
+  active: PlanTab;
+  setActive: (tab: PlanTab) => void;
+  text: (typeof copy)["en"];
+}) {
+  const tabs: Array<{ id: PlanTab; label: string; icon: React.ReactNode }> = [
+    { id: "market", label: text.tabMarket, icon: <Search size={15} /> },
+    { id: "strategy", label: text.tabStrategy, icon: <FileDown size={15} /> },
+    { id: "social", label: text.tabSocial, icon: <CalendarDays size={15} /> },
+    { id: "ads", label: text.tabAds, icon: <Megaphone size={15} /> },
+    { id: "apply", label: text.tabApply, icon: <Play size={15} /> },
+  ];
+  return (
+    <div className="sticky top-0 z-10 -mx-1 overflow-x-auto bg-background/85 px-1 py-2 backdrop-blur print:hidden">
+      <div className="inline-flex min-w-full gap-2 rounded-2xl border border-border bg-card p-1 shadow-sm">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActive(tab.id)}
+            className={`flex min-w-fit flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+              active === tab.id
+                ? "bg-foreground text-background shadow-sm"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MarketIntelligencePanel({
+  intelligence,
+  text,
+}: {
+  intelligence: MarketingIntelligence | null;
+  text: (typeof copy)["en"];
+}) {
+  const competitors = intelligence?.competitors || [];
+  const demand = intelligence?.demand_signals || [];
+  const supply = intelligence?.supply_signals || [];
+  const opportunities = intelligence?.opportunities || [];
+  const sources = intelligence?.source_links || [];
+  const warnings = intelligence?.warnings || [];
+
+  return (
+    <section className="space-y-5">
+      <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#2f80ff]/10 text-[#2f80ff]">
+            <Search size={19} />
+          </span>
+          <div>
+            <h2 className="text-2xl font-black text-foreground">{text.marketTitle}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{text.marketDesc}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.2fr_.8fr]">
+        <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
+          <h3 className="text-lg font-bold text-foreground">{text.competitors}</h3>
+          {competitors.length === 0 ? (
+            <p className="mt-3 rounded-2xl border border-dashed border-border bg-background p-4 text-sm text-muted-foreground">{text.noCompetitors}</p>
+          ) : (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {competitors.map((competitor) => (
+                <div key={competitor.id} className="rounded-2xl border border-border bg-background p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-foreground" dir="auto">{competitor.name}</p>
+                      <p className="mt-1 text-xs uppercase text-muted-foreground">{competitor.platform}</p>
+                    </div>
+                    {competitor.url && (
+                      <a href={competitor.url} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">
+                        <ExternalLink size={16} />
+                      </a>
+                    )}
+                  </div>
+                  {[competitor.reason, competitor.offer, competitor.evidence, competitor.opportunity].filter(Boolean).slice(0, 3).map((line) => (
+                    <p key={line} className="mt-2 text-sm leading-6 text-muted-foreground" dir="auto">{line}</p>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <SignalCard title={text.demand} items={demand} accent="blue" />
+          <SignalCard title={text.supply} items={supply} accent="pink" />
+          <SignalCard title={text.opportunities} items={opportunities} accent="yellow" />
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-3xl border border-border bg-card p-5">
+          <h3 className="text-lg font-bold text-foreground">{text.sources}</h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {sources.length === 0 ? (
+              <span className="text-sm text-muted-foreground">-</span>
+            ) : sources.map((source) => (
+              <a key={`${source.source}-${source.url}-${source.label}`} href={source.url || "#"} target="_blank" rel="noreferrer" className="rounded-full border border-border bg-background px-3 py-1 text-sm text-muted-foreground hover:text-foreground" dir="auto">
+                {source.source ? `${source.source}: ` : ""}{source.label}
+              </a>
+            ))}
+          </div>
+        </div>
+        {warnings.length > 0 && (
+          <div className="rounded-3xl border border-[#f8d84a]/40 bg-[#f8d84a]/10 p-5">
+            <h3 className="text-lg font-bold text-foreground">{text.warnings}</h3>
+            <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+              {warnings.map((warning) => <p key={warning} dir="auto">- {warning}</p>)}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function SignalCard({ title, items, accent }: { title: string; items: Array<{ id: string; title: string; source?: string }>; accent: "blue" | "pink" | "yellow" }) {
+  const color = accent === "blue" ? "bg-[#2f80ff]/10 text-[#2f80ff]" : accent === "pink" ? "bg-[#ff4fa3]/10 text-[#ff4fa3]" : "bg-[#f8d84a]/20 text-[#9a6b00]";
+  return (
+    <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${color}`}>
+          <Target size={16} />
+        </span>
+        <h3 className="text-lg font-bold text-foreground">{title}</h3>
+      </div>
+      <div className="mt-3 space-y-2">
+        {items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">-</p>
+        ) : items.slice(0, 6).map((item) => (
+          <p key={item.id} className="rounded-2xl border border-border bg-background p-3 text-sm text-muted-foreground" dir="auto">
+            {item.title}
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ActionItemsPanel({
+  title,
+  description,
+  items,
+  text,
+  onGenerateItem,
+  groupedByFunnel = false,
+}: {
+  title: string;
+  description: string;
+  items: MarketingActionItem[];
+  text: (typeof copy)["en"];
+  onGenerateItem: (request: GenerateContentRequest, title: string) => void;
+  groupedByFunnel?: boolean;
+}) {
+  const grouped = groupedByFunnel
+    ? items.reduce<Record<string, MarketingActionItem[]>>((acc, item) => {
+        const key = item.funnel_stage || "Other";
+        acc[key] = acc[key] || [];
+        acc[key].push(item);
+        return acc;
+      }, {})
+    : { all: items };
+
+  return (
+    <section className="space-y-5">
+      <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
+        <h2 className="text-2xl font-black text-foreground">{title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      </div>
+      {Object.entries(grouped).map(([group, groupItems]) => (
+        <div key={group} className="space-y-3">
+          {groupedByFunnel && <h3 className="text-lg font-bold text-foreground">{group}</h3>}
+          <div className="grid gap-3 lg:grid-cols-2">
+            {groupItems.map((item) => (
+              <div key={item.id} className="rounded-3xl border border-border bg-card p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-bold text-foreground" dir="auto">{item.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground" dir="auto">
+                      {[item.objective, item.channel, item.placement, ...(item.output_types || [])].filter(Boolean).join(" / ")}
+                    </p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.required_assets?.length ? "bg-[#f8d84a]/20 text-[#9a6b00]" : "bg-emerald-500/10 text-emerald-600"}`}>
+                    {item.required_assets?.length ? text.needsAssets : text.readyToGenerate}
+                  </span>
+                </div>
+                {item.generation_prompt && <p className="mt-3 text-sm leading-6 text-muted-foreground" dir="auto">{item.generation_prompt}</p>}
+                {item.required_assets && item.required_assets.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {item.required_assets.map((asset) => (
+                      <span key={asset} className="rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground">{asset}</span>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-4 flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!item.generation_request || Boolean(item.required_assets?.length)}
+                    onClick={() => item.generation_request && onGenerateItem(item.generation_request, item.title)}
+                    className="gap-2"
+                  >
+                    <Play size={14} /> {text.generate}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function ApplyPlanPanel({
+  actionPlan,
+  text,
+}: {
+  actionPlan: MarketingActionPlan | null;
+  text: (typeof copy)["en"];
+}) {
+  const socialCount = actionPlan?.social_items?.length || 0;
+  const adsCount = actionPlan?.ad_funnel_items?.length || 0;
+  return (
+    <section className="rounded-3xl border border-border bg-card p-6 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-foreground text-background">
+          <Play size={19} />
+        </span>
+        <div>
+          <h2 className="text-2xl font-black text-foreground">{text.applyTitle}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{text.applyDesc}</p>
+        </div>
+      </div>
+      <div className="mt-6 grid gap-3 md:grid-cols-3">
+        <ApplyScopeButton title={text.applyFull} count={socialCount + adsCount} />
+        <ApplyScopeButton title={text.applySocial} count={socialCount} />
+        <ApplyScopeButton title={text.applyAds} count={adsCount} />
+      </div>
+    </section>
+  );
+}
+
+function ApplyScopeButton({ title, count }: { title: string; count: number }) {
+  return (
+    <button
+      type="button"
+      disabled
+      className="rounded-2xl border border-dashed border-border bg-background p-4 text-start opacity-80"
+    >
+      <p className="font-bold text-foreground">{title}</p>
+      <p className="mt-2 text-sm text-muted-foreground">{count} items</p>
+      <p className="mt-4 text-xs text-muted-foreground">Execution workspace: next slice</p>
+    </button>
   );
 }

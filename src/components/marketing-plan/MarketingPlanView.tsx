@@ -72,9 +72,11 @@ function planCopy(language?: string) {
 export function MarketingPlanView({
   deck,
   onGenerateItem,
+  showExecutionSections = true,
 }: {
   deck: MarketingPlanDeck;
   onGenerateItem?: (request: GenerateContentRequest, title: string) => void;
+  showExecutionSections?: boolean;
 }) {
   const lang = (deck.language || "").split("-")[0];
   const dir = rtlLangs.has(lang) ? "rtl" : "ltr";
@@ -144,11 +146,11 @@ export function MarketingPlanView({
         </section>
       )}
 
-      {deck.monthly_work_plan && (
+      {showExecutionSections && deck.monthly_work_plan && (
         <ActionWorkPlan plan={deck.monthly_work_plan} t={t} onGenerateItem={onGenerateItem} />
       )}
 
-      {deck.paid_funnel && (
+      {showExecutionSections && deck.paid_funnel && (
         <PaidFunnel funnel={deck.paid_funnel} t={t} onGenerateItem={onGenerateItem} />
       )}
 

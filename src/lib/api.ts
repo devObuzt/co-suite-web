@@ -434,6 +434,44 @@ export interface MarketingPlanDeck {
   share?: MarketingPlanShare;
 }
 
+export interface MarketingSourceLink {
+  label: string;
+  url?: string;
+  source?: string;
+}
+
+export interface MarketingCompetitor {
+  id: string;
+  name: string;
+  platform: string;
+  url?: string;
+  reason?: string;
+  offer?: string;
+  evidence?: string;
+  opportunity?: string;
+  confidence?: string;
+}
+
+export interface MarketingSignal {
+  id: string;
+  title: string;
+  source?: string;
+  description?: string;
+}
+
+export interface MarketingIntelligence {
+  version: string;
+  language?: string;
+  generated_at?: string;
+  status?: string;
+  competitors: MarketingCompetitor[];
+  demand_signals: MarketingSignal[];
+  supply_signals: MarketingSignal[];
+  opportunities: MarketingSignal[];
+  source_links: MarketingSourceLink[];
+  warnings?: string[];
+}
+
 export interface MarketingPlanWorkItem {
   id: string;
   title: string;
@@ -445,6 +483,40 @@ export interface MarketingPlanWorkItem {
   needs_user_asset?: boolean;
   notes?: string;
   generation_request?: GenerateContentRequest;
+}
+
+export interface MarketingActionItem {
+  id: string;
+  plan_type: "social" | "ads" | string;
+  title: string;
+  objective?: string;
+  channel?: string;
+  platforms?: string[];
+  placement?: string;
+  output_types?: string[];
+  schedule_window?: string;
+  funnel_stage?: string | null;
+  required_assets?: string[];
+  generation_prompt?: string;
+  caption?: string;
+  hook?: string;
+  source_references?: unknown[];
+  status?: string;
+  notes?: string;
+  user_edits?: unknown[];
+  generated_post_ids?: string[];
+  generation_request?: GenerateContentRequest;
+}
+
+export interface MarketingActionPlan {
+  version: string;
+  language?: string;
+  generated_at?: string;
+  status?: string;
+  social_items: MarketingActionItem[];
+  ad_funnel_items: MarketingActionItem[];
+  planning_questions?: string[];
+  warnings?: string[];
 }
 
 export interface MarketingPlanFunnelStage {
@@ -467,6 +539,8 @@ export interface MarketingPlanResponse {
   suite_id: string;
   language?: string;
   deck: MarketingPlanDeck | null;
+  intelligence?: MarketingIntelligence;
+  action_plan?: MarketingActionPlan;
   generation_status?: GenerationStatus | null;
 }
 
