@@ -423,6 +423,9 @@ export interface MarketingPlanDeck {
       seasonal_notes?: string[];
       [key: string]: unknown;
     };
+    recommended_weekly_posts?: number;
+    recommended_monthly_posts?: number;
+    cadence_reason?: string;
     content_mix?: Array<{ type: string; percentage: number }>;
     daily_story_direction?: string[];
     items?: MarketingPlanWorkItem[];
@@ -494,6 +497,7 @@ export interface MarketingActionItem {
   platforms?: string[];
   placement?: string;
   output_types?: string[];
+  production_mode?: string;
   schedule_window?: string;
   funnel_stage?: string | null;
   required_assets?: string[];

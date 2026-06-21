@@ -19,6 +19,9 @@ const copy = {
     researchDescription: "The plan documents what was used and what still needs validation.",
     monthlyTitle: "Monthly social work plan",
     monthlyDescription: "Organic content plan built around 70% attraction, 20% trust, and 10% sales.",
+    cadence: "Recommended cadence",
+    weeklyPosts: "posts/week",
+    monthlyPosts: "ideas/month",
     questions: "Questions before applying the month",
     calendar: "Calendar and culture checks",
     generate: "Generate",
@@ -37,6 +40,9 @@ const copy = {
     researchDescription: "الخطة توثق المصادر المستخدمة وما يحتاج تأكيدًا من العميل.",
     monthlyTitle: "خطة العمل الشهرية للسوشيال",
     monthlyDescription: "خطة محتوى عضوية مبنية على 70% جذب، 20% ثقة، و10% مبيعات.",
+    cadence: "وتيرة النشر المقترحة",
+    weeklyPosts: "منشورات/أسبوع",
+    monthlyPosts: "أفكار/شهر",
     questions: "أسئلة قبل تطبيق خطة الشهر",
     calendar: "فحص التقويم والمناسبات الثقافية",
     generate: "ولّد",
@@ -55,6 +61,9 @@ const copy = {
     researchDescription: "התכנית מתעדת במה השתמשנו ומה עדיין דורש אימות.",
     monthlyTitle: "תכנית עבודה חודשית לסושיאל",
     monthlyDescription: "תכנית תוכן אורגנית לפי 70% משיכה, 20% אמון ו-10% מכירות.",
+    cadence: "קצב פרסום מומלץ",
+    weeklyPosts: "פוסטים/שבוע",
+    monthlyPosts: "רעיונות/חודש",
     questions: "שאלות לפני יישום החודש",
     calendar: "בדיקת לוח שנה ותרבות",
     generate: "צור",
@@ -194,6 +203,27 @@ function ActionWorkPlan({
               <p className="mt-1 text-2xl font-black text-foreground">{mix.percentage}%</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {(plan.recommended_weekly_posts || plan.recommended_monthly_posts || plan.cadence_reason) && (
+        <div className="mt-5 rounded-xl border border-[#2f80ff]/25 bg-[#2f80ff]/5 p-4">
+          <p className="text-sm font-semibold text-foreground">{t.cadence}</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {plan.recommended_weekly_posts && (
+              <div className="rounded-xl border border-border bg-background p-3">
+                <p className="text-2xl font-black text-foreground">{plan.recommended_weekly_posts}</p>
+                <p className="text-xs text-muted-foreground">{t.weeklyPosts}</p>
+              </div>
+            )}
+            {plan.recommended_monthly_posts && (
+              <div className="rounded-xl border border-border bg-background p-3">
+                <p className="text-2xl font-black text-foreground">{plan.recommended_monthly_posts}</p>
+                <p className="text-xs text-muted-foreground">{t.monthlyPosts}</p>
+              </div>
+            )}
+          </div>
+          {plan.cadence_reason && <p className="mt-3 text-sm leading-6 text-muted-foreground" dir="auto">{plan.cadence_reason}</p>}
         </div>
       )}
 

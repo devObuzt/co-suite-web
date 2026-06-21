@@ -631,7 +631,7 @@ function ActionItemsPanel({
                   <div>
                     <p className="font-bold text-foreground" dir="auto">{item.title}</p>
                     <p className="mt-1 text-xs text-muted-foreground" dir="auto">
-                      {[item.objective, item.channel, item.placement, ...(item.output_types || [])].filter(Boolean).join(" / ")}
+                      {[item.objective, item.channel, item.placement, item.production_mode, ...(item.output_types || [])].filter(Boolean).join(" / ")}
                     </p>
                   </div>
                   <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.required_assets?.length ? "bg-[#f8d84a]/20 text-[#9a6b00]" : "bg-emerald-500/10 text-emerald-600"}`}>
