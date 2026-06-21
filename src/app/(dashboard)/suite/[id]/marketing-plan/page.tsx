@@ -211,6 +211,11 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
   const planGenerationActive = isPlanGenerationActive(generationStatus);
   const planProgress = Math.max(0, Math.min(100, Number(generationStatus?.progress || 0)));
   const planStatusText = generationStatus?.message || (planGenerationActive ? text.planQueued : "");
+  const planStatusVisible = generationStatus && generationStatus.status !== "idle" && (
+    planGenerationActive ||
+    generating ||
+    (!deck && ["failed", "timeout", "cancelled"].includes(generationStatus.status))
+  );
 
   return (
     <SuitePageShell title={text.title} description={text.desc}>
@@ -278,7 +283,7 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
             </>
           )}
         </div>
-        {generationStatus && generationStatus.status !== "idle" && (
+        {planStatusVisible && (
           <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-800 dark:text-blue-100" dir="auto">
             <div className="flex items-center justify-between gap-3">
               <span>

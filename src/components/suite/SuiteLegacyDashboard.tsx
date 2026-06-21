@@ -142,6 +142,7 @@ function jobStatusMessage(status?: GenerationStatus | null) {
 
 function isRecentTerminalGenerationStatus(status?: GenerationStatus | null) {
   if (!status || !status.is_terminal) return false;
+  if (status.status === "completed") return false;
   const timestamp = status.finished_at || status.updated_at || status.created_at;
   if (!timestamp) return false;
   const time = new Date(timestamp).getTime();
