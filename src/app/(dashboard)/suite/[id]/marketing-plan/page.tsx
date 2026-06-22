@@ -36,6 +36,50 @@ function isPlanGenerationActive(status?: GenerationStatus | null) {
   return Boolean(status.is_active || ["queued", "waiting_capacity", "waiting_provider_limit", "running", "retrying"].includes(status.status));
 }
 
+function planStageLabel(status: string | undefined, lang: string) {
+  if (status === "completed") return lang === "ar" ? "جاهز" : lang === "he" ? "מוכן" : "Ready";
+  if (status === "running") return lang === "ar" ? "قيد العمل" : lang === "he" ? "בעבודה" : "Running";
+  if (status === "failed") return lang === "ar" ? "فشل" : lang === "he" ? "נכשל" : "Failed";
+  return lang === "ar" ? "بانتظار" : lang === "he" ? "ממתין" : "Pending";
+}
+
+function PlanGenerationStages({ status, lang }: { status?: GenerationStatus | null; lang: string }) {
+  const stages = status?.stages || status?.result?.stages || [];
+  if (!stages.length) return null;
+  return (
+    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      {stages.map((stage) => {
+        const state = stage.status || "pending";
+        const active = state === "running";
+        const done = state === "completed";
+        return (
+          <div
+            key={stage.id}
+            className={`rounded-lg border px-3 py-2 ${
+              done
+                ? "border-emerald-500/30 bg-emerald-500/10"
+                : active
+                  ? "border-blue-500/30 bg-blue-500/10"
+                  : "border-border bg-background/70"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="min-w-0 truncate font-medium">{stage.label || stage.id}</span>
+              <span className="shrink-0 text-[11px] opacity-75">{planStageLabel(state, lang)}</span>
+            </div>
+            <div className="mt-2 h-1 overflow-hidden rounded-full bg-foreground/10">
+              <div
+                className={`h-full rounded-full transition-all ${done ? "bg-emerald-500" : active ? "bg-blue-500" : "bg-muted-foreground/30"}`}
+                style={{ width: `${done ? 100 : active ? Math.max(12, Math.min(100, stage.progress || status?.progress || 10)) : 0}%` }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const copy = {
   ar: {
     title: "عرض الخطة التسويقية",
@@ -400,6 +444,7 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-blue-500/15">
               <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${planProgress}%` }} />
             </div>
+            <PlanGenerationStages status={generationStatus} lang={lang} />
           </div>
         )}
         {error && <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200" dir="auto">{error}</div>}

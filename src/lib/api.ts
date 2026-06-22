@@ -951,7 +951,15 @@ export interface GenerationStatus {
   created_at?: string;
   updated_at?: string;
   finished_at?: string;
-  result?: { post_ids?: string[]; count?: number } | null;
+  stages?: Array<{ id: string; label?: string; status?: string; progress?: number }>;
+  partial?: Record<string, unknown> | null;
+  result?: {
+    post_ids?: string[];
+    count?: number;
+    stages?: Array<{ id: string; label?: string; status?: string; progress?: number }>;
+    partial?: Record<string, unknown> | null;
+    [key: string]: unknown;
+  } | null;
 }
 
 export interface SocialLoop {
