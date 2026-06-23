@@ -37,6 +37,34 @@ function isPlanGenerationActive(status?: GenerationStatus | null) {
   return Boolean(status.is_active || ["queued", "waiting_capacity", "waiting_provider_limit", "running", "retrying"].includes(status.status));
 }
 
+type ActivePlanAction = "strategy" | "competitors" | "demand_supply" | "social" | "ads";
+
+function statusSection(status?: GenerationStatus | null): ActivePlanAction | null {
+  const section = status?.result?.section;
+  if (section === "competitors" || section === "demand_supply" || section === "social" || section === "ads") {
+    return section;
+  }
+  const stage = status?.stage;
+  if (stage === "competitor_research") return "competitors";
+  if (stage === "demand_supply") return "demand_supply";
+  if (stage === "social_plan") return "social";
+  if (stage === "ads_funnel") return "ads";
+  if (stage === "ai_strategy" || stage === "saving" || stage === "retrying") return "strategy";
+  return null;
+}
+
+function displayedPlanProgress(status?: GenerationStatus | null) {
+  if (!status) return 0;
+  const direct = Math.max(0, Math.min(100, Number(status.progress || 0)));
+  if (direct > 0) return direct;
+  const partial = status.partial || status.result?.partial || {};
+  if (partial.deck_ready) return 95;
+  if (partial.demand_supply_ready) return 55;
+  if (partial.competitors_ready) return 35;
+  if (partial.intelligence_ready) return 35;
+  return 0;
+}
+
 function planStageLabel(status: string | undefined, lang: string) {
   if (status === "completed") return lang === "ar" ? "جاهز" : lang === "he" ? "מוכן" : "Ready";
   if (status === "running") return lang === "ar" ? "قيد العمل" : lang === "he" ? "בעבודה" : "Running";
@@ -284,7 +312,7 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
   const [actionPlan, setActionPlan] = useState<MarketingActionPlan | null>(null);
   const [activeTab, setActiveTab] = useState<PlanTab>("market");
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
+  const [activeAction, setActiveAction] = useState<ActivePlanAction | null>(null);
   const [sharing, setSharing] = useState(false);
   const [password, setPassword] = useState("");
   const [nearTermFocus, setNearTermFocus] = useState("");
@@ -340,7 +368,7 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
   }, [generationStatus, id, load]);
 
   async function generate() {
-    setGenerating(true);
+    setActiveAction("strategy");
     setError("");
     try {
       const res = await api.marketingPlans.generate(id, {
@@ -359,7 +387,7 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
     } finally {
-      setGenerating(false);
+      setActiveAction(null);
     }
   }
 
@@ -373,7 +401,7 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
   }
 
   async function generateExecutionSection(section: "social" | "ads") {
-    setGenerating(true);
+    setActiveAction(section);
     setError("");
     setGenerationMessage("");
     try {
@@ -388,12 +416,12 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
     } finally {
-      setGenerating(false);
+      setActiveAction(null);
     }
   }
 
   async function generateMarketResearch(section: "competitors" | "demand_supply") {
-    setGenerating(true);
+    setActiveAction(section);
     setError("");
     setGenerationMessage("");
     try {
@@ -408,7 +436,7 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
     } finally {
-      setGenerating(false);
+      setActiveAction(null);
     }
   }
 
@@ -476,11 +504,14 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
   }
 
   const planGenerationActive = isPlanGenerationActive(generationStatus);
-  const planProgress = Math.max(0, Math.min(100, Number(generationStatus?.progress || 0)));
+  const currentStatusSection = planGenerationActive ? statusSection(generationStatus) : null;
+  const isActionBusy = (action: ActivePlanAction) => activeAction === action || currentStatusSection === action;
+  const controlsDisabled = Boolean(activeAction || planGenerationActive);
+  const planProgress = displayedPlanProgress(generationStatus);
   const planStatusText = generationStatus?.message || (planGenerationActive ? text.planQueued : "");
   const planStatusVisible = generationStatus && generationStatus.status !== "idle" && (
     planGenerationActive ||
-    generating ||
+    Boolean(activeAction) ||
     (!deck && ["failed", "timeout", "cancelled"].includes(generationStatus.status))
   );
 
@@ -516,13 +547,13 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-3">
-          <Button onClick={generate} disabled={generating || planGenerationActive} className="gap-2">
-            {generating || planGenerationActive ? <Loader2 size={16} className="animate-spin" /> : deck ? <RefreshCw size={16} /> : <FileDown size={16} />}
-            {generating || planGenerationActive ? text.generating : deck ? text.regenerate : text.generate}
+          <Button onClick={generate} disabled={controlsDisabled} className="gap-2">
+            {isActionBusy("strategy") ? <Loader2 size={16} className="animate-spin" /> : deck ? <RefreshCw size={16} /> : <FileDown size={16} />}
+            {isActionBusy("strategy") ? text.generating : deck ? text.regenerate : text.generate}
           </Button>
           {deck && (
             <>
-              <Button variant="destructive" onClick={deletePlan} disabled={deletingPlan || planGenerationActive} className="gap-2">
+              <Button variant="destructive" onClick={deletePlan} disabled={deletingPlan || controlsDisabled} className="gap-2">
                 {deletingPlan ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                 {deletingPlan ? text.deletingPlan : text.deletePlan}
               </Button>
@@ -589,8 +620,9 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
             <MarketIntelligencePanel
               intelligence={intelligence}
               text={text}
-              disabled={generating || planGenerationActive}
-              loading={generating || planGenerationActive}
+              disabled={controlsDisabled}
+              loading={isActionBusy("competitors")}
+              demandSupplyLoading={isActionBusy("demand_supply")}
               onGenerateCompetitors={() => generateMarketResearch("competitors")}
               onGenerateDemandSupply={() => generateMarketResearch("demand_supply")}
             />
@@ -604,8 +636,8 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
               title={text.socialTitle}
               description={text.socialMissingDesc}
               buttonLabel={text.generateSocialPlan}
-              disabled={generating || planGenerationActive}
-              loading={generating || planGenerationActive}
+              disabled={controlsDisabled}
+              loading={isActionBusy("social")}
               onGenerate={() => generateExecutionSection("social")}
             />
           ))}
@@ -617,8 +649,8 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
               title={text.adsTitle}
               description={text.adsMissingDesc}
               buttonLabel={text.generateAdsFunnel}
-              disabled={generating || planGenerationActive}
-              loading={generating || planGenerationActive}
+              disabled={controlsDisabled}
+              loading={isActionBusy("ads")}
               onGenerate={() => generateExecutionSection("ads")}
             />
           ))}
@@ -629,8 +661,9 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
           <MarketIntelligencePanel
             intelligence={intelligence}
             text={text}
-            disabled={generating || planGenerationActive}
-            loading={generating || planGenerationActive}
+            disabled={controlsDisabled}
+            loading={isActionBusy("competitors")}
+            demandSupplyLoading={isActionBusy("demand_supply")}
             onGenerateCompetitors={() => generateMarketResearch("competitors")}
             onGenerateDemandSupply={() => generateMarketResearch("demand_supply")}
           />
@@ -638,9 +671,9 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
             <FileDown size={34} className="mx-auto text-muted-foreground" />
             <h2 className="mt-3 text-xl font-bold text-foreground">{text.missingTitle}</h2>
             <p className="mx-auto mt-2 max-w-2xl text-sm text-muted-foreground">{text.missingDesc}</p>
-            <Button onClick={generate} disabled={generating || planGenerationActive} className="mt-5 gap-2">
-              {generating || planGenerationActive ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
-              {generating || planGenerationActive ? text.generating : text.generate}
+            <Button onClick={generate} disabled={controlsDisabled} className="mt-5 gap-2">
+              {isActionBusy("strategy") ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+              {isActionBusy("strategy") ? text.generating : text.generate}
             </Button>
           </div>
         </div>
@@ -725,6 +758,7 @@ function MarketIntelligencePanel({
   text,
   disabled,
   loading,
+  demandSupplyLoading,
   onGenerateCompetitors,
   onGenerateDemandSupply,
 }: {
@@ -732,6 +766,7 @@ function MarketIntelligencePanel({
   text: (typeof copy)["en"];
   disabled?: boolean;
   loading?: boolean;
+  demandSupplyLoading?: boolean;
   onGenerateCompetitors?: () => void;
   onGenerateDemandSupply?: () => void;
 }) {
@@ -765,7 +800,7 @@ function MarketIntelligencePanel({
             )}
             {onGenerateDemandSupply && (
               <Button onClick={onGenerateDemandSupply} disabled={disabled || competitors.length === 0} className="gap-2">
-                {loading ? <Loader2 size={16} className="animate-spin" /> : <Target size={16} />}
+                {demandSupplyLoading ? <Loader2 size={16} className="animate-spin" /> : <Target size={16} />}
                 {text.generateDemandSupply}
               </Button>
             )}
@@ -811,7 +846,7 @@ function MarketIntelligencePanel({
           {!hasDemandSupply && onGenerateDemandSupply && (
             <div className="rounded-3xl border border-dashed border-border bg-card p-5 text-sm text-muted-foreground">
               <Button onClick={onGenerateDemandSupply} disabled={disabled || competitors.length === 0} className="gap-2">
-                {loading ? <Loader2 size={16} className="animate-spin" /> : <Target size={16} />}
+                {demandSupplyLoading ? <Loader2 size={16} className="animate-spin" /> : <Target size={16} />}
                 {text.generateDemandSupply}
               </Button>
             </div>
