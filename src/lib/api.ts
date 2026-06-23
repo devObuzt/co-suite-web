@@ -304,6 +304,10 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data || {}),
       }),
+    delete: (suiteId: string) =>
+      request<MarketingPlanResponse & { deleted?: boolean; removed?: string[] }>(`/suites/${suiteId}/marketing-plan`, {
+        method: "DELETE",
+      }),
     generateCompetitors: (suiteId: string, data?: { language?: string; near_term_focus?: string; upcoming_campaigns?: string[]; planning_notes?: string }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/competitors/generate`, {
         method: "POST",

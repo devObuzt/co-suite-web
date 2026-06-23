@@ -15,6 +15,7 @@ import {
   Search,
   Share2,
   Target,
+  Trash2,
 } from "lucide-react";
 import {
   api,
@@ -87,6 +88,10 @@ const copy = {
     generate: "توليد الخطة",
     regenerate: "توليد من جديد",
     generating: "جاري بناء الخطة...",
+    deletePlan: "حذف الخطة",
+    deletingPlan: "جاري حذف الخطة...",
+    deletePlanConfirm: "متأكد بدك تحذف الخطة التسويقية الحالية؟ لا يمكن التراجع عن هذه الخطوة.",
+    planDeleted: "تم حذف الخطة التسويقية",
     missingTitle: "لا توجد خطة تسويقية بعد",
     missingDesc: "سنستخدم بيانات السوت، العلامة التجارية، الروابط، المنافسين والمعطيات المتاحة لبناء عرض واضح للعميل.",
     share: "تفعيل رابط المشاركة",
@@ -146,6 +151,10 @@ const copy = {
     generate: "צור תכנית",
     regenerate: "צור מחדש",
     generating: "בונה את התכנית...",
+    deletePlan: "מחק תכנית",
+    deletingPlan: "מוחק תכנית...",
+    deletePlanConfirm: "למחוק את התכנית השיווקית הנוכחית? לא ניתן לבטל פעולה זו.",
+    planDeleted: "התכנית השיווקית נמחקה",
     missingTitle: "עדיין אין תכנית שיווקית",
     missingDesc: "נשתמש בנתוני הסוויט, המותג, הקישורים, המתחרים והנתונים הזמינים כדי לבנות מצגת ברורה ללקוח.",
     share: "הפעל קישור שיתוף",
@@ -205,6 +214,10 @@ const copy = {
     generate: "Generate plan",
     regenerate: "Regenerate",
     generating: "Building the plan...",
+    deletePlan: "Delete plan",
+    deletingPlan: "Deleting plan...",
+    deletePlanConfirm: "Delete the current marketing plan? This cannot be undone.",
+    planDeleted: "Marketing plan deleted",
     missingTitle: "No marketing plan yet",
     missingDesc: "OneShare will use suite data, brand profile, links, competitors, and available metrics to create a clear client deck.",
     share: "Enable share link",
@@ -282,6 +295,7 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
   const [error, setError] = useState("");
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
   const [generationMessage, setGenerationMessage] = useState("");
+  const [deletingPlan, setDeletingPlan] = useState(false);
 
   const load = useCallback(async (options?: { quiet?: boolean }) => {
     if (!options?.quiet) setLoading(true);
@@ -398,6 +412,28 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
     }
   }
 
+  async function deletePlan() {
+    if (!window.confirm(text.deletePlanConfirm)) return;
+    setDeletingPlan(true);
+    setError("");
+    setGenerationMessage("");
+    try {
+      await api.marketingPlans.delete(id);
+      setDeck(null);
+      setIntelligence(null);
+      setActionPlan(null);
+      setGenerationStatus(null);
+      setShareUrl("");
+      setPassword("");
+      setGenerationMessage(text.planDeleted);
+      setActiveTab("market");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setDeletingPlan(false);
+    }
+  }
+
   async function enableShare() {
     setSharing(true);
     setError("");
@@ -486,6 +522,10 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
           </Button>
           {deck && (
             <>
+              <Button variant="destructive" onClick={deletePlan} disabled={deletingPlan || planGenerationActive} className="gap-2">
+                {deletingPlan ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                {deletingPlan ? text.deletingPlan : text.deletePlan}
+              </Button>
               <Button variant="outline" onClick={() => window.print()} className="gap-2">
                 <FileDown size={16} /> {text.print}
               </Button>
