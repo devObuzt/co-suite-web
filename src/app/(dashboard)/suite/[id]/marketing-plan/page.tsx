@@ -102,6 +102,8 @@ const copy = {
     open: "فتح الرابط",
     generationQueued: "تم إرسال المحتوى للتوليد",
     planQueued: "تم إرسال الخطة للتوليد. يمكنك مغادرة الصفحة والرجوع لاحقاً.",
+    competitorsQueued: "تم إرسال بحث المنافسين",
+    demandSupplyQueued: "تم إرسال تحليل العرض والطلب",
     planStatus: "حالة توليد الخطة",
     tabMarket: "السوق",
     tabStrategy: "الخطة",
@@ -117,6 +119,10 @@ const copy = {
     sources: "المصادر",
     warnings: "ملاحظات",
     noCompetitors: "لم يتم توليد بحث منافسين خارجي بعد. هذه المنطقة جاهزة للـ Slice القادمة.",
+    generateCompetitors: "سكراتش المنافسين",
+    refreshCompetitors: "تحديث المنافسين",
+    generateDemandSupply: "توليد العرض والطلب",
+    starterLead: "مسار بحث",
     socialTitle: "خطة السوشيال القابلة للتطبيق",
     socialDesc: "كل عنصر يمكن تعديله، توليده، أو طلب ملف من العميل حسب الحاجة.",
     adsTitle: "قمع الإعلانات القابل للتطبيق",
@@ -155,6 +161,8 @@ const copy = {
     open: "פתח קישור",
     generationQueued: "התוכן נשלח ליצירה",
     planQueued: "התכנית נשלחה ליצירה. אפשר לצאת מהעמוד ולחזור מאוחר יותר.",
+    competitorsQueued: "מחקר המתחרים נשלח ליצירה",
+    demandSupplyQueued: "ניתוח הביקוש וההיצע נשלח ליצירה",
     planStatus: "סטטוס יצירת התכנית",
     tabMarket: "שוק",
     tabStrategy: "תכנית",
@@ -170,6 +178,10 @@ const copy = {
     sources: "מקורות",
     warnings: "הערות",
     noCompetitors: "עדיין לא נוצר מחקר מתחרים חיצוני. האזור מוכן לסלייס הבא.",
+    generateCompetitors: "צור מתחרים",
+    refreshCompetitors: "רענן מתחרים",
+    generateDemandSupply: "צור ביקוש והיצע",
+    starterLead: "כיוון מחקר",
     socialTitle: "תכנית סושיאל לביצוע",
     socialDesc: "כל פריט ניתן לעריכה, יצירה, או בקשת קובץ מהלקוח.",
     adsTitle: "משפך מודעות לביצוע",
@@ -208,6 +220,8 @@ const copy = {
     open: "Open link",
     generationQueued: "Content sent to generation",
     planQueued: "The plan was queued. You can leave this page and come back later.",
+    competitorsQueued: "Competitor scratch was queued",
+    demandSupplyQueued: "Demand and supply analysis was queued",
     planStatus: "Plan generation status",
     tabMarket: "Market",
     tabStrategy: "Strategy",
@@ -223,6 +237,10 @@ const copy = {
     sources: "Sources",
     warnings: "Notes",
     noCompetitors: "External competitor research has not been generated yet. This area is ready for the next slice.",
+    generateCompetitors: "Scratch competitors",
+    refreshCompetitors: "Refresh competitors",
+    generateDemandSupply: "Generate demand and supply",
+    starterLead: "Research lead",
     socialTitle: "Executable social plan",
     socialDesc: "Each item can be edited, generated, or blocked until the client uploads the needed asset.",
     adsTitle: "Executable ads funnel",
@@ -353,6 +371,26 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
       setActionPlan(res.action_plan || null);
       setGenerationStatus(res.generation_status || null);
       setGenerationMessage(`${text.sectionQueued}: ${section === "social" ? text.tabSocial : text.tabAds}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function generateMarketResearch(section: "competitors" | "demand_supply") {
+    setGenerating(true);
+    setError("");
+    setGenerationMessage("");
+    try {
+      const res = section === "competitors"
+        ? await api.marketingPlans.generateCompetitors(id, planningPayload())
+        : await api.marketingPlans.generateDemandSupply(id, planningPayload());
+      setDeck(res.deck);
+      setIntelligence(res.intelligence || null);
+      setActionPlan(res.action_plan || null);
+      setGenerationStatus(res.generation_status || null);
+      setGenerationMessage(section === "competitors" ? text.competitorsQueued : text.demandSupplyQueued);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
     } finally {
@@ -507,7 +545,16 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
       ) : deck ? (
         <div className="space-y-5">
           <PlanTabs active={activeTab} setActive={setActiveTab} text={text} />
-          {activeTab === "market" && <MarketIntelligencePanel intelligence={intelligence} text={text} />}
+          {activeTab === "market" && (
+            <MarketIntelligencePanel
+              intelligence={intelligence}
+              text={text}
+              disabled={generating || planGenerationActive}
+              loading={generating || planGenerationActive}
+              onGenerateCompetitors={() => generateMarketResearch("competitors")}
+              onGenerateDemandSupply={() => generateMarketResearch("demand_supply")}
+            />
+          )}
           {activeTab === "strategy" && <MarketingPlanView deck={deck} onGenerateItem={generatePlanItem} showExecutionSections={false} />}
           {activeTab === "social" && (actionPlan?.social_items?.length ? (
             <ActionItemsPanel title={text.socialTitle} description={text.socialDesc} items={actionPlan.social_items} text={text} onGenerateItem={generatePlanItem} />
@@ -538,14 +585,24 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
           {activeTab === "apply" && <ApplyPlanPanel actionPlan={actionPlan} text={text} />}
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">
-          <FileDown size={34} className="mx-auto text-muted-foreground" />
-          <h2 className="mt-3 text-xl font-bold text-foreground">{text.missingTitle}</h2>
-          <p className="mx-auto mt-2 max-w-2xl text-sm text-muted-foreground">{text.missingDesc}</p>
-          <Button onClick={generate} disabled={generating || planGenerationActive} className="mt-5 gap-2">
-            {generating || planGenerationActive ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
-            {generating || planGenerationActive ? text.generating : text.generate}
-          </Button>
+        <div className="space-y-5">
+          <MarketIntelligencePanel
+            intelligence={intelligence}
+            text={text}
+            disabled={generating || planGenerationActive}
+            loading={generating || planGenerationActive}
+            onGenerateCompetitors={() => generateMarketResearch("competitors")}
+            onGenerateDemandSupply={() => generateMarketResearch("demand_supply")}
+          />
+          <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">
+            <FileDown size={34} className="mx-auto text-muted-foreground" />
+            <h2 className="mt-3 text-xl font-bold text-foreground">{text.missingTitle}</h2>
+            <p className="mx-auto mt-2 max-w-2xl text-sm text-muted-foreground">{text.missingDesc}</p>
+            <Button onClick={generate} disabled={generating || planGenerationActive} className="mt-5 gap-2">
+              {generating || planGenerationActive ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+              {generating || planGenerationActive ? text.generating : text.generate}
+            </Button>
+          </div>
         </div>
       )}
     </SuitePageShell>
@@ -626,9 +683,17 @@ function GenerateSectionPanel({
 function MarketIntelligencePanel({
   intelligence,
   text,
+  disabled,
+  loading,
+  onGenerateCompetitors,
+  onGenerateDemandSupply,
 }: {
   intelligence: MarketingIntelligence | null;
   text: (typeof copy)["en"];
+  disabled?: boolean;
+  loading?: boolean;
+  onGenerateCompetitors?: () => void;
+  onGenerateDemandSupply?: () => void;
 }) {
   const competitors = intelligence?.competitors || [];
   const demand = intelligence?.demand_signals || [];
@@ -636,17 +701,34 @@ function MarketIntelligencePanel({
   const opportunities = intelligence?.opportunities || [];
   const sources = intelligence?.source_links || [];
   const warnings = intelligence?.warnings || [];
+  const hasDemandSupply = demand.length > 0 || supply.length > 0 || opportunities.length > 0;
 
   return (
     <section className="space-y-5">
       <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-        <div className="flex items-start gap-3">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#2f80ff]/10 text-[#2f80ff]">
             <Search size={19} />
           </span>
           <div>
             <h2 className="text-2xl font-black text-foreground">{text.marketTitle}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{text.marketDesc}</p>
+          </div>
+          </div>
+          <div className="flex flex-wrap gap-2 print:hidden">
+            {onGenerateCompetitors && (
+              <Button variant="outline" onClick={onGenerateCompetitors} disabled={disabled} className="gap-2">
+                {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                {competitors.length ? text.refreshCompetitors : text.generateCompetitors}
+              </Button>
+            )}
+            {onGenerateDemandSupply && (
+              <Button onClick={onGenerateDemandSupply} disabled={disabled || competitors.length === 0} className="gap-2">
+                {loading ? <Loader2 size={16} className="animate-spin" /> : <Target size={16} />}
+                {text.generateDemandSupply}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -663,7 +745,9 @@ function MarketIntelligencePanel({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-bold text-foreground" dir="auto">{competitor.name}</p>
-                      <p className="mt-1 text-xs uppercase text-muted-foreground">{competitor.platform}</p>
+                      <p className="mt-1 text-xs uppercase text-muted-foreground">
+                        {competitor.platform}{competitor.research_lead ? ` · ${text.starterLead}` : ""}
+                      </p>
                     </div>
                     {competitor.url && (
                       <a href={competitor.url} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">
@@ -684,6 +768,14 @@ function MarketIntelligencePanel({
           <SignalCard title={text.demand} items={demand} accent="blue" />
           <SignalCard title={text.supply} items={supply} accent="pink" />
           <SignalCard title={text.opportunities} items={opportunities} accent="yellow" />
+          {!hasDemandSupply && onGenerateDemandSupply && (
+            <div className="rounded-3xl border border-dashed border-border bg-card p-5 text-sm text-muted-foreground">
+              <Button onClick={onGenerateDemandSupply} disabled={disabled || competitors.length === 0} className="gap-2">
+                {loading ? <Loader2 size={16} className="animate-spin" /> : <Target size={16} />}
+                {text.generateDemandSupply}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 

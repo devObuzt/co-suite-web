@@ -304,6 +304,16 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data || {}),
       }),
+    generateCompetitors: (suiteId: string, data?: { language?: string; near_term_focus?: string; upcoming_campaigns?: string[]; planning_notes?: string }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/competitors/generate`, {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }),
+    generateDemandSupply: (suiteId: string, data?: { language?: string; near_term_focus?: string; upcoming_campaigns?: string[]; planning_notes?: string }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/demand-supply/generate`, {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }),
     generateSocialPlan: (suiteId: string, data?: { language?: string; near_term_focus?: string; upcoming_campaigns?: string[]; planning_notes?: string }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/social-plan/generate`, {
         method: "POST",
@@ -471,6 +481,7 @@ export interface MarketingCompetitor {
   evidence?: string;
   opportunity?: string;
   confidence?: string;
+  research_lead?: boolean;
 }
 
 export interface MarketingSignal {
