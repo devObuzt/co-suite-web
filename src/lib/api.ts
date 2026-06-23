@@ -304,6 +304,16 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data || {}),
       }),
+    generateSocialPlan: (suiteId: string, data?: { language?: string; near_term_focus?: string; upcoming_campaigns?: string[]; planning_notes?: string }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/social-plan/generate`, {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }),
+    generatePaidFunnel: (suiteId: string, data?: { language?: string; near_term_focus?: string; upcoming_campaigns?: string[]; planning_notes?: string }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/paid-funnel/generate`, {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }),
     share: (suiteId: string, data: { enabled?: boolean; password?: string }) =>
       request<{ ok: boolean; share: MarketingPlanShare }>(`/suites/${suiteId}/marketing-plan/share`, {
         method: "POST",
@@ -400,6 +410,14 @@ export interface MarketingPlanDeck {
     near_term_focus?: string;
     upcoming_campaigns?: string[];
     planning_notes?: string;
+    [key: string]: unknown;
+  };
+  partial?: {
+    intelligence_ready?: boolean;
+    deck_ready?: boolean;
+    action_plan_ready?: boolean;
+    social_plan_ready?: boolean;
+    paid_funnel_ready?: boolean;
     [key: string]: unknown;
   };
   cover: {

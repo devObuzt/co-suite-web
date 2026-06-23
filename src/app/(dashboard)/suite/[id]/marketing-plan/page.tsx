@@ -128,6 +128,11 @@ const copy = {
     applyAds: "تطبيق خطة الإعلانات فقط",
     needsAssets: "يحتاج ملفات من العميل",
     readyToGenerate: "جاهز للتوليد",
+    generateSocialPlan: "توليد خطة السوشيال",
+    generateAdsFunnel: "توليد قمع الإعلانات",
+    sectionQueued: "تم إرسال هذا القسم للتوليد",
+    socialMissingDesc: "الخطة الأساسية جاهزة. ولّد خطة السوشيال عندما تريد تفاصيل التنفيذ الشهرية.",
+    adsMissingDesc: "الخطة الأساسية جاهزة. ولّد قمع الإعلانات عندما تريد أفكار الحملات المدفوعة.",
   },
   he: {
     title: "מצגת התכנית השיווקית",
@@ -176,6 +181,11 @@ const copy = {
     applyAds: "יישום מודעות בלבד",
     needsAssets: "דורש קבצים מהלקוח",
     readyToGenerate: "מוכן ליצירה",
+    generateSocialPlan: "צור תכנית סושיאל",
+    generateAdsFunnel: "צור משפך מודעות",
+    sectionQueued: "החלק נשלח ליצירה",
+    socialMissingDesc: "התכנית הבסיסית מוכנה. צור את תכנית הסושיאל כשתרצה פירוט ביצוע חודשי.",
+    adsMissingDesc: "התכנית הבסיסית מוכנה. צור את משפך המודעות כשתרצה רעיונות לקמפיינים ממומנים.",
   },
   en: {
     title: "Marketing Plan Deck",
@@ -224,6 +234,11 @@ const copy = {
     applyAds: "Apply ads only",
     needsAssets: "Needs client assets",
     readyToGenerate: "Ready to generate",
+    generateSocialPlan: "Generate social plan",
+    generateAdsFunnel: "Generate ads funnel",
+    sectionQueued: "Section sent to generation",
+    socialMissingDesc: "The core plan is ready. Generate the social plan when you need monthly execution detail.",
+    adsMissingDesc: "The core plan is ready. Generate the ads funnel when you need paid campaign ideas.",
   },
 };
 
@@ -309,6 +324,35 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
       if (res.deck?.share?.token && typeof window !== "undefined") {
         setShareUrl(`${window.location.origin}/marketing-plans/share/${res.deck.share.token}`);
       }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function planningPayload() {
+    return {
+      language: lang,
+      near_term_focus: nearTermFocus.trim() || undefined,
+      upcoming_campaigns: upcomingCampaigns.split("\n").map((item) => item.trim()).filter(Boolean),
+      planning_notes: planningNotes.trim() || undefined,
+    };
+  }
+
+  async function generateExecutionSection(section: "social" | "ads") {
+    setGenerating(true);
+    setError("");
+    setGenerationMessage("");
+    try {
+      const res = section === "social"
+        ? await api.marketingPlans.generateSocialPlan(id, planningPayload())
+        : await api.marketingPlans.generatePaidFunnel(id, planningPayload());
+      setDeck(res.deck);
+      setIntelligence(res.intelligence || null);
+      setActionPlan(res.action_plan || null);
+      setGenerationStatus(res.generation_status || null);
+      setGenerationMessage(`${text.sectionQueued}: ${section === "social" ? text.tabSocial : text.tabAds}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
     } finally {
@@ -465,8 +509,32 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
           <PlanTabs active={activeTab} setActive={setActiveTab} text={text} />
           {activeTab === "market" && <MarketIntelligencePanel intelligence={intelligence} text={text} />}
           {activeTab === "strategy" && <MarketingPlanView deck={deck} onGenerateItem={generatePlanItem} showExecutionSections={false} />}
-          {activeTab === "social" && <ActionItemsPanel title={text.socialTitle} description={text.socialDesc} items={actionPlan?.social_items || []} text={text} onGenerateItem={generatePlanItem} />}
-          {activeTab === "ads" && <ActionItemsPanel title={text.adsTitle} description={text.adsDesc} items={actionPlan?.ad_funnel_items || []} text={text} onGenerateItem={generatePlanItem} groupedByFunnel />}
+          {activeTab === "social" && (actionPlan?.social_items?.length ? (
+            <ActionItemsPanel title={text.socialTitle} description={text.socialDesc} items={actionPlan.social_items} text={text} onGenerateItem={generatePlanItem} />
+          ) : (
+            <GenerateSectionPanel
+              icon={<CalendarDays size={28} />}
+              title={text.socialTitle}
+              description={text.socialMissingDesc}
+              buttonLabel={text.generateSocialPlan}
+              disabled={generating || planGenerationActive}
+              loading={generating || planGenerationActive}
+              onGenerate={() => generateExecutionSection("social")}
+            />
+          ))}
+          {activeTab === "ads" && (actionPlan?.ad_funnel_items?.length ? (
+            <ActionItemsPanel title={text.adsTitle} description={text.adsDesc} items={actionPlan.ad_funnel_items} text={text} onGenerateItem={generatePlanItem} groupedByFunnel />
+          ) : (
+            <GenerateSectionPanel
+              icon={<Megaphone size={28} />}
+              title={text.adsTitle}
+              description={text.adsMissingDesc}
+              buttonLabel={text.generateAdsFunnel}
+              disabled={generating || planGenerationActive}
+              loading={generating || planGenerationActive}
+              onGenerate={() => generateExecutionSection("ads")}
+            />
+          ))}
           {activeTab === "apply" && <ApplyPlanPanel actionPlan={actionPlan} text={text} />}
         </div>
       ) : (
@@ -519,6 +587,38 @@ function PlanTabs({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function GenerateSectionPanel({
+  icon,
+  title,
+  description,
+  buttonLabel,
+  disabled,
+  loading,
+  onGenerate,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  buttonLabel: string;
+  disabled?: boolean;
+  loading?: boolean;
+  onGenerate: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+        {icon}
+      </div>
+      <h2 className="mt-4 text-xl font-bold text-foreground">{title}</h2>
+      <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-muted-foreground" dir="auto">{description}</p>
+      <Button onClick={onGenerate} disabled={disabled} className="mt-5 gap-2">
+        {loading ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
+        {buttonLabel}
+      </Button>
     </div>
   );
 }
