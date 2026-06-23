@@ -431,7 +431,7 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
       setDeck(res.deck);
       setIntelligence(res.intelligence || null);
       setActionPlan(res.action_plan || null);
-      setGenerationStatus(res.generation_status || null);
+      setGenerationStatus(null);
       setGenerationMessage(section === "competitors" ? text.competitorsQueued : text.demandSupplyQueued);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
