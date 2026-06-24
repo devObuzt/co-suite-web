@@ -539,7 +539,7 @@ function DemandSupplyStage({ text, suiteId, intelligence, loading, onGenerate, d
   const planner = intelligence?.demand_supply;
   const summary = planner?.summary;
   const keywordMetrics = planner?.keyword_metrics || [];
-  const hasData = Boolean(summary?.analyzed_keywords || keywordMetrics.length || demand.length || supply.length || opportunities.length);
+  const hasData = Boolean(summary?.analyzed_keywords || keywordMetrics.length || planner?.warning || demand.length || supply.length || opportunities.length);
   return (
     <StageBox title={text.demandTitle} description={text.demandDesc} icon={<Target size={18} />} suiteId={suiteId} slug="demand-supply" detail={detail}>
       <Button onClick={onGenerate} disabled={loading} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Target size={15} />}{text.generate}</Button>
@@ -551,7 +551,7 @@ function DemandSupplyStage({ text, suiteId, intelligence, loading, onGenerate, d
             <MetricTile label={text.marketPressure} value={`${summary?.market_pressure_score || 0}/100`} helper={`${summary?.analyzed_keywords || 0} keywords`} />
             <MetricTile label={text.suggestedKeywords} value={`${summary?.suggested_keywords || planner?.suggested_keywords?.length || 0}`} helper="Keyword Planner" />
           </div>
-          {planner?.warning && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{planner.warning}</p>}
+          {planner?.warning && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" dir="auto">{planner.warning}</p>}
           {keywordMetrics.length > 0 ? (
             <div className="overflow-x-auto rounded-xl border border-border bg-background">
               <table className="min-w-[760px] w-full text-sm">
