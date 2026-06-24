@@ -313,6 +313,26 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data || {}),
       }),
+    generateMoreCompetitors: (suiteId: string, data?: { language?: string; existing_ids?: string[]; existing_values?: string[] }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/competitors/generate-more`, {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }),
+    updateCompetitor: (suiteId: string, competitorId: string, data: { classification_tags: string[] }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/competitors/${competitorId}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    generateKeywords: (suiteId: string, data?: { language?: string; existing_ids?: string[]; existing_values?: string[] }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/keywords/generate`, {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }),
+    generateMoreKeywords: (suiteId: string, data?: { language?: string; existing_ids?: string[]; existing_values?: string[] }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/keywords/generate-more`, {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }),
     generateDemandSupply: (suiteId: string, data?: { language?: string; near_term_focus?: string; upcoming_campaigns?: string[]; planning_notes?: string }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/demand-supply/generate`, {
         method: "POST",
@@ -478,14 +498,26 @@ export interface MarketingSourceLink {
 export interface MarketingCompetitor {
   id: string;
   name: string;
+  title?: string;
   platform: string;
+  result_type?: string;
   url?: string;
   reason?: string;
   offer?: string;
   evidence?: string;
+  snippet?: string;
   opportunity?: string;
   confidence?: string;
   research_lead?: boolean;
+  classification_tags?: string[];
+}
+
+export interface MarketingKeyword {
+  id: string;
+  text: string;
+  intent?: string;
+  source?: string;
+  confidence?: string;
 }
 
 export interface MarketingSignal {
@@ -500,6 +532,7 @@ export interface MarketingIntelligence {
   language?: string;
   generated_at?: string;
   status?: string;
+  keywords?: MarketingKeyword[];
   competitors: MarketingCompetitor[];
   demand_signals: MarketingSignal[];
   supply_signals: MarketingSignal[];
