@@ -84,6 +84,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    me: () => request<{ id: string; email: string; full_name: string; is_active?: boolean; is_verified?: boolean; is_super_admin?: boolean }>("/auth/me"),
   },
 
   suites: {

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-interface AuthUser {
+export interface AuthUser {
   id: string;
   email: string;
   full_name: string;
@@ -16,6 +16,7 @@ interface AuthState {
   _hasHydrated: boolean;
   setHasHydrated: (v: boolean) => void;
   setAuth: (token: string, user: AuthUser) => void;
+  setUser: (user: AuthUser) => void;
   logout: () => void;
 }
 
@@ -30,6 +31,7 @@ export const useAuthStore = create<AuthState>()(
         localStorage.setItem("cosuite_token", token);
         set({ token, user });
       },
+      setUser: (user) => set({ user }),
       logout: () => {
         localStorage.removeItem("cosuite_token");
         set({ token: null, user: null });

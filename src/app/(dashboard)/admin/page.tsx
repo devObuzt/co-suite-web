@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { api, AdminProvider, AdminSummary, AdminUser, AdminUserDetail, AuditLog, ProviderUsageEvent, ProviderUsageSummary } from "@/lib/api";
-import { useAuthStore } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +17,6 @@ const PERIODS = [
 ];
 
 export default function AdminPage() {
-  const { user } = useAuthStore();
   const [period, setPeriod] = useState("month");
   const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -125,17 +123,6 @@ export default function AdminPage() {
     } finally {
       setBusyUserId(null);
     }
-  }
-
-  if (!user?.is_super_admin) {
-    return (
-      <main className="mx-auto max-w-3xl p-8">
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h1 className="text-xl font-semibold">Admin access required</h1>
-          <p className="mt-2 text-sm text-muted-foreground">This area is available only to super admins.</p>
-        </div>
-      </main>
-    );
   }
 
   return (

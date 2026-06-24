@@ -13,7 +13,7 @@ import { SuiteNav } from "@/components/suite/SuiteNav";
 import { api, Suite } from "@/lib/api";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, logout, _hasHydrated } = useAuthStore();
+  const { user, logout, _hasHydrated, setUser } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
   const t = useT();
@@ -35,8 +35,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (!_hasHydrated || !user) return;
+    api.auth.me().then(setUser).catch(() => undefined);
     api.suites.list().then(setSuites).catch(() => setSuites([]));
-  }, [_hasHydrated, user]);
+  }, [_hasHydrated, user?.id, setUser]);
 
   // Show spinner while auth state is loading from localStorage
   if (!_hasHydrated) {
