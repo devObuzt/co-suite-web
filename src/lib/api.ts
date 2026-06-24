@@ -378,6 +378,21 @@ export const api = {
     payUrl: (suiteId: string) => request<{ url: string; amount: number }>(`/billing/${suiteId}/pay-url`),
   },
 
+  admin: {
+    summary: (period = "month") => request<AdminSummary>(`/admin/summary?period=${period}`),
+    users: (q = "") => request<AdminUser[]>(`/admin/users${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+    user: (userId: string) => request<AdminUserDetail>(`/admin/users/${userId}`),
+    updateUser: (userId: string, data: Partial<Pick<AdminUser, "email" | "full_name" | "is_active" | "is_verified" | "is_super_admin">>) =>
+      request<AdminUser>(`/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(data) }),
+    changePassword: (userId: string, password: string) =>
+      request<{ ok: boolean }>(`/admin/users/${userId}/password`, { method: "POST", body: JSON.stringify({ password }) }),
+    deactivateUser: (userId: string) =>
+      request<{ ok: boolean; deactivated: boolean }>(`/admin/users/${userId}`, { method: "DELETE" }),
+    auditLogs: (period = "month") => request<AuditLog[]>(`/admin/audit-logs?period=${period}`),
+    providerUsage: (period = "month") => request<ProviderUsageEvent[]>(`/admin/provider-usage?period=${period}`),
+    providerUsageSummary: (period = "month") => request<ProviderUsageSummary[]>(`/admin/provider-usage/summary?period=${period}`),
+  },
+
   connections: {
     get: (suiteId: string) => request<Connections>(`/connections/${suiteId}`),
     metaAuthUrl: (suiteId: string) => request<{ url: string }>(`/connections/${suiteId}/meta/auth-url`),
@@ -724,6 +739,87 @@ export interface UsageEvent {
   idempotency_key?: string | null;
   event_data?: Record<string, unknown> | null;
   created_at: string;
+}
+
+export interface AdminSummary {
+  users: number;
+  active_users: number;
+  suites: number;
+  generation_jobs: number;
+  provider_cost_usd: number;
+  billed_amount_usd: number;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  full_name: string;
+  is_active: boolean;
+  is_verified: boolean;
+  is_super_admin: boolean;
+  suite_count?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface AdminSuiteSummary {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  ai_generation_enabled: boolean;
+  auto_publish_enabled: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface AdminUserDetail {
+  user: AdminUser;
+  suites: AdminSuiteSummary[];
+}
+
+export interface AuditLog {
+  id: string;
+  actor_user_id?: string | null;
+  actor_email?: string | null;
+  action: string;
+  resource_type: string;
+  resource_id?: string | null;
+  suite_id?: string | null;
+  target_user_id?: string | null;
+  metadata: Record<string, unknown>;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  created_at: string;
+}
+
+export interface ProviderUsageEvent {
+  id: string;
+  provider: string;
+  model?: string | null;
+  endpoint?: string | null;
+  operation: string;
+  status: string;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  actual_cost_usd: number;
+  suite_id?: string | null;
+  user_id?: string | null;
+  generation_job_id?: string | null;
+  latency_ms?: number | null;
+  request_id?: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface ProviderUsageSummary {
+  provider: string;
+  model?: string | null;
+  requests: number;
+  total_tokens: number;
+  actual_cost_usd: number;
+  successes: number;
 }
 
 export interface Connections {

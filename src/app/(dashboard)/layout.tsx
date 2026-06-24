@@ -4,7 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Settings, LogOut, Plus, Menu, X, Sparkles, Layers } from "lucide-react";
+import { LayoutDashboard, Settings, LogOut, Plus, Menu, X, Sparkles, Layers, ShieldCheck } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { BrandMark } from "@/components/BrandMark";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -59,6 +59,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <SideLink href="/suites" icon={<LayoutDashboard size={16} />} label={t("nav.dashboard")} active={!hasSuites && pathname === "/suites"} />
           <SideLink href="/create" icon={<Sparkles size={16} />} label={t("nav.create")} active={pathname === "/create"} />
           <SideLink href={suitesNavHref} icon={suitesNavIcon} label={suitesNavLabel} active={suitesNavActive} />
+          {user.is_super_admin && <SideLink href="/admin" icon={<ShieldCheck size={16} />} label="Admin" active={pathname === "/admin"} />}
           <SideLink href="/settings" icon={<Settings size={16} />} label={t("nav.settings")} active={pathname === "/settings"} />
           {activeSuiteId && <SuiteNav suiteId={activeSuiteId} />}
         </nav>
@@ -101,6 +102,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <IconLink href="/suites" icon={<LayoutDashboard size={17} />} active={!hasSuites && pathname === "/suites"} />
               <IconLink href="/create" icon={<Sparkles size={17} />} active={pathname === "/create"} />
               <IconLink href={suitesNavHref} icon={mobileSuitesNavIcon} active={suitesNavActive} />
+              {user.is_super_admin && <IconLink href="/admin" icon={<ShieldCheck size={17} />} active={pathname === "/admin"} />}
               <IconLink href="/settings" icon={<Settings size={17} />} active={pathname === "/settings"} />
               <Button
                 variant="ghost"
