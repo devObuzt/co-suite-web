@@ -527,6 +527,34 @@ export interface MarketingSignal {
   description?: string;
 }
 
+export interface MarketingDemandSupplyKeyword {
+  keyword: string;
+  source?: string;
+  average_monthly_searches?: number;
+  competition?: string;
+  competition_index?: number;
+  low_top_of_page_bid?: number;
+  high_top_of_page_bid?: number;
+  monthly_search_volumes?: Array<{ year?: number; month?: string; monthly_searches?: number }>;
+}
+
+export interface MarketingDemandSupplyData {
+  provider?: string;
+  summary?: {
+    analyzed_keywords?: number;
+    average_monthly_searches?: number;
+    total_monthly_searches?: number;
+    average_competition_index?: number;
+    competition_level?: string;
+    demand_level?: string;
+    market_pressure_score?: number;
+    suggested_keywords?: number;
+  };
+  keyword_metrics?: MarketingDemandSupplyKeyword[];
+  suggested_keywords?: MarketingDemandSupplyKeyword[];
+  warning?: string;
+}
+
 export interface MarketingIntelligence {
   version: string;
   language?: string;
@@ -539,6 +567,7 @@ export interface MarketingIntelligence {
   opportunities: MarketingSignal[];
   source_links: MarketingSourceLink[];
   warnings?: string[];
+  demand_supply?: MarketingDemandSupplyData;
 }
 
 export interface MarketingPlanWorkItem {

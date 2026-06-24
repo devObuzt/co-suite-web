@@ -43,7 +43,7 @@ const labels = {
     competitorsTitle: "المنافسون",
     competitorsDesc: "نبحث حسب المصدر ونفصل النتائج بين Google Organic وMaps والمنصات الاجتماعية.",
     demandTitle: "العرض والطلب",
-    demandDesc: "حاليًا تحليل أولي. لاحقًا سيتم ربطه ببيانات Google Ads.",
+    demandDesc: "نقرأ الطلب والمنافسة من Google Ads Keyword Planner حسب البلد واللغة والكلمات.",
     generate: "Generate",
     generateMore: "Generate More",
     openStage: "فتح الصفحة",
@@ -57,6 +57,15 @@ const labels = {
     noCompetitors: "لم يتم توليد منافسين بعد.",
     noSourceCompetitors: "لا توجد نتائج من هذا المصدر.",
     noDemand: "لم يتم توليد العرض والطلب بعد.",
+    demandAvg: "متوسط الطلب",
+    demandCompetition: "المنافسة",
+    marketPressure: "ضغط السوق",
+    suggestedKeywords: "اقتراحات Google",
+    keyword: "الكلمة",
+    source: "المصدر",
+    searches: "البحث الشهري",
+    competition: "المنافسة",
+    bidRange: "نطاق النقرة",
     showAll: "عرض الكل",
     collapse: "إخفاء",
     notCompetitor: "غير منافس",
@@ -77,7 +86,7 @@ const labels = {
     competitorsTitle: "Competitors",
     competitorsDesc: "Search by source and split results across Google Organic, Maps, and social platforms.",
     demandTitle: "Demand and Supply",
-    demandDesc: "Initial analysis for now. Later this connects to Google Ads data.",
+    demandDesc: "Read demand and competition from Google Ads Keyword Planner by country, language, and keywords.",
     generate: "Generate",
     generateMore: "Generate More",
     openStage: "Open page",
@@ -91,6 +100,15 @@ const labels = {
     noCompetitors: "No competitors generated yet.",
     noSourceCompetitors: "No results from this source.",
     noDemand: "Demand and supply have not been generated yet.",
+    demandAvg: "Average demand",
+    demandCompetition: "Competition",
+    marketPressure: "Market pressure",
+    suggestedKeywords: "Google suggestions",
+    keyword: "Keyword",
+    source: "Source",
+    searches: "Monthly searches",
+    competition: "Competition",
+    bidRange: "Bid range",
     showAll: "Show all",
     collapse: "Collapse",
     notCompetitor: "Not a competitor",
@@ -111,7 +129,7 @@ const labels = {
     competitorsTitle: "מתחרים",
     competitorsDesc: "חיפוש לפי מקור והפרדה בין Google Organic, Maps ופלטפורמות חברתיות.",
     demandTitle: "ביקוש והיצע",
-    demandDesc: "ניתוח ראשוני כרגע. בהמשך יחובר לנתוני Google Ads.",
+    demandDesc: "קריאת ביקוש ותחרות מ-Google Ads Keyword Planner לפי מדינה, שפה ומילות מפתח.",
     generate: "Generate",
     generateMore: "Generate More",
     openStage: "פתח עמוד",
@@ -125,6 +143,15 @@ const labels = {
     noCompetitors: "עדיין לא נוצרו מתחרים.",
     noSourceCompetitors: "אין תוצאות ממקור זה.",
     noDemand: "ביקוש והיצע עדיין לא נוצרו.",
+    demandAvg: "ביקוש ממוצע",
+    demandCompetition: "תחרות",
+    marketPressure: "לחץ שוק",
+    suggestedKeywords: "הצעות Google",
+    keyword: "מילת מפתח",
+    source: "מקור",
+    searches: "חיפושים חודשיים",
+    competition: "תחרות",
+    bidRange: "טווח קליק",
     showAll: "הצג הכל",
     collapse: "כווץ",
     notCompetitor: "לא מתחרה",
@@ -509,18 +536,67 @@ function DemandSupplyStage({ text, suiteId, intelligence, loading, onGenerate, d
   const demand = intelligence?.demand_signals || [];
   const supply = intelligence?.supply_signals || [];
   const opportunities = intelligence?.opportunities || [];
-  const hasData = demand.length || supply.length || opportunities.length;
+  const planner = intelligence?.demand_supply;
+  const summary = planner?.summary;
+  const keywordMetrics = planner?.keyword_metrics || [];
+  const hasData = Boolean(summary?.analyzed_keywords || keywordMetrics.length || demand.length || supply.length || opportunities.length);
   return (
     <StageBox title={text.demandTitle} description={text.demandDesc} icon={<Target size={18} />} suiteId={suiteId} slug="demand-supply" detail={detail}>
       <Button onClick={onGenerate} disabled={loading} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Target size={15} />}{text.generate}</Button>
       {!hasData ? <p className="mt-4 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noDemand}</p> : (
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <SignalList title="Demand" items={demand} />
-          <SignalList title="Supply" items={supply} />
-          <SignalList title="Opportunities" items={opportunities} />
+        <div className="mt-4 space-y-4">
+          <div className="grid gap-3 md:grid-cols-4">
+            <MetricTile label={text.demandAvg} value={`${summary?.average_monthly_searches || 0}`} helper={summary?.demand_level || ""} />
+            <MetricTile label={text.demandCompetition} value={summary?.competition_level || "UNKNOWN"} helper={`${summary?.average_competition_index || 0}/100`} />
+            <MetricTile label={text.marketPressure} value={`${summary?.market_pressure_score || 0}/100`} helper={`${summary?.analyzed_keywords || 0} keywords`} />
+            <MetricTile label={text.suggestedKeywords} value={`${summary?.suggested_keywords || planner?.suggested_keywords?.length || 0}`} helper="Keyword Planner" />
+          </div>
+          {planner?.warning && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{planner.warning}</p>}
+          {keywordMetrics.length > 0 ? (
+            <div className="overflow-x-auto rounded-xl border border-border bg-background">
+              <table className="min-w-[760px] w-full text-sm">
+                <thead className="bg-muted text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-start font-semibold">{text.keyword}</th>
+                    <th className="px-3 py-2 text-start font-semibold">{text.source}</th>
+                    <th className="px-3 py-2 text-start font-semibold">{text.searches}</th>
+                    <th className="px-3 py-2 text-start font-semibold">{text.competition}</th>
+                    <th className="px-3 py-2 text-start font-semibold">{text.bidRange}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {keywordMetrics.slice(0, detail ? 80 : 8).map((item) => (
+                    <tr key={`${item.keyword}-${item.source}`} className="border-t border-border">
+                      <td className="px-3 py-2 font-semibold text-foreground" dir="auto">{item.keyword}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{item.source || "-"}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{item.average_monthly_searches ?? 0}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{item.competition || "UNKNOWN"} {item.competition_index ? `(${item.competition_index})` : ""}</td>
+                      <td className="px-3 py-2 text-muted-foreground">${item.low_top_of_page_bid ?? 0} - ${item.high_top_of_page_bid ?? 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-3">
+              <SignalList title="Demand" items={demand} />
+              <SignalList title="Supply" items={supply} />
+              <SignalList title="Opportunities" items={opportunities} />
+            </div>
+          )}
         </div>
       )}
     </StageBox>
+  );
+}
+
+function MetricTile({ label, value, helper }: { label: string; value: string; helper?: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-background p-3">
+      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-foreground" dir="auto">{value}</p>
+      {helper && <p className="mt-1 text-xs text-muted-foreground" dir="auto">{helper}</p>}
+    </div>
   );
 }
 
