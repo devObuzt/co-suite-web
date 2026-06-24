@@ -41,7 +41,7 @@ const labels = {
     keywordsTitle: "الكلمات المفتاحية",
     keywordsDesc: "نولّد كلمات ملائمة بناءً على فئة البزنس والخدمات واللغة.",
     competitorsTitle: "المنافسون",
-    competitorsDesc: "حاليًا نعرض نتائج تجريبية بنفس شكل نتائج SerpAPI القادمة.",
+    competitorsDesc: "نبحث حسب المصدر ونفصل النتائج بين Google Organic وMaps والمنصات الاجتماعية.",
     demandTitle: "العرض والطلب",
     demandDesc: "حاليًا تحليل أولي. لاحقًا سيتم ربطه ببيانات Google Ads.",
     generate: "Generate",
@@ -55,6 +55,7 @@ const labels = {
     locked: "غير متاح حتى يتم التوليد",
     noKeywords: "لم يتم توليد كلمات بعد.",
     noCompetitors: "لم يتم توليد منافسين بعد.",
+    noSourceCompetitors: "لا توجد نتائج من هذا المصدر.",
     noDemand: "لم يتم توليد العرض والطلب بعد.",
     showAll: "عرض الكل",
     collapse: "إخفاء",
@@ -74,7 +75,7 @@ const labels = {
     keywordsTitle: "Keywords",
     keywordsDesc: "Generate suitable keywords from the business category, services, and language.",
     competitorsTitle: "Competitors",
-    competitorsDesc: "For now this shows mock results using the future SerpAPI result shape.",
+    competitorsDesc: "Search by source and split results across Google Organic, Maps, and social platforms.",
     demandTitle: "Demand and Supply",
     demandDesc: "Initial analysis for now. Later this connects to Google Ads data.",
     generate: "Generate",
@@ -88,6 +89,7 @@ const labels = {
     locked: "Locked until generated",
     noKeywords: "No keywords generated yet.",
     noCompetitors: "No competitors generated yet.",
+    noSourceCompetitors: "No results from this source.",
     noDemand: "Demand and supply have not been generated yet.",
     showAll: "Show all",
     collapse: "Collapse",
@@ -107,7 +109,7 @@ const labels = {
     keywordsTitle: "מילות מפתח",
     keywordsDesc: "יצירת מילות מפתח לפי קטגוריית העסק, השירותים והשפה.",
     competitorsTitle: "מתחרים",
-    competitorsDesc: "כרגע מוצגות תוצאות דמו במבנה העתידי של SerpAPI.",
+    competitorsDesc: "חיפוש לפי מקור והפרדה בין Google Organic, Maps ופלטפורמות חברתיות.",
     demandTitle: "ביקוש והיצע",
     demandDesc: "ניתוח ראשוני כרגע. בהמשך יחובר לנתוני Google Ads.",
     generate: "Generate",
@@ -121,6 +123,7 @@ const labels = {
     locked: "נעול עד יצירה",
     noKeywords: "עדיין לא נוצרו מילות מפתח.",
     noCompetitors: "עדיין לא נוצרו מתחרים.",
+    noSourceCompetitors: "אין תוצאות ממקור זה.",
     noDemand: "ביקוש והיצע עדיין לא נוצרו.",
     showAll: "הצג הכל",
     collapse: "כווץ",
@@ -137,6 +140,19 @@ const tagLabels = (text: typeof labels.en) => ({
   local_competitor: text.localCompetitor,
   global_competitor: text.globalCompetitor,
 });
+
+const competitorSourceOrder = ["google_organic", "maps", "instagram", "facebook", "tiktok", "google_sponsored", "sponsored", "other"];
+
+const competitorSourceLabels: Record<string, string> = {
+  google_organic: "Google Organic",
+  maps: "Google Maps",
+  instagram: "Instagram",
+  facebook: "Facebook",
+  tiktok: "TikTok",
+  google_sponsored: "Google Sponsored",
+  sponsored: "Google Sponsored",
+  other: "Other",
+};
 
 function shortUrl(url?: string) {
   if (!url) return "-";
@@ -388,15 +404,47 @@ function KeywordsStage({ text, suiteId, keywords, loading, loadingMore, onGenera
 }
 
 function CompetitorsStage({ text, suiteId, competitors, loading, loadingMore, onGenerate, onMore, onTagsChange, detail }: { text: typeof labels.en; suiteId: string; competitors: MarketingCompetitor[]; loading: boolean; loadingMore: boolean; onGenerate: () => void; onMore: () => void; onTagsChange: (id: string, tags: string[]) => void; detail?: boolean }) {
+  const grouped = useMemo(() => {
+    const groups = new Map<string, MarketingCompetitor[]>();
+    for (const competitor of competitors) {
+      const key = `${competitor.result_type || competitor.platform || "other"}`.toLowerCase();
+      const normalized = key === "google" ? "google_organic" : key;
+      groups.set(normalized, [...(groups.get(normalized) || []), competitor]);
+    }
+    const primarySources = competitorSourceOrder.slice(0, 5).map((source) => [source, groups.get(source) || []] as [string, MarketingCompetitor[]]);
+    const extraSources = [...groups.entries()].filter(([source]) => !competitorSourceOrder.slice(0, 5).includes(source));
+    return [...primarySources, ...extraSources].sort(([a], [b]) => {
+      const indexA = competitorSourceOrder.indexOf(a);
+      const indexB = competitorSourceOrder.indexOf(b);
+      return (indexA === -1 ? 99 : indexA) - (indexB === -1 ? 99 : indexB);
+    });
+  }, [competitors]);
+
   return (
     <StageBox title={text.competitorsTitle} description={text.competitorsDesc} icon={<Search size={18} />} suiteId={suiteId} slug="competitors" detail={detail}>
       <div className="flex flex-wrap gap-2">
         <Button onClick={onGenerate} disabled={loading || loadingMore} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}{text.generate}</Button>
         {competitors.length > 0 && <Button variant="outline" onClick={onMore} disabled={loading || loadingMore} className="gap-2">{loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.generateMore}</Button>}
       </div>
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        {competitors.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noCompetitors}</p> : competitors.map((competitor) => (
-          <CompetitorCard key={competitor.id} text={text} competitor={competitor} onTagsChange={onTagsChange} />
+      <div className="mt-4 space-y-5">
+        {competitors.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noCompetitors}</p>
+        ) : grouped.map(([source, items]) => (
+          <section key={source} className="min-w-0">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <h3 className="text-sm font-bold text-foreground">{competitorSourceLabels[source] || source}</h3>
+              <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">{items.length}</span>
+            </div>
+            <div className="flex snap-x gap-3 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]">
+              {items.length === 0 ? (
+                <p className="w-[min(21rem,85vw)] shrink-0 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noSourceCompetitors}</p>
+              ) : items.map((competitor) => (
+                <div key={competitor.id} className="w-[min(21rem,85vw)] shrink-0 snap-start">
+                  <CompetitorCard text={text} competitor={competitor} onTagsChange={onTagsChange} />
+                </div>
+              ))}
+            </div>
+          </section>
         ))}
       </div>
     </StageBox>
