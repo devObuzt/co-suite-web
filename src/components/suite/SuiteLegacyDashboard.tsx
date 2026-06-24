@@ -2160,18 +2160,6 @@ export function ConnectionsPanel({ suiteId }: { suiteId: string }) {
     }
   }
 
-  async function connectGoogle() {
-    setConnecting(true);
-    setConnectionError("");
-    try {
-      const { url } = await api.connections.googleAuthUrl(suiteId);
-      window.location.href = url;
-    } catch (e: unknown) {
-      setConnectionError(e instanceof Error ? e.message : "Failed to start Google Ads connection");
-      setConnecting(false);
-    }
-  }
-
   async function disconnect(platform: string) {
     await api.connections.disconnect(suiteId, platform);
     const updated = await api.connections.get(suiteId);
@@ -2196,10 +2184,9 @@ export function ConnectionsPanel({ suiteId }: { suiteId: string }) {
   const ig = connections.instagram;
   const metaAds = connections.meta_ads;
   const metaConnected = !!fb?.connected;
-  const googleAds = connections.google_ads;
   const indicators = [
     { label: "Meta", connected: metaConnected },
-    { label: "Google", connected: !!googleAds?.connected },
+    { label: "Google", connected: true },
     { label: "Storage", connected: !!storage?.configured },
   ];
 
@@ -2291,35 +2278,10 @@ export function ConnectionsPanel({ suiteId }: { suiteId: string }) {
           <div className="flex items-center gap-2 text-zinc-300 text-sm font-medium">
             <BarChart3 size={15} className="text-amber-400" /> Google Ads
           </div>
-          {googleAds?.connected ? (
-            <>
-              <div className="space-y-1">
-                <p className="text-zinc-300 text-xs font-medium">{googleAds.customer_name || googleAds.customer_id}</p>
-                <p className="text-zinc-500 text-xs">{googleAds.customer_id}</p>
-                {googleAds.user_email && (
-                  <p className="text-zinc-400 text-xs" dir="ltr">{googleAds.user_email}</p>
-                )}
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => disconnect("google_ads")}
-                className="w-full border-zinc-700 text-zinc-400 hover:text-red-400 hover:border-red-900 gap-1 text-xs h-7"
-              >
-                <Link2Off size={11} /> Disconnect
-              </Button>
-            </>
-          ) : (
-            <Button
-              size="sm"
-              onClick={connectGoogle}
-              disabled={connecting}
-              className="w-full bg-amber-700 hover:bg-amber-600 gap-1 text-xs h-7"
-            >
-              {connecting ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
-              Connect Google Ads
-            </Button>
-          )}
+          <div className="space-y-1">
+            <p className="text-zinc-300 text-xs font-medium">Managed by OneShare</p>
+            <p className="text-zinc-500 text-xs">Keyword Planner demand and competition data uses the platform account.</p>
+          </div>
         </div>
 
         {/* TikTok (future) */}

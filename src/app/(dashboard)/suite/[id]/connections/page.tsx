@@ -52,7 +52,7 @@ export default function ConnectionsPage({ params }: { params: Promise<{ id: stri
     : metaReadyCount > 0
       ? "needs_attention"
       : "not_connected";
-  const googleStatus: Readiness = connections.google_ads?.connected ? "connected" : "not_connected";
+  const googleStatus: Readiness = "connected";
   const storageStatus: Readiness = !storage
     ? "unavailable"
     : storage.configured && storage.public
@@ -90,11 +90,11 @@ export default function ConnectionsPage({ params }: { params: Promise<{ id: stri
             icon={<BarChart3 size={16} />}
             title="Google Ads"
             status={googleStatus}
-            detail={googleStatus === "connected" ? t("suite.connections.googleReady") : t("suite.connections.googleSetup")}
+            detail={t("suite.connections.googleSetup")}
             rows={[{
               label: t("suite.connections.adsAccount"),
-              value: connections.google_ads?.customer_name || connections.google_ads?.customer_id || t("suite.connections.notConnected"),
-              ready: !!connections.google_ads?.connected,
+              value: connections.google_ads?.customer_name || connections.google_ads?.customer_id || t("suite.connections.platformManaged"),
+              ready: true,
             }]}
           />
           <StatusCard
