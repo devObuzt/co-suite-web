@@ -56,6 +56,8 @@ const labels = {
     noKeywords: "لم يتم توليد كلمات بعد.",
     noCompetitors: "لم يتم توليد منافسين بعد.",
     noDemand: "لم يتم توليد العرض والطلب بعد.",
+    showAll: "عرض الكل",
+    collapse: "إخفاء",
     notCompetitor: "غير منافس",
     goodCompetitor: "منافس جيد",
     localCompetitor: "منافس محلي",
@@ -87,6 +89,8 @@ const labels = {
     noKeywords: "No keywords generated yet.",
     noCompetitors: "No competitors generated yet.",
     noDemand: "Demand and supply have not been generated yet.",
+    showAll: "Show all",
+    collapse: "Collapse",
     notCompetitor: "Not a competitor",
     goodCompetitor: "Good competitor",
     localCompetitor: "Local competitor",
@@ -118,6 +122,8 @@ const labels = {
     noKeywords: "עדיין לא נוצרו מילות מפתח.",
     noCompetitors: "עדיין לא נוצרו מתחרים.",
     noDemand: "ביקוש והיצע עדיין לא נוצרו.",
+    showAll: "הצג הכל",
+    collapse: "כווץ",
     notCompetitor: "לא מתחרה",
     goodCompetitor: "מתחרה טוב",
     localCompetitor: "מתחרה מקומי",
@@ -173,7 +179,31 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
   }, [load]);
 
   const brand = (suite?.brand || {}) as Brand;
-  const services = useMemo(() => Array.from(new Set([...(brand.services || []), ...(brand.products || [])].filter(Boolean))), [brand.products, brand.services]);
+  const services = useMemo(() => {
+    const strategy = (suite?.strategy || {}) as Record<string, unknown>;
+    const marketingPlan = (strategy.marketing_plan || {}) as Record<string, unknown>;
+    const toList = (value: unknown) => Array.isArray(value) ? value : value ? [value] : [];
+    const values = [
+      ...toList(brand.services),
+      ...toList(brand.products),
+      ...toList((brand as Record<string, unknown>).products_services),
+      ...toList(strategy.services),
+      ...toList(strategy.products),
+      ...toList(strategy.products_services),
+      ...toList(marketingPlan.services),
+      ...toList(marketingPlan.products),
+      ...toList(marketingPlan.products_services),
+    ];
+    const seen = new Set<string>();
+    return values
+      .map((item) => String(item || "").trim())
+      .filter((item) => {
+        const marker = item.toLocaleLowerCase();
+        if (!marker || seen.has(marker)) return false;
+        seen.add(marker);
+        return true;
+      });
+  }, [brand, suite?.strategy]);
 
   function applyPlanResponse(res: MarketingPlanResponse) {
     setIntelligence(res.intelligence || null);
@@ -336,17 +366,23 @@ function ServicesStage({ text, suiteId, services, saving, onSave, detail }: { te
 }
 
 function KeywordsStage({ text, suiteId, keywords, loading, loadingMore, onGenerate, onMore, detail }: { text: typeof labels.en; suiteId: string; keywords: MarketingKeyword[]; loading: boolean; loadingMore: boolean; onGenerate: () => void; onMore: () => void; detail?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
   return (
     <StageBox title={text.keywordsTitle} description={text.keywordsDesc} icon={<FileSearch size={18} />} suiteId={suiteId} slug="keywords" detail={detail}>
       <div className="flex flex-wrap gap-2">
         <Button onClick={onGenerate} disabled={loading || loadingMore} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}{text.generate}</Button>
         {keywords.length > 0 && <Button variant="outline" onClick={onMore} disabled={loading || loadingMore} className="gap-2">{loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.generateMore}</Button>}
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className={`mt-4 flex flex-wrap gap-2 overflow-hidden transition-[max-height] ${expanded || detail ? "max-h-none" : "max-h-[5.6rem]"}`}>
         {keywords.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noKeywords}</p> : keywords.map((keyword) => (
-          <span key={keyword.id} className="rounded-full border border-border bg-background px-3 py-1.5 text-sm" dir="auto">{keyword.text}</span>
+          <span key={keyword.id} className="max-w-full rounded-full border border-border bg-background px-3 py-1.5 text-sm leading-5" dir="auto">{keyword.text}</span>
         ))}
       </div>
+      {keywords.length > 10 && !detail && (
+        <Button type="button" variant="outline" size="sm" onClick={() => setExpanded((value) => !value)} className="mt-3">
+          {expanded ? text.collapse : text.showAll}
+        </Button>
+      )}
     </StageBox>
   );
 }
