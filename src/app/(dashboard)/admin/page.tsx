@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { api, AdminProvider, AdminSummary, AdminUser, AdminUserDetail, AuditLog, ProviderUsageEvent, ProviderUsageSummary } from "@/lib/api";
+import { api, AdminBillingUsageEvent, AdminProvider, AdminSummary, AdminUser, AdminUserDetail, AuditLog, ProviderUsageEvent, ProviderUsageSummary } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ export default function AdminPage() {
   const [providerRows, setProviderRows] = useState<ProviderUsageEvent[]>([]);
   const [providerSummary, setProviderSummary] = useState<ProviderUsageSummary[]>([]);
   const [providers, setProviders] = useState<AdminProvider[]>([]);
+  const [billingRows, setBillingRows] = useState<AdminBillingUsageEvent[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
@@ -38,10 +39,11 @@ export default function AdminPage() {
 
   async function load(nextPeriod = period, nextQuery = query) {
     setError(null);
-    const [s, u, catalog, ps, pr, l] = await Promise.all([
+    const [s, u, catalog, billing, ps, pr, l] = await Promise.all([
       api.admin.summary(nextPeriod),
       api.admin.users(nextQuery),
       api.admin.providers(),
+      api.admin.billingUsage(nextPeriod),
       api.admin.providerUsageSummary(nextPeriod),
       api.admin.providerUsage(nextPeriod),
       api.admin.auditLogs(nextPeriod),
@@ -49,6 +51,7 @@ export default function AdminPage() {
     setSummary(s);
     setUsers(u);
     setProviders(catalog);
+    setBillingRows(billing);
     setProviderSummary(ps);
     setProviderRows(pr);
     setLogs(l);
@@ -249,6 +252,48 @@ export default function AdminPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
+        <Panel title="Billed Usage Requests">
+          <div className="mb-3 text-sm text-muted-foreground">
+            These rows explain the billed total for the selected period. Provider cost is separate and only appears for newly instrumented provider calls.
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[860px] text-sm">
+              <thead className="border-b border-border text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="py-2 pr-3">Time</th>
+                  <th className="py-2 pr-3">Request</th>
+                  <th className="py-2 pr-3">Suite</th>
+                  <th className="py-2 pr-3">Owner</th>
+                  <th className="py-2 pr-3">Tokens</th>
+                  <th className="py-2 pr-3">Actual</th>
+                  <th className="py-2 pr-3">Billed</th>
+                  <th className="py-2 pr-3">Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {billingRows.map((item) => (
+                  <tr key={item.id} className="border-b border-border/60 align-top">
+                    <td className="py-3 pr-3 text-muted-foreground">{formatDate(item.created_at)}</td>
+                    <td className="py-3 pr-3">
+                      <div className="font-medium">{item.event_type}</div>
+                      <div className="text-xs text-muted-foreground">{item.billing_event_type} · {item.ledger_account}</div>
+                    </td>
+                    <td className="py-3 pr-3">{item.suite_name || shortId(item.suite_id)}</td>
+                    <td className="py-3 pr-3 text-muted-foreground">{item.owner_email || "-"}</td>
+                    <td className="py-3 pr-3">{item.amount_tokens || 0}</td>
+                    <td className="py-3 pr-3">${item.actual_cost_usd.toFixed(4)}</td>
+                    <td className="py-3 pr-3 font-semibold">${item.billed_amount.toFixed(4)}</td>
+                    <td className="max-w-[260px] truncate py-3 pr-3 text-xs text-muted-foreground">
+                      {JSON.stringify(item.event_data || {})}
+                    </td>
+                  </tr>
+                ))}
+                {billingRows.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">No billed usage rows for this period.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+
         <Panel title="External Providers">
           <div className="grid gap-3 md:grid-cols-2">
             {providers.map((item) => (

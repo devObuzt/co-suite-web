@@ -390,6 +390,7 @@ export const api = {
       request<{ ok: boolean }>(`/admin/users/${userId}/password`, { method: "POST", body: JSON.stringify({ password }) }),
     deactivateUser: (userId: string) =>
       request<{ ok: boolean; deactivated: boolean }>(`/admin/users/${userId}`, { method: "DELETE" }),
+    billingUsage: (period = "month") => request<AdminBillingUsageEvent[]>(`/admin/billing-usage?period=${period}`),
     auditLogs: (period = "month") => request<AuditLog[]>(`/admin/audit-logs?period=${period}`),
     providerUsage: (period = "month") => request<ProviderUsageEvent[]>(`/admin/provider-usage?period=${period}`),
     providerUsageSummary: (period = "month") => request<ProviderUsageSummary[]>(`/admin/provider-usage/summary?period=${period}`),
@@ -769,6 +770,26 @@ export interface AdminProvider {
   configured: boolean;
   models: string[];
   operations: string[];
+}
+
+export interface AdminBillingUsageEvent {
+  id: string;
+  suite_id: string;
+  suite_name?: string | null;
+  owner_email?: string | null;
+  event_type: string;
+  ledger_account: string;
+  billing_event_type: string;
+  amount_tokens: number;
+  balance_after_tokens?: number | null;
+  amount_usd: number;
+  balance_after_usd?: number | null;
+  actual_cost_usd: number;
+  billed_amount: number;
+  external_ref?: string | null;
+  idempotency_key?: string | null;
+  event_data: Record<string, unknown>;
+  created_at: string;
 }
 
 export interface AdminSuiteSummary {
