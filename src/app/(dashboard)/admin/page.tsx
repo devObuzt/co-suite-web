@@ -172,7 +172,7 @@ export default function AdminPage() {
             <Button variant="outline" size="sm" onClick={searchUsers} className="gap-2"><Search size={14} /> Search</Button>
           </div>
         }>
-          <div className="overflow-x-auto">
+          <div className="os-scroll-x">
             <table className="w-full min-w-[760px] text-sm">
               <thead className="border-b border-border text-left text-xs text-muted-foreground">
                 <tr>
@@ -256,7 +256,7 @@ export default function AdminPage() {
           <div className="mb-3 text-sm text-muted-foreground">
             These rows explain the billed total for the selected period. Provider cost is separate and only appears for newly instrumented provider calls.
           </div>
-          <div className="overflow-x-auto">
+          <div className="os-scroll-x">
             <table className="w-full min-w-[860px] text-sm">
               <thead className="border-b border-border text-left text-xs text-muted-foreground">
                 <tr>
@@ -319,7 +319,7 @@ export default function AdminPage() {
         </Panel>
 
         <Panel title="Provider Usage Summary">
-          <div className="overflow-x-auto">
+          <div className="os-scroll-x">
             <table className="w-full min-w-[560px] text-sm">
               <thead className="border-b border-border text-left text-xs text-muted-foreground">
                 <tr><th className="py-2 pr-3">Provider</th><th className="py-2 pr-3">Model</th><th className="py-2 pr-3">Requests</th><th className="py-2 pr-3">Tokens</th><th className="py-2 pr-3">Cost</th></tr>
@@ -359,7 +359,7 @@ export default function AdminPage() {
       </section>
 
       <Panel title="Audit Logs">
-        <div className="overflow-x-auto">
+        <div className="os-scroll-x">
           <table className="w-full min-w-[920px] text-sm">
             <thead className="border-b border-border text-left text-xs text-muted-foreground">
               <tr><th className="py-2 pr-3">Time</th><th className="py-2 pr-3">Actor</th><th className="py-2 pr-3">Action</th><th className="py-2 pr-3">Resource</th><th className="py-2 pr-3">Metadata</th></tr>

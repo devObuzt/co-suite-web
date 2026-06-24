@@ -288,7 +288,7 @@ export default function SuiteHomePage({ params }: { params: Promise<{ id: string
 
   return (
     <SuitePageShell title={suite.name} description={text.description}>
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className="grid w-full min-w-0 gap-4 lg:grid-cols-2">
         {sections.map((section) => (
           <SuiteAreaCard key={section.id} section={section} statusLabels={{ ready: text.statusReady, needs_setup: text.statusNeedsSetup, soon: text.soon, open: text.open }} />
         ))}
@@ -313,16 +313,16 @@ function SuiteAreaCard({
   statusLabels: { ready: string; needs_setup: string; soon: string; open: string };
 }) {
   return (
-    <article className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+    <article className="relative w-full min-w-0 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5">
       <div className={`pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b ${section.accent}`} />
       <div className="relative">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start justify-between gap-3 sm:gap-4">
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{section.eyebrow}</p>
-            <h2 className="mt-1 text-2xl font-black text-foreground" dir="auto">{section.title}</h2>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground" dir="auto">{section.desc}</p>
+            <h2 className="os-text-wrap mt-1 text-[1.65rem] font-black leading-tight text-foreground sm:text-2xl" dir="auto">{section.title}</h2>
+            <p className="os-text-wrap mt-2 max-w-xl text-sm leading-6 text-muted-foreground" dir="auto">{section.desc}</p>
           </div>
-          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${section.iconClass}`}>
+          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${section.iconClass}`}>
             {section.icon}
           </div>
         </div>
@@ -351,14 +351,14 @@ function AreaLink({ item, labels }: { item: SectionLink; labels: { ready: string
 
   if (!item.href) {
     return (
-      <div className="flex min-h-11 items-center gap-2 rounded-xl border border-dashed border-border bg-background/55 px-2.5 opacity-80">
+      <div className="flex min-h-11 max-w-full items-center gap-2 rounded-xl border border-dashed border-border bg-background/55 px-2.5 opacity-80">
         {content}
       </div>
     );
   }
 
   return (
-    <Link href={item.href} className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-background/70 px-2.5 transition hover:bg-muted">
+    <Link href={item.href} className="flex min-h-11 max-w-full items-center gap-2 rounded-xl border border-border bg-background/70 px-2.5 transition hover:bg-muted">
       {content}
     </Link>
   );

@@ -280,7 +280,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
   }
 
   const allStages = (
-    <div className="space-y-4" dir={dir}>
+    <div className="w-full min-w-0 overflow-x-hidden space-y-4" dir={dir}>
       <ServicesStage text={text} suiteId={suiteId} services={services} saving={busy === "save-services"} onSave={saveServices} />
       <KeywordsStage
         text={text}
@@ -317,12 +317,12 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
   }
 
   return (
-    <div className="space-y-5" dir={dir}>
-      <div className="rounded-2xl border border-border bg-card p-5">
-        <h1 className="text-2xl font-black text-foreground">{text.title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{text.desc}</p>
+    <div className="w-full min-w-0 overflow-x-hidden space-y-5" dir={dir}>
+      <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-border bg-card p-4 sm:p-5">
+        <h1 className="os-text-wrap text-2xl font-black text-foreground">{text.title}</h1>
+        <p className="os-text-wrap mt-1 text-sm text-muted-foreground">{text.desc}</p>
       </div>
-      {error && <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200">{error}</div>}
+      {error && <div className="os-text-wrap rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200">{error}</div>}
       {stage === "services" && <ServicesStage text={text} suiteId={suiteId} services={services} saving={busy === "save-services"} onSave={saveServices} detail />}
       {stage === "keywords" && (
         <KeywordsStage text={text} suiteId={suiteId} keywords={intelligence?.keywords || []} loading={busy === "keywords"} loadingMore={busy === "keywords-more"} onGenerate={() => run("keywords", () => api.marketingPlans.generateKeywords(suiteId, { language: lang }))} onMore={() => run("keywords-more", () => api.marketingPlans.generateMoreKeywords(suiteId, { language: lang, existing_values: (intelligence?.keywords || []).map((k) => k.text) }))} detail />
@@ -338,13 +338,13 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
 
 function StageBox({ title, description, icon, suiteId, slug, children, detail }: { title: string; description: string; icon: ReactNode; suiteId: string; slug: StageSlug; children: ReactNode; detail?: boolean }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
+        <div className="flex min-w-0 items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color:var(--brand-accent)]/10 text-[color:var(--brand-accent)]">{icon}</span>
-          <div>
-            <h2 className="text-xl font-black text-foreground">{title}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <div className="min-w-0">
+            <h2 className="os-text-wrap text-xl font-black text-foreground">{title}</h2>
+            <p className="os-text-wrap mt-1 text-sm text-muted-foreground">{description}</p>
           </div>
         </div>
         {!detail && (
@@ -353,7 +353,7 @@ function StageBox({ title, description, icon, suiteId, slug, children, detail }:
           </Link>
         )}
       </div>
-      <div className="mt-5">{children}</div>
+      <div className="mt-5 min-w-0">{children}</div>
     </section>
   );
 }
@@ -383,21 +383,21 @@ function ServicesStage({ text, suiteId, services, saving, onSave, detail }: { te
 
   return (
     <StageBox title={text.servicesTitle} description={text.servicesDesc} icon={<Package size={18} />} suiteId={suiteId} slug="services" detail={detail}>
-      <div className="flex gap-2">
+      <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
         <Input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={text.newService} dir="auto" onKeyDown={(e) => { if (e.key === "Enter") void add(); }} />
-        <Button onClick={add} disabled={saving || !draft.trim()} className="gap-2">{saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.addService}</Button>
+        <Button onClick={add} disabled={saving || !draft.trim()} className="w-full gap-2 sm:w-auto">{saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.addService}</Button>
       </div>
       <div className="mt-4 grid gap-2 md:grid-cols-2">
         {services.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.emptyServices}</p> : services.map((service) => (
-          <div key={service} className="flex items-center gap-2 rounded-xl border border-border bg-background p-2">
+          <div key={service} className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-background p-2">
             {editing === service ? (
               <>
-                <Input value={editValue} onChange={(e) => setEditValue(e.target.value)} dir="auto" />
+                <Input value={editValue} onChange={(e) => setEditValue(e.target.value)} dir="auto" className="min-w-0" />
                 <Button size="sm" variant="outline" onClick={() => saveEdit(service)}><Check size={14} /></Button>
               </>
             ) : (
               <>
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold" dir="auto">{service}</span>
+                <span className="os-text-wrap min-w-0 flex-1 text-sm font-semibold" dir="auto">{service}</span>
                 <Button size="sm" variant="outline" onClick={() => { setEditing(service); setEditValue(service); }}><Pencil size={14} /></Button>
                 <Button size="sm" variant="outline" onClick={() => remove(service)}><Trash2 size={14} /></Button>
               </>
@@ -413,13 +413,13 @@ function KeywordsStage({ text, suiteId, keywords, loading, loadingMore, onGenera
   const [expanded, setExpanded] = useState(false);
   return (
     <StageBox title={text.keywordsTitle} description={text.keywordsDesc} icon={<FileSearch size={18} />} suiteId={suiteId} slug="keywords" detail={detail}>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex min-w-0 flex-wrap gap-2">
         <Button onClick={onGenerate} disabled={loading || loadingMore} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}{text.generate}</Button>
         {keywords.length > 0 && <Button variant="outline" onClick={onMore} disabled={loading || loadingMore} className="gap-2">{loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.generateMore}</Button>}
       </div>
-      <div className={`mt-4 flex flex-wrap gap-2 overflow-hidden transition-[max-height] ${expanded || detail ? "max-h-none" : "max-h-[5.6rem]"}`}>
+      <div className={`mt-4 flex min-w-0 flex-wrap gap-2 overflow-hidden transition-[max-height] ${expanded || detail ? "max-h-none" : "max-h-[5.6rem]"}`}>
         {keywords.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noKeywords}</p> : keywords.map((keyword) => (
-          <span key={keyword.id} className="max-w-full rounded-full border border-border bg-background px-3 py-1.5 text-sm leading-5" dir="auto">{keyword.text}</span>
+          <span key={keyword.id} className="os-text-wrap max-w-full rounded-2xl border border-border bg-background px-3 py-1.5 text-sm leading-5" dir="auto">{keyword.text}</span>
         ))}
       </div>
       {keywords.length > 10 && !detail && (
@@ -450,14 +450,14 @@ function CompetitorsStage({ text, suiteId, competitors, warnings, loading, loadi
 
   return (
     <StageBox title={text.competitorsTitle} description={text.competitorsDesc} icon={<Search size={18} />} suiteId={suiteId} slug="competitors" detail={detail}>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex min-w-0 flex-wrap gap-2">
         <Button onClick={onGenerate} disabled={loading || loadingMore} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}{text.generate}</Button>
         {competitors.length > 0 && <Button variant="outline" onClick={onMore} disabled={loading || loadingMore} className="gap-2">{loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.generateMore}</Button>}
       </div>
       {warnings.length > 0 && (
         <div className="mt-4 space-y-2">
           {warnings.slice(0, 4).map((warning, index) => (
-            <p key={`${warning}-${index}`} className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" dir="auto">{warning}</p>
+            <p key={`${warning}-${index}`} className="os-text-wrap rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" dir="auto">{warning}</p>
           ))}
         </div>
       )}
@@ -470,11 +470,11 @@ function CompetitorsStage({ text, suiteId, competitors, warnings, loading, loadi
               <h3 className="text-sm font-bold text-foreground">{competitorSourceLabels[source] || source}</h3>
               <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">{items.length}</span>
             </div>
-            <div className="flex snap-x gap-3 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]">
+            <div className="os-scroll-x flex snap-x gap-3 pb-2">
               {items.length === 0 ? (
-                <p className="w-[min(21rem,85vw)] shrink-0 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noSourceCompetitors}</p>
+                <p className="w-[min(21rem,calc(100vw-3rem))] max-w-full shrink-0 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noSourceCompetitors}</p>
               ) : items.map((competitor) => (
-                <div key={competitor.id} className="w-[min(21rem,85vw)] shrink-0 snap-start">
+                <div key={competitor.id} className="w-[min(21rem,calc(100vw-3rem))] max-w-full shrink-0 snap-start">
                   <CompetitorCard text={text} competitor={competitor} onTagsChange={onTagsChange} />
                 </div>
               ))}
@@ -502,35 +502,35 @@ function CompetitorCard({ text, competitor, onTagsChange }: { text: typeof label
     onTagsChange(competitor.id, next);
   }
   return (
-    <article className="relative rounded-xl border border-border bg-background p-4">
+    <article className="relative min-w-0 overflow-hidden rounded-xl border border-border bg-background p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+          <div className="mb-2 inline-flex max-w-full items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
             <SourceIcon competitor={competitor} />
-            {competitor.result_type || competitor.platform}
+            <span className="min-w-0 truncate">{competitor.result_type || competitor.platform}</span>
           </div>
-          <h3 className="font-bold text-foreground" dir="auto">{competitor.title || competitor.name}</h3>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground" dir="auto">{competitor.snippet || competitor.reason || competitor.evidence}</p>
+          <h3 className="os-text-wrap font-bold text-foreground" dir="auto">{competitor.title || competitor.name}</h3>
+          <p className="os-text-wrap mt-2 text-sm leading-6 text-muted-foreground" dir="auto">{competitor.snippet || competitor.reason || competitor.evidence}</p>
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="max-w-full truncate rounded-lg border border-border px-2.5 py-1 text-xs text-muted-foreground" dir="ltr">{shortUrl(competitor.url)}</span>
+        <span className="min-w-0 max-w-full truncate rounded-lg border border-border px-2.5 py-1 text-xs text-muted-foreground" dir="ltr">{shortUrl(competitor.url)}</span>
         {competitor.url && <a href={competitor.url} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-xs font-semibold hover:bg-muted"><ArrowUpRight size={13} />{text.open}</a>}
         <Button type="button" size="sm" variant="outline" onClick={copyUrl} className="h-8 gap-1 px-2 text-xs"><Copy size={13} />{copied ? text.copied : text.copy}</Button>
         <Button type="button" size="sm" variant="outline" onClick={() => setPreview(true)} className="h-8 gap-1 px-2 text-xs"><Eye size={13} />{text.preview}</Button>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {Object.entries(tagText).map(([tag, label]) => (
-          <button key={tag} type="button" onClick={() => toggleTag(tag)} className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${tags.includes(tag) ? "border-[color:var(--brand-accent)] bg-[color:var(--brand-accent)]/10 text-[color:var(--brand-accent)]" : "border-border text-muted-foreground hover:text-foreground"}`}>{label}</button>
+          <button key={tag} type="button" onClick={() => toggleTag(tag)} className={`os-text-wrap rounded-full border px-2.5 py-1 text-xs font-semibold ${tags.includes(tag) ? "border-[color:var(--brand-accent)] bg-[color:var(--brand-accent)]/10 text-[color:var(--brand-accent)]" : "border-border text-muted-foreground hover:text-foreground"}`}>{label}</button>
         ))}
       </div>
       {preview && (
-        <div className="absolute inset-x-4 top-4 z-10 rounded-xl border border-border bg-card p-3 shadow-lg">
+        <div className="absolute inset-x-3 top-3 z-10 min-w-0 rounded-xl border border-border bg-card p-3 shadow-lg sm:inset-x-4 sm:top-4">
           <div className="flex items-start justify-between gap-3">
             <p className="break-all text-xs text-muted-foreground" dir="ltr">{competitor.url || "-"}</p>
             <button type="button" onClick={() => setPreview(false)} className="text-muted-foreground hover:text-foreground"><X size={15} /></button>
           </div>
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="outline" onClick={copyUrl} className="gap-1"><Copy size={13} />{text.copy}</Button>
             <Button type="button" size="sm" onClick={() => setPreview(false)}>{text.close}</Button>
           </div>
@@ -561,7 +561,7 @@ function DemandSupplyStage({ text, suiteId, intelligence, loading, onGenerate, d
           </div>
           {planner?.warning && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" dir="auto">{planner.warning}</p>}
           {keywordMetrics.length > 0 ? (
-            <div className="overflow-x-auto rounded-xl border border-border bg-background">
+            <div className="os-scroll-x rounded-xl border border-border bg-background">
               <table className="min-w-[760px] w-full text-sm">
                 <thead className="bg-muted text-muted-foreground">
                   <tr>
@@ -575,7 +575,7 @@ function DemandSupplyStage({ text, suiteId, intelligence, loading, onGenerate, d
                 <tbody>
                   {keywordMetrics.slice(0, detail ? 80 : 8).map((item) => (
                     <tr key={`${item.keyword}-${item.source}`} className="border-t border-border">
-                      <td className="px-3 py-2 font-semibold text-foreground" dir="auto">{item.keyword}</td>
+                      <td className="os-text-wrap px-3 py-2 font-semibold text-foreground" dir="auto">{item.keyword}</td>
                       <td className="px-3 py-2 text-muted-foreground">{item.source || "-"}</td>
                       <td className="px-3 py-2 text-muted-foreground">{item.average_monthly_searches ?? 0}</td>
                       <td className="px-3 py-2 text-muted-foreground">{item.competition || "UNKNOWN"} {item.competition_index ? `(${item.competition_index})` : ""}</td>
@@ -600,20 +600,20 @@ function DemandSupplyStage({ text, suiteId, intelligence, loading, onGenerate, d
 
 function MetricTile({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
-    <div className="rounded-xl border border-border bg-background p-3">
-      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-foreground" dir="auto">{value}</p>
-      {helper && <p className="mt-1 text-xs text-muted-foreground" dir="auto">{helper}</p>}
+    <div className="min-w-0 rounded-xl border border-border bg-background p-3">
+      <p className="os-text-wrap text-xs font-semibold text-muted-foreground">{label}</p>
+      <p className="os-text-wrap mt-2 text-2xl font-bold text-foreground" dir="auto">{value}</p>
+      {helper && <p className="os-text-wrap mt-1 text-xs text-muted-foreground" dir="auto">{helper}</p>}
     </div>
   );
 }
 
 function SignalList({ title, items }: { title: string; items: Array<{ id: string; title: string }> }) {
   return (
-    <div className="rounded-xl border border-border bg-background p-3">
-      <h3 className="font-bold text-foreground">{title}</h3>
+    <div className="min-w-0 rounded-xl border border-border bg-background p-3">
+      <h3 className="os-text-wrap font-bold text-foreground">{title}</h3>
       <div className="mt-2 space-y-2">
-        {items.slice(0, 6).map((item) => <p key={item.id} className="text-sm leading-6 text-muted-foreground" dir="auto">{item.title}</p>)}
+        {items.slice(0, 6).map((item) => <p key={item.id} className="os-text-wrap text-sm leading-6 text-muted-foreground" dir="auto">{item.title}</p>)}
       </div>
     </div>
   );

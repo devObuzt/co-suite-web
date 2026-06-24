@@ -18,16 +18,16 @@ export function SuitePageShell({
   const { dir } = useLanguage();
   const t = useT();
   return (
-    <div className="mx-auto max-w-6xl space-y-5 px-4 py-5 sm:space-y-6 md:p-8" dir={dir}>
-      <header className="flex flex-col gap-2">
+    <div className="mx-auto w-full max-w-6xl overflow-x-hidden space-y-5 px-4 py-5 sm:space-y-6 md:p-8" dir={dir}>
+      <header className="flex min-w-0 flex-col gap-2">
         {backHref && (
           <Link href={backHref} className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft size={14} className={dir === "rtl" ? "rotate-180" : ""} />
             {t("suite.back")}
           </Link>
         )}
-        <h1 className="text-2xl font-bold text-foreground" dir="auto">{title}</h1>
-        {description && <p className="max-w-3xl text-sm text-muted-foreground" dir="auto">{description}</p>}
+        <h1 className="os-text-wrap text-2xl font-bold text-foreground" dir="auto">{title}</h1>
+        {description && <p className="os-text-wrap max-w-3xl text-sm text-muted-foreground" dir="auto">{description}</p>}
       </header>
       {children}
     </div>

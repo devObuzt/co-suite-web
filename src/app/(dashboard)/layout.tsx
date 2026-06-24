@@ -82,7 +82,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 min-w-0 overflow-auto">
+      <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
         <div className="md:hidden sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur px-4 py-3">
           <div className="flex items-center justify-between">
             <Link href="/suites" className="text-foreground font-semibold"><BrandMark size="sm" /></Link>

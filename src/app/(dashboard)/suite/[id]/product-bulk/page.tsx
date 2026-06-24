@@ -683,7 +683,7 @@ function ImportPreview({
             First product row {firstProduct.row_index} has no matched image. Generate first templates stays unavailable until that image is matched.
           </div>
         )}
-        <div className="overflow-x-auto rounded-lg border border-border">
+        <div className="os-scroll-x rounded-lg border border-border">
           <table className="min-w-[760px] w-full text-left text-sm">
             <thead className="bg-muted text-xs text-muted-foreground">
               <tr>

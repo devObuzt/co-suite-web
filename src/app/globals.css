@@ -129,11 +129,45 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+  }
   body {
     @apply bg-background text-foreground;
+    min-width: 0;
   }
   html {
     @apply font-sans;
+  }
+
+  main,
+  section,
+  article,
+  header,
+  footer,
+  nav,
+  aside,
+  div,
+  form {
+    min-width: 0;
+  }
+
+  input,
+  textarea,
+  select {
+    max-width: 100%;
+    font-size: 16px;
+  }
+
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
   }
 
   /* Arabic text — any element with dir="rtl" or dir="auto" uses Cairo */
@@ -229,6 +263,18 @@
 
   .os-progress-fill {
     background: linear-gradient(90deg, var(--brand-accent), var(--brand-mint));
+  }
+
+  .os-scroll-x {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .os-text-wrap {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
 

@@ -298,7 +298,7 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
           <p className="mt-1 text-xs text-muted-foreground">Review, approve, schedule, or publish generated work.</p>
         </div>
         <div className="flex flex-col gap-2">
-          <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg border border-border bg-card p-1">
+          <div className="flex max-w-full gap-1 os-scroll-x rounded-lg border border-border bg-card p-1">
             {(["all", "post", "image", "video", "carousel", "set", "bulk", "campaign"] as const).map((f) => (
               <button
                 key={f}
@@ -314,7 +314,7 @@ export function ContentTab({ suiteId }: { suiteId: string }) {
               </button>
             ))}
           </div>
-          <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg border border-border bg-card p-1">
+          <div className="flex max-w-full gap-1 os-scroll-x rounded-lg border border-border bg-card p-1">
             {(["all", "pending", "approved", "rejected", "published"] as const).map((f) => (
               <button
                 key={f}
@@ -852,7 +852,7 @@ function CreateCommandCenter({
         <p className="mt-2 text-xs text-muted-foreground" dir="auto">{brandReadiness.detail}</p>
       )}
 
-      <div className="mt-3 flex max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-card/70 p-1 sm:mt-4">
+      <div className="mt-3 flex max-w-full gap-1 os-scroll-x rounded-xl border border-border bg-card/70 p-1 sm:mt-4">
         {modes.map((item) => {
           const Icon = item.icon;
           const active = mode === item.id;
@@ -2909,7 +2909,7 @@ export function StrategyPanel({
             <CardTitle className="text-sm text-zinc-400 font-normal">Customer Personas</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            <div className="os-scroll-x">
               <table className="w-full text-xs text-left">
                 <thead>
                   <tr className="border-b border-zinc-800">
