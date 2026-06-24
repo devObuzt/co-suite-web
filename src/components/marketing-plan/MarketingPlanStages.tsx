@@ -472,9 +472,9 @@ function CompetitorsStage({ text, suiteId, competitors, warnings, loading, loadi
             </div>
             <div className="os-scroll-x flex snap-x gap-3 pb-2">
               {items.length === 0 ? (
-                <p className="w-[min(21rem,calc(100vw-3rem))] max-w-full shrink-0 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noSourceCompetitors}</p>
+                <p className="w-[80vw] max-w-80 shrink-0 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground sm:w-80">{text.noSourceCompetitors}</p>
               ) : items.map((competitor) => (
-                <div key={competitor.id} className="w-[min(21rem,calc(100vw-3rem))] max-w-full shrink-0 snap-start">
+                <div key={competitor.id} className="w-[80vw] max-w-80 shrink-0 snap-start sm:w-80">
                   <CompetitorCard text={text} competitor={competitor} onTagsChange={onTagsChange} />
                 </div>
               ))}
