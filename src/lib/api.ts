@@ -380,6 +380,7 @@ export const api = {
 
   admin: {
     summary: (period = "month") => request<AdminSummary>(`/admin/summary?period=${period}`),
+    providers: () => request<AdminProvider[]>("/admin/providers"),
     users: (q = "") => request<AdminUser[]>(`/admin/users${q ? `?q=${encodeURIComponent(q)}` : ""}`),
     user: (userId: string) => request<AdminUserDetail>(`/admin/users/${userId}`),
     updateUser: (userId: string, data: Partial<Pick<AdminUser, "email" | "full_name" | "is_active" | "is_verified" | "is_super_admin">>) =>
@@ -760,6 +761,13 @@ export interface AdminUser {
   suite_count?: number;
   created_at: string;
   updated_at?: string;
+}
+
+export interface AdminProvider {
+  provider: string;
+  configured: boolean;
+  models: string[];
+  operations: string[];
 }
 
 export interface AdminSuiteSummary {

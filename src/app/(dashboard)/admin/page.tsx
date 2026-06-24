@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { api, AdminSummary, AdminUser, AdminUserDetail, AuditLog, ProviderUsageEvent, ProviderUsageSummary } from "@/lib/api";
+import { api, AdminProvider, AdminSummary, AdminUser, AdminUserDetail, AuditLog, ProviderUsageEvent, ProviderUsageSummary } from "@/lib/api";
 import { useAuthStore } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ export default function AdminPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [providerRows, setProviderRows] = useState<ProviderUsageEvent[]>([]);
   const [providerSummary, setProviderSummary] = useState<ProviderUsageSummary[]>([]);
+  const [providers, setProviders] = useState<AdminProvider[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
@@ -39,15 +40,17 @@ export default function AdminPage() {
 
   async function load(nextPeriod = period, nextQuery = query) {
     setError(null);
-    const [s, u, ps, pr, l] = await Promise.all([
+    const [s, u, catalog, ps, pr, l] = await Promise.all([
       api.admin.summary(nextPeriod),
       api.admin.users(nextQuery),
+      api.admin.providers(),
       api.admin.providerUsageSummary(nextPeriod),
       api.admin.providerUsage(nextPeriod),
       api.admin.auditLogs(nextPeriod),
     ]);
     setSummary(s);
     setUsers(u);
+    setProviders(catalog);
     setProviderSummary(ps);
     setProviderRows(pr);
     setLogs(l);
@@ -259,6 +262,25 @@ export default function AdminPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
+        <Panel title="External Providers">
+          <div className="grid gap-3 md:grid-cols-2">
+            {providers.map((item) => (
+              <div key={item.provider} className="rounded-md border border-border p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-semibold capitalize">{item.provider}</div>
+                  <Badge variant={item.configured ? "outline" : "secondary"}>{item.configured ? "configured" : "missing env"}</Badge>
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  <div className="font-medium text-foreground">Models</div>
+                  <div className="mt-1">{item.models.filter(Boolean).join(", ") || "-"}</div>
+                  <div className="mt-2 font-medium text-foreground">Operations</div>
+                  <div className="mt-1">{item.operations.join(", ")}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
         <Panel title="Provider Usage Summary">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] text-sm">
