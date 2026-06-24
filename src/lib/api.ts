@@ -789,6 +789,10 @@ export interface AdminBillingUsageEvent {
   external_ref?: string | null;
   idempotency_key?: string | null;
   event_data: Record<string, unknown>;
+  provider?: string | null;
+  model?: string | null;
+  operation?: string | null;
+  cost_basis?: string | null;
   created_at: string;
 }
 

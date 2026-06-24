@@ -262,6 +262,7 @@ export default function AdminPage() {
                 <tr>
                   <th className="py-2 pr-3">Time</th>
                   <th className="py-2 pr-3">Request</th>
+                  <th className="py-2 pr-3">Provider</th>
                   <th className="py-2 pr-3">Suite</th>
                   <th className="py-2 pr-3">Owner</th>
                   <th className="py-2 pr-3">Tokens</th>
@@ -278,6 +279,10 @@ export default function AdminPage() {
                       <div className="font-medium">{item.event_type}</div>
                       <div className="text-xs text-muted-foreground">{item.billing_event_type} · {item.ledger_account}</div>
                     </td>
+                    <td className="py-3 pr-3">
+                      <div className="font-medium">{item.provider || "-"}</div>
+                      <div className="text-xs text-muted-foreground">{item.model || item.cost_basis || "-"}</div>
+                    </td>
                     <td className="py-3 pr-3">{item.suite_name || shortId(item.suite_id)}</td>
                     <td className="py-3 pr-3 text-muted-foreground">{item.owner_email || "-"}</td>
                     <td className="py-3 pr-3">{item.amount_tokens || 0}</td>
@@ -288,7 +293,7 @@ export default function AdminPage() {
                     </td>
                   </tr>
                 ))}
-                {billingRows.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">No billed usage rows for this period.</td></tr>}
+                {billingRows.length === 0 && <tr><td colSpan={9} className="py-8 text-center text-muted-foreground">No billed usage rows for this period.</td></tr>}
               </tbody>
             </table>
           </div>
