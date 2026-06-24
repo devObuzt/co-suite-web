@@ -295,6 +295,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         text={text}
         suiteId={suiteId}
         competitors={intelligence?.competitors || []}
+        warnings={intelligence?.warnings || []}
         loading={busy === "competitors"}
         loadingMore={busy === "competitors-more"}
         onGenerate={() => run("competitors", () => api.marketingPlans.generateCompetitors(suiteId, { language: lang }))}
@@ -327,7 +328,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         <KeywordsStage text={text} suiteId={suiteId} keywords={intelligence?.keywords || []} loading={busy === "keywords"} loadingMore={busy === "keywords-more"} onGenerate={() => run("keywords", () => api.marketingPlans.generateKeywords(suiteId, { language: lang }))} onMore={() => run("keywords-more", () => api.marketingPlans.generateMoreKeywords(suiteId, { language: lang, existing_values: (intelligence?.keywords || []).map((k) => k.text) }))} detail />
       )}
       {stage === "competitors" && (
-        <CompetitorsStage text={text} suiteId={suiteId} competitors={intelligence?.competitors || []} loading={busy === "competitors"} loadingMore={busy === "competitors-more"} onGenerate={() => run("competitors", () => api.marketingPlans.generateCompetitors(suiteId, { language: lang }))} onMore={() => run("competitors-more", () => api.marketingPlans.generateMoreCompetitors(suiteId, { language: lang }))} onTagsChange={(competitorId, tags) => run("competitors", () => api.marketingPlans.updateCompetitor(suiteId, competitorId, { classification_tags: tags }))} detail />
+        <CompetitorsStage text={text} suiteId={suiteId} competitors={intelligence?.competitors || []} warnings={intelligence?.warnings || []} loading={busy === "competitors"} loadingMore={busy === "competitors-more"} onGenerate={() => run("competitors", () => api.marketingPlans.generateCompetitors(suiteId, { language: lang }))} onMore={() => run("competitors-more", () => api.marketingPlans.generateMoreCompetitors(suiteId, { language: lang }))} onTagsChange={(competitorId, tags) => run("competitors", () => api.marketingPlans.updateCompetitor(suiteId, competitorId, { classification_tags: tags }))} detail />
       )}
       {stage === "demand-supply" && <DemandSupplyStage text={text} suiteId={suiteId} intelligence={intelligence} loading={busy === "demand-supply"} onGenerate={() => run("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang }))} detail />}
       {!stage && allStages}
@@ -430,7 +431,7 @@ function KeywordsStage({ text, suiteId, keywords, loading, loadingMore, onGenera
   );
 }
 
-function CompetitorsStage({ text, suiteId, competitors, loading, loadingMore, onGenerate, onMore, onTagsChange, detail }: { text: typeof labels.en; suiteId: string; competitors: MarketingCompetitor[]; loading: boolean; loadingMore: boolean; onGenerate: () => void; onMore: () => void; onTagsChange: (id: string, tags: string[]) => void; detail?: boolean }) {
+function CompetitorsStage({ text, suiteId, competitors, warnings, loading, loadingMore, onGenerate, onMore, onTagsChange, detail }: { text: typeof labels.en; suiteId: string; competitors: MarketingCompetitor[]; warnings: string[]; loading: boolean; loadingMore: boolean; onGenerate: () => void; onMore: () => void; onTagsChange: (id: string, tags: string[]) => void; detail?: boolean }) {
   const grouped = useMemo(() => {
     const groups = new Map<string, MarketingCompetitor[]>();
     for (const competitor of competitors) {
@@ -453,6 +454,13 @@ function CompetitorsStage({ text, suiteId, competitors, loading, loadingMore, on
         <Button onClick={onGenerate} disabled={loading || loadingMore} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}{text.generate}</Button>
         {competitors.length > 0 && <Button variant="outline" onClick={onMore} disabled={loading || loadingMore} className="gap-2">{loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.generateMore}</Button>}
       </div>
+      {warnings.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {warnings.slice(0, 4).map((warning, index) => (
+            <p key={`${warning}-${index}`} className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" dir="auto">{warning}</p>
+          ))}
+        </div>
+      )}
       <div className="mt-4 space-y-5">
         {competitors.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noCompetitors}</p>
