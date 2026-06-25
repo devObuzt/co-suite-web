@@ -218,10 +218,13 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
   }, [suiteId]);
 
   useEffect(() => {
-    void load().catch((e) => setError(e instanceof Error ? e.message : "Request failed"));
+    const timer = window.setTimeout(() => {
+      void load().catch((e) => setError(e instanceof Error ? e.message : "Request failed"));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
-  const brand = (suite?.brand || {}) as Brand;
+  const brand = useMemo(() => (suite?.brand || {}) as Brand, [suite?.brand]);
   const services = useMemo(() => {
     const strategy = (suite?.strategy || {}) as Record<string, unknown>;
     const marketingPlan = (strategy.marketing_plan || {}) as Record<string, unknown>;
@@ -472,9 +475,9 @@ function CompetitorsStage({ text, suiteId, competitors, warnings, loading, loadi
             </div>
             <div className="os-scroll-x flex snap-x gap-3 pb-2">
               {items.length === 0 ? (
-                <p className="w-[80vw] max-w-80 shrink-0 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground sm:w-80">{text.noSourceCompetitors}</p>
+                <p className="w-[76%] max-w-80 shrink-0 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground sm:w-80">{text.noSourceCompetitors}</p>
               ) : items.map((competitor) => (
-                <div key={competitor.id} className="w-[80vw] max-w-80 shrink-0 snap-start sm:w-80">
+                <div key={competitor.id} className="w-[76%] max-w-80 shrink-0 snap-start sm:w-80">
                   <CompetitorCard text={text} competitor={competitor} onTagsChange={onTagsChange} />
                 </div>
               ))}
