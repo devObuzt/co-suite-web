@@ -181,6 +181,29 @@ const competitorSourceLabels: Record<string, string> = {
   other: "Other",
 };
 
+const stageTones: Record<StageSlug, { section: string; icon: string; accent: string }> = {
+  services: {
+    section: "border-sky-200/80 bg-[linear-gradient(135deg,rgba(14,165,233,0.08),rgba(255,255,255,0)_42%)] dark:border-sky-500/20 dark:bg-[linear-gradient(135deg,rgba(14,165,233,0.14),rgba(0,0,0,0)_42%)]",
+    icon: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200",
+    accent: "bg-sky-500",
+  },
+  keywords: {
+    section: "border-violet-200/80 bg-[linear-gradient(135deg,rgba(139,92,246,0.08),rgba(255,255,255,0)_42%)] dark:border-violet-500/20 dark:bg-[linear-gradient(135deg,rgba(139,92,246,0.14),rgba(0,0,0,0)_42%)]",
+    icon: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200",
+    accent: "bg-violet-500",
+  },
+  competitors: {
+    section: "border-amber-200/80 bg-[linear-gradient(135deg,rgba(245,158,11,0.08),rgba(255,255,255,0)_42%)] dark:border-amber-500/20 dark:bg-[linear-gradient(135deg,rgba(245,158,11,0.14),rgba(0,0,0,0)_42%)]",
+    icon: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200",
+    accent: "bg-amber-500",
+  },
+  "demand-supply": {
+    section: "border-emerald-200/80 bg-[linear-gradient(135deg,rgba(16,185,129,0.08),rgba(255,255,255,0)_42%)] dark:border-emerald-500/20 dark:bg-[linear-gradient(135deg,rgba(16,185,129,0.14),rgba(0,0,0,0)_42%)]",
+    icon: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200",
+    accent: "bg-emerald-500",
+  },
+};
+
 function shortUrl(url?: string) {
   if (!url) return "-";
   try {
@@ -340,18 +363,20 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
 }
 
 function StageBox({ title, description, icon, suiteId, slug, children, detail }: { title: string; description: string; icon: ReactNode; suiteId: string; slug: StageSlug; children: ReactNode; detail?: boolean }) {
+  const tone = stageTones[slug];
   return (
-    <section className="w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <section className={`relative w-full min-w-0 max-w-full overflow-hidden rounded-2xl border bg-card p-4 shadow-sm sm:p-5 ${tone.section}`}>
+      <span className={`absolute inset-x-0 top-0 h-1 ${tone.accent}`} />
+      <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color:var(--brand-accent)]/10 text-[color:var(--brand-accent)]">{icon}</span>
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone.icon}`}>{icon}</span>
           <div className="min-w-0">
             <h2 className="os-text-wrap text-xl font-black text-foreground">{title}</h2>
             <p className="os-text-wrap mt-1 text-sm text-muted-foreground">{description}</p>
           </div>
         </div>
         {!detail && (
-          <Link href={`/suite/${suiteId}/marketing-plan/${slug}`} className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold hover:bg-muted">
+          <Link href={`/suite/${suiteId}/marketing-plan/${slug}`} aria-label={title} title={title} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background/80 text-foreground shadow-sm hover:bg-muted">
             <ArrowUpRight size={15} />
           </Link>
         )}
@@ -365,6 +390,9 @@ function ServicesStage({ text, suiteId, services, saving, onSave, detail }: { te
   const [draft, setDraft] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const visibleServices = detail || expanded ? services : services.slice(0, 3);
+  const hiddenServices = Math.max(0, services.length - visibleServices.length);
 
   async function add() {
     const value = draft.trim();
@@ -391,7 +419,7 @@ function ServicesStage({ text, suiteId, services, saving, onSave, detail }: { te
         <Button onClick={add} disabled={saving || !draft.trim()} className="w-full gap-2 sm:w-auto">{saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.addService}</Button>
       </div>
       <div className="mt-4 grid gap-2 md:grid-cols-2">
-        {services.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.emptyServices}</p> : services.map((service) => (
+        {services.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.emptyServices}</p> : visibleServices.map((service) => (
           <div key={service} className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-background p-2">
             {editing === service ? (
               <>
@@ -408,6 +436,16 @@ function ServicesStage({ text, suiteId, services, saving, onSave, detail }: { te
           </div>
         ))}
       </div>
+      {hiddenServices > 0 && !detail && (
+        <Button type="button" variant="outline" size="sm" onClick={() => setExpanded(true)} className="mt-3">
+          {text.showAll} +{hiddenServices}
+        </Button>
+      )}
+      {expanded && !detail && services.length > 3 && (
+        <Button type="button" variant="ghost" size="sm" onClick={() => setExpanded(false)} className="mt-2">
+          {text.collapse}
+        </Button>
+      )}
     </StageBox>
   );
 }
@@ -420,7 +458,7 @@ function KeywordsStage({ text, suiteId, keywords, loading, loadingMore, onGenera
         <Button onClick={onGenerate} disabled={loading || loadingMore} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}{text.generate}</Button>
         {keywords.length > 0 && <Button variant="outline" onClick={onMore} disabled={loading || loadingMore} className="gap-2">{loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.generateMore}</Button>}
       </div>
-      <div className={`mt-4 flex min-w-0 flex-wrap gap-2 overflow-hidden transition-[max-height] ${expanded || detail ? "max-h-none" : "max-h-[5.6rem]"}`}>
+      <div className={`relative mt-4 flex min-w-0 flex-wrap gap-2 overflow-hidden transition-[max-height] ${expanded || detail ? "max-h-none" : "max-h-[4.6rem]"}`}>
         {keywords.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noKeywords}</p> : keywords.map((keyword) => (
           <span key={keyword.id} className="os-text-wrap max-w-full rounded-2xl border border-border bg-background px-3 py-1.5 text-sm leading-5" dir="auto">{keyword.text}</span>
         ))}
@@ -435,6 +473,7 @@ function KeywordsStage({ text, suiteId, keywords, loading, loadingMore, onGenera
 }
 
 function CompetitorsStage({ text, suiteId, competitors, warnings, loading, loadingMore, onGenerate, onMore, onTagsChange, detail }: { text: typeof labels.en; suiteId: string; competitors: MarketingCompetitor[]; warnings: string[]; loading: boolean; loadingMore: boolean; onGenerate: () => void; onMore: () => void; onTagsChange: (id: string, tags: string[]) => void; detail?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
   const grouped = useMemo(() => {
     const groups = new Map<string, MarketingCompetitor[]>();
     for (const competitor of competitors) {
@@ -450,6 +489,9 @@ function CompetitorsStage({ text, suiteId, competitors, warnings, loading, loadi
       return (indexA === -1 ? 99 : indexA) - (indexB === -1 ? 99 : indexB);
     });
   }, [competitors]);
+  const firstPreviewGroup = grouped.find(([, items]) => items.length > 0) || grouped[0];
+  const visibleGroups = detail || expanded || !firstPreviewGroup ? grouped : [firstPreviewGroup];
+  const hiddenGroupCount = Math.max(0, grouped.filter(([, items]) => items.length > 0).length - visibleGroups.filter(([, items]) => items.length > 0).length);
 
   return (
     <StageBox title={text.competitorsTitle} description={text.competitorsDesc} icon={<Search size={18} />} suiteId={suiteId} slug="competitors" detail={detail}>
@@ -467,7 +509,7 @@ function CompetitorsStage({ text, suiteId, competitors, warnings, loading, loadi
       <div className="mt-4 space-y-5">
         {competitors.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noCompetitors}</p>
-        ) : grouped.map(([source, items]) => (
+        ) : visibleGroups.map(([source, items]) => (
           <section key={source} className="min-w-0">
             <div className="mb-2 flex items-center justify-between gap-3">
               <h3 className="text-sm font-bold text-foreground">{competitorSourceLabels[source] || source}</h3>
@@ -485,6 +527,16 @@ function CompetitorsStage({ text, suiteId, competitors, warnings, loading, loadi
           </section>
         ))}
       </div>
+      {competitors.length > 0 && hiddenGroupCount > 0 && !detail && (
+        <Button type="button" variant="outline" size="sm" onClick={() => setExpanded(true)} className="mt-3">
+          {text.showAll} +{hiddenGroupCount}
+        </Button>
+      )}
+      {expanded && !detail && hiddenGroupCount === 0 && grouped.length > 1 && (
+        <Button type="button" variant="ghost" size="sm" onClick={() => setExpanded(false)} className="mt-2">
+          {text.collapse}
+        </Button>
+      )}
     </StageBox>
   );
 }
