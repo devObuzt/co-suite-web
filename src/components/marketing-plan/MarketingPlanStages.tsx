@@ -66,6 +66,9 @@ const labels = {
     searches: "البحث الشهري",
     competition: "المنافسة",
     bidRange: "نطاق النقرة",
+    demandSignals: "الطلب",
+    supplySignals: "العرض",
+    opportunitySignals: "الفرص",
     showAll: "عرض الكل",
     collapse: "إخفاء",
     notCompetitor: "غير منافس",
@@ -109,6 +112,9 @@ const labels = {
     searches: "Monthly searches",
     competition: "Competition",
     bidRange: "Bid range",
+    demandSignals: "Demand",
+    supplySignals: "Supply",
+    opportunitySignals: "Opportunities",
     showAll: "Show all",
     collapse: "Collapse",
     notCompetitor: "Not a competitor",
@@ -152,6 +158,9 @@ const labels = {
     searches: "חיפושים חודשיים",
     competition: "תחרות",
     bidRange: "טווח קליק",
+    demandSignals: "ביקוש",
+    supplySignals: "היצע",
+    opportunitySignals: "הזדמנויות",
     showAll: "הצג הכל",
     collapse: "כווץ",
     notCompetitor: "לא מתחרה",
@@ -642,9 +651,9 @@ function DemandSupplyStage({ text, suiteId, intelligence, loading, onGenerate, d
             </div>
           ) : (
             <div className="grid gap-3 md:grid-cols-3">
-              <SignalList title="Demand" items={demand} />
-              <SignalList title="Supply" items={supply} />
-              <SignalList title="Opportunities" items={opportunities} />
+              <SignalList title={text.demandSignals} items={demand} />
+              <SignalList title={text.supplySignals} items={supply} />
+              <SignalList title={text.opportunitySignals} items={opportunities} />
             </div>
           )}
         </div>
