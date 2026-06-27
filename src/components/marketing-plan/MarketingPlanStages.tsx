@@ -28,7 +28,7 @@ import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 type StageSlug = "services" | "keywords" | "competitors" | "demand-supply" | "personas";
-type BusyAction = StageSlug | "keywords-more" | "competitors-more" | "save-services" | null;
+type BusyAction = StageSlug | "keywords-more" | "competitors-more" | "personas-more" | "save-services" | null;
 
 const labels = {
   ar: {
@@ -61,6 +61,7 @@ const labels = {
     noSourceCompetitors: "لا توجد نتائج من هذا المصدر.",
     noDemand: "لم يتم توليد العرض والطلب بعد.",
     noPersonas: "لم يتم توليد شخصيات العملاء بعد.",
+    loadingMorePersonas: "جاري جلب شخصيات إضافية...",
     demandAvg: "متوسط الطلب",
     demandCompetition: "المنافسة",
     marketPressure: "ضغط السوق",
@@ -118,6 +119,7 @@ const labels = {
     noSourceCompetitors: "No results from this source.",
     noDemand: "Demand and supply have not been generated yet.",
     noPersonas: "No customer personas generated yet.",
+    loadingMorePersonas: "Loading more customer personas...",
     demandAvg: "Average demand",
     demandCompetition: "Competition",
     marketPressure: "Market pressure",
@@ -175,6 +177,7 @@ const labels = {
     noSourceCompetitors: "אין תוצאות ממקור זה.",
     noDemand: "ביקוש והיצע עדיין לא נוצרו.",
     noPersonas: "עדיין לא נוצרו פרסונות לקוחות.",
+    loadingMorePersonas: "טוען עוד פרסונות לקוחות...",
     demandAvg: "ביקוש ממוצע",
     demandCompetition: "תחרות",
     marketPressure: "לחץ שוק",
@@ -353,6 +356,37 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     }
   }
 
+  async function generatePersonasInitial() {
+    setBusy("personas");
+    setError("");
+    try {
+      const firstBatch = await api.marketingPlans.generatePersonas(suiteId, { language: lang });
+      applyPlanResponse(firstBatch);
+      const firstPersonas = firstBatch.intelligence?.personas || [];
+      if (firstPersonas.length === 0) return;
+      setBusy("personas-more");
+      const secondBatch = await api.marketingPlans.generateMorePersonas(suiteId, {
+        language: lang,
+        existing_values: firstPersonas.map((persona) => persona.name || persona.id).filter(Boolean),
+      });
+      applyPlanResponse(secondBatch);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function generateMorePersonas() {
+    const existing = intelligence?.personas || [];
+    await run("personas-more", () =>
+      api.marketingPlans.generateMorePersonas(suiteId, {
+        language: lang,
+        existing_values: existing.map((persona) => persona.name || persona.id).filter(Boolean),
+      })
+    );
+  }
+
   const allStages = (
     <div className="w-full min-w-0 overflow-x-hidden space-y-4" dir={dir}>
       <ServicesStage text={text} suiteId={suiteId} services={services} saving={busy === "save-services"} onSave={saveServices} />
@@ -388,7 +422,9 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         suiteId={suiteId}
         personas={intelligence?.personas || []}
         loading={busy === "personas"}
-        onGenerate={() => run("personas", () => api.marketingPlans.generatePersonas(suiteId, { language: lang }))}
+        loadingMore={busy === "personas-more"}
+        onGenerate={generatePersonasInitial}
+        onMore={generateMorePersonas}
       />
     </div>
   );
@@ -412,7 +448,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         <CompetitorsStage text={text} suiteId={suiteId} competitors={intelligence?.competitors || []} warnings={intelligence?.warnings || []} loading={busy === "competitors"} loadingMore={busy === "competitors-more"} onGenerate={() => run("competitors", () => api.marketingPlans.generateCompetitors(suiteId, { language: lang }))} onMore={() => run("competitors-more", () => api.marketingPlans.generateMoreCompetitors(suiteId, { language: lang }))} onTagsChange={(competitorId, tags) => run("competitors", () => api.marketingPlans.updateCompetitor(suiteId, competitorId, { classification_tags: tags }))} detail />
       )}
       {stage === "demand-supply" && <DemandSupplyStage text={text} suiteId={suiteId} intelligence={intelligence} loading={busy === "demand-supply"} onGenerate={() => run("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang }))} detail />}
-      {stage === "personas" && <PersonasStage text={text} suiteId={suiteId} personas={intelligence?.personas || []} loading={busy === "personas"} onGenerate={() => run("personas", () => api.marketingPlans.generatePersonas(suiteId, { language: lang }))} detail />}
+      {stage === "personas" && <PersonasStage text={text} suiteId={suiteId} personas={intelligence?.personas || []} loading={busy === "personas"} loadingMore={busy === "personas-more"} onGenerate={generatePersonasInitial} onMore={generateMorePersonas} detail />}
       {!stage && allStages}
     </div>
   );
@@ -730,10 +766,39 @@ function personaInitials(persona: MarketingPersona) {
   return words.slice(0, 2).map((word) => word[0]).join("").toUpperCase();
 }
 
-function PersonasStage({ text, suiteId, personas, loading, onGenerate, detail }: { text: typeof labels.en; suiteId: string; personas: MarketingPersona[]; loading: boolean; onGenerate: () => void; detail?: boolean }) {
+function PersonasStage({
+  text,
+  suiteId,
+  personas,
+  loading,
+  loadingMore,
+  onGenerate,
+  onMore,
+  detail,
+}: {
+  text: typeof labels.en;
+  suiteId: string;
+  personas: MarketingPersona[];
+  loading: boolean;
+  loadingMore: boolean;
+  onGenerate: () => void;
+  onMore: () => void;
+  detail?: boolean;
+}) {
   return (
     <StageBox title={text.personasTitle} description={text.personasDesc} icon={<UserRound size={18} />} suiteId={suiteId} slug="personas" detail={detail}>
-      <Button onClick={onGenerate} disabled={loading} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <UserRound size={15} />}{text.generate}</Button>
+      <div className="flex min-w-0 flex-wrap gap-2">
+        <Button onClick={onGenerate} disabled={loading || loadingMore} className="gap-2">
+          {loading ? <Loader2 size={15} className="animate-spin" /> : <UserRound size={15} />}
+          {text.generate}
+        </Button>
+        {personas.length > 0 && (
+          <Button variant="outline" onClick={onMore} disabled={loading || loadingMore} className="gap-2">
+            {loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+            {text.generateMore}
+          </Button>
+        )}
+      </div>
       {personas.length === 0 ? (
         <p className="mt-4 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noPersonas}</p>
       ) : (
@@ -763,6 +828,12 @@ function PersonasStage({ text, suiteId, personas, loading, onGenerate, detail }:
               </div>
             </article>
           ))}
+          {loadingMore && (
+            <article className="flex min-h-64 w-[78%] max-w-[22rem] shrink-0 snap-start flex-col items-center justify-center rounded-xl border border-dashed border-rose-200 bg-rose-50/60 p-4 text-center text-sm text-rose-900 sm:w-80 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-100">
+              <Loader2 size={22} className="mb-3 animate-spin" />
+              <span className="os-text-wrap">{text.loadingMorePersonas}</span>
+            </article>
+          )}
         </div>
       )}
     </StageBox>
