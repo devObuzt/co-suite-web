@@ -339,6 +339,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data || {}),
       }),
+    generatePersonas: (suiteId: string, data?: { language?: string; existing_ids?: string[]; existing_values?: string[] }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/personas/generate`, {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }),
     generateSocialPlan: (suiteId: string, data?: { language?: string; near_term_focus?: string; upcoming_campaigns?: string[]; planning_notes?: string }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/social-plan/generate`, {
         method: "POST",
@@ -573,6 +578,21 @@ export interface MarketingDemandSupplyData {
   warning?: string;
 }
 
+export interface MarketingPersona {
+  id: string;
+  name: string;
+  age?: number;
+  gender?: string;
+  economic_status?: string;
+  profession?: string;
+  challenge?: string;
+  need?: string;
+  motivation?: string;
+  solution?: string;
+  avatar_seed?: string;
+  avatar_prompt?: string;
+}
+
 export interface MarketingIntelligence {
   version: string;
   language?: string;
@@ -583,6 +603,7 @@ export interface MarketingIntelligence {
   demand_signals: MarketingSignal[];
   supply_signals: MarketingSignal[];
   opportunities: MarketingSignal[];
+  personas?: MarketingPersona[];
   source_links: MarketingSourceLink[];
   warnings?: string[];
   demand_supply?: MarketingDemandSupplyData;

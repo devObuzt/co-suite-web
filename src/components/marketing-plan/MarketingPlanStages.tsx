@@ -19,14 +19,15 @@ import {
   Search,
   Target,
   Trash2,
+  UserRound,
   X,
 } from "lucide-react";
-import { api, Brand, MarketingCompetitor, MarketingIntelligence, MarketingKeyword, MarketingPlanResponse, Suite } from "@/lib/api";
+import { api, Brand, MarketingCompetitor, MarketingIntelligence, MarketingKeyword, MarketingPersona, MarketingPlanResponse, Suite } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
-type StageSlug = "services" | "keywords" | "competitors" | "demand-supply";
+type StageSlug = "services" | "keywords" | "competitors" | "demand-supply" | "personas";
 type BusyAction = StageSlug | "keywords-more" | "competitors-more" | "save-services" | null;
 
 const labels = {
@@ -44,6 +45,8 @@ const labels = {
     competitorsDesc: "نبحث حسب المصدر ونفصل النتائج بين Google Organic وMaps والمنصات الاجتماعية.",
     demandTitle: "العرض والطلب",
     demandDesc: "نقرأ الطلب والمنافسة من Google Ads Keyword Planner حسب البلد واللغة والكلمات.",
+    personasTitle: "شخصيات العملاء",
+    personasDesc: "نبني بروفايلات عملاء محتملين ونربط الحاجة بالعرض التسويقي.",
     generate: "Generate",
     generateMore: "Generate More",
     openStage: "فتح الصفحة",
@@ -57,6 +60,7 @@ const labels = {
     noCompetitors: "لم يتم توليد منافسين بعد.",
     noSourceCompetitors: "لا توجد نتائج من هذا المصدر.",
     noDemand: "لم يتم توليد العرض والطلب بعد.",
+    noPersonas: "لم يتم توليد شخصيات العملاء بعد.",
     demandAvg: "متوسط الطلب",
     demandCompetition: "المنافسة",
     marketPressure: "ضغط السوق",
@@ -75,6 +79,14 @@ const labels = {
     goodCompetitor: "منافس جيد",
     localCompetitor: "منافس محلي",
     globalCompetitor: "منافس عالمي",
+    age: "العمر",
+    gender: "الجندر",
+    profession: "المهنة",
+    economicStatus: "الوضع الاقتصادي",
+    challenge: "التحدي",
+    need: "الحاجة",
+    motivation: "الدافع",
+    solution: "الحل من العرض",
   },
   en: {
     title: "Marketing Plan",
@@ -90,6 +102,8 @@ const labels = {
     competitorsDesc: "Search by source and split results across Google Organic, Maps, and social platforms.",
     demandTitle: "Demand and Supply",
     demandDesc: "Read demand and competition from Google Ads Keyword Planner by country, language, and keywords.",
+    personasTitle: "Customer Personas",
+    personasDesc: "Build potential customer profiles and connect their needs to the marketing offer.",
     generate: "Generate",
     generateMore: "Generate More",
     openStage: "Open page",
@@ -103,6 +117,7 @@ const labels = {
     noCompetitors: "No competitors generated yet.",
     noSourceCompetitors: "No results from this source.",
     noDemand: "Demand and supply have not been generated yet.",
+    noPersonas: "No customer personas generated yet.",
     demandAvg: "Average demand",
     demandCompetition: "Competition",
     marketPressure: "Market pressure",
@@ -121,6 +136,14 @@ const labels = {
     goodCompetitor: "Good competitor",
     localCompetitor: "Local competitor",
     globalCompetitor: "Global competitor",
+    age: "Age",
+    gender: "Gender",
+    profession: "Profession",
+    economicStatus: "Economic status",
+    challenge: "Challenge",
+    need: "Need",
+    motivation: "Motivation",
+    solution: "Offer solution",
   },
   he: {
     title: "התכנית השיווקית",
@@ -136,6 +159,8 @@ const labels = {
     competitorsDesc: "חיפוש לפי מקור והפרדה בין Google Organic, Maps ופלטפורמות חברתיות.",
     demandTitle: "ביקוש והיצע",
     demandDesc: "קריאת ביקוש ותחרות מ-Google Ads Keyword Planner לפי מדינה, שפה ומילות מפתח.",
+    personasTitle: "פרסונות לקוחות",
+    personasDesc: "בניית פרופילים של לקוחות פוטנציאליים וחיבור הצורך להצעה השיווקית.",
     generate: "Generate",
     generateMore: "Generate More",
     openStage: "פתח עמוד",
@@ -149,6 +174,7 @@ const labels = {
     noCompetitors: "עדיין לא נוצרו מתחרים.",
     noSourceCompetitors: "אין תוצאות ממקור זה.",
     noDemand: "ביקוש והיצע עדיין לא נוצרו.",
+    noPersonas: "עדיין לא נוצרו פרסונות לקוחות.",
     demandAvg: "ביקוש ממוצע",
     demandCompetition: "תחרות",
     marketPressure: "לחץ שוק",
@@ -167,6 +193,14 @@ const labels = {
     goodCompetitor: "מתחרה טוב",
     localCompetitor: "מתחרה מקומי",
     globalCompetitor: "מתחרה גלובלי",
+    age: "גיל",
+    gender: "מגדר",
+    profession: "מקצוע",
+    economicStatus: "מצב כלכלי",
+    challenge: "אתגר",
+    need: "צורך",
+    motivation: "מוטיבציה",
+    solution: "פתרון ההצעה",
   },
 };
 
@@ -210,6 +244,11 @@ const stageTones: Record<StageSlug, { section: string; icon: string; accent: str
     section: "border-emerald-200/80 bg-[linear-gradient(135deg,rgba(16,185,129,0.08),rgba(255,255,255,0)_42%)] dark:border-emerald-500/20 dark:bg-[linear-gradient(135deg,rgba(16,185,129,0.14),rgba(0,0,0,0)_42%)]",
     icon: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200",
     accent: "bg-emerald-500",
+  },
+  personas: {
+    section: "border-rose-200/80 bg-[linear-gradient(135deg,rgba(244,63,94,0.08),rgba(255,255,255,0)_42%)] dark:border-rose-500/20 dark:bg-[linear-gradient(135deg,rgba(244,63,94,0.14),rgba(0,0,0,0)_42%)]",
+    icon: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200",
+    accent: "bg-rose-500",
   },
 };
 
@@ -344,6 +383,13 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         loading={busy === "demand-supply"}
         onGenerate={() => run("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang }))}
       />
+      <PersonasStage
+        text={text}
+        suiteId={suiteId}
+        personas={intelligence?.personas || []}
+        loading={busy === "personas"}
+        onGenerate={() => run("personas", () => api.marketingPlans.generatePersonas(suiteId, { language: lang }))}
+      />
     </div>
   );
 
@@ -366,6 +412,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         <CompetitorsStage text={text} suiteId={suiteId} competitors={intelligence?.competitors || []} warnings={intelligence?.warnings || []} loading={busy === "competitors"} loadingMore={busy === "competitors-more"} onGenerate={() => run("competitors", () => api.marketingPlans.generateCompetitors(suiteId, { language: lang }))} onMore={() => run("competitors-more", () => api.marketingPlans.generateMoreCompetitors(suiteId, { language: lang }))} onTagsChange={(competitorId, tags) => run("competitors", () => api.marketingPlans.updateCompetitor(suiteId, competitorId, { classification_tags: tags }))} detail />
       )}
       {stage === "demand-supply" && <DemandSupplyStage text={text} suiteId={suiteId} intelligence={intelligence} loading={busy === "demand-supply"} onGenerate={() => run("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang }))} detail />}
+      {stage === "personas" && <PersonasStage text={text} suiteId={suiteId} personas={intelligence?.personas || []} loading={busy === "personas"} onGenerate={() => run("personas", () => api.marketingPlans.generatePersonas(suiteId, { language: lang }))} detail />}
       {!stage && allStages}
     </div>
   );
@@ -659,6 +706,76 @@ function DemandSupplyStage({ text, suiteId, intelligence, loading, onGenerate, d
         </div>
       )}
     </StageBox>
+  );
+}
+
+const personaAvatarColors = [
+  "bg-rose-100 text-rose-700",
+  "bg-sky-100 text-sky-700",
+  "bg-amber-100 text-amber-800",
+  "bg-emerald-100 text-emerald-700",
+  "bg-violet-100 text-violet-700",
+];
+
+function personaColor(seed?: string) {
+  const text = seed || "persona";
+  let total = 0;
+  for (let index = 0; index < text.length; index += 1) total += text.charCodeAt(index);
+  return personaAvatarColors[total % personaAvatarColors.length];
+}
+
+function personaInitials(persona: MarketingPersona) {
+  const words = String(persona.name || "").trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  return words.slice(0, 2).map((word) => word[0]).join("").toUpperCase();
+}
+
+function PersonasStage({ text, suiteId, personas, loading, onGenerate, detail }: { text: typeof labels.en; suiteId: string; personas: MarketingPersona[]; loading: boolean; onGenerate: () => void; detail?: boolean }) {
+  return (
+    <StageBox title={text.personasTitle} description={text.personasDesc} icon={<UserRound size={18} />} suiteId={suiteId} slug="personas" detail={detail}>
+      <Button onClick={onGenerate} disabled={loading} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <UserRound size={15} />}{text.generate}</Button>
+      {personas.length === 0 ? (
+        <p className="mt-4 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noPersonas}</p>
+      ) : (
+        <div className="os-scroll-x mt-4 flex snap-x gap-3 pb-2">
+          {personas.map((persona) => (
+            <article key={persona.id} className="w-[78%] max-w-[22rem] shrink-0 snap-start rounded-xl border border-border bg-background p-4 sm:w-80">
+              <div className="flex items-start gap-3">
+                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-black ${personaColor(persona.avatar_seed)}`}>
+                  {personaInitials(persona)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="os-text-wrap text-lg font-black text-foreground" dir="auto">{persona.name}</h3>
+                  <p className="os-text-wrap mt-1 text-xs font-semibold text-muted-foreground" dir="auto">
+                    {[persona.age ? `${text.age}: ${persona.age}` : "", persona.gender ? `${text.gender}: ${persona.gender}` : ""].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {persona.profession && <span className="os-text-wrap rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground" dir="auto">{text.profession}: {persona.profession}</span>}
+                {persona.economic_status && <span className="os-text-wrap rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground" dir="auto">{text.economicStatus}: {persona.economic_status}</span>}
+              </div>
+              <div className="mt-4 space-y-3">
+                <PersonaField label={text.challenge} value={persona.challenge} />
+                <PersonaField label={text.need} value={persona.need} />
+                <PersonaField label={text.motivation} value={persona.motivation} />
+                <PersonaField label={text.solution} value={persona.solution} highlighted />
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </StageBox>
+  );
+}
+
+function PersonaField({ label, value, highlighted }: { label: string; value?: string; highlighted?: boolean }) {
+  if (!value) return null;
+  return (
+    <div className={`min-w-0 rounded-lg border p-3 ${highlighted ? "border-rose-200 bg-rose-50/70 dark:border-rose-500/20 dark:bg-rose-500/10" : "border-border bg-card/60"}`}>
+      <p className="text-[11px] font-bold uppercase text-muted-foreground">{label}</p>
+      <p className="os-text-wrap mt-1 text-sm leading-6 text-foreground" dir="auto">{value}</p>
+    </div>
   );
 }
 
