@@ -193,6 +193,39 @@ type SectionLink = {
   status?: "ready" | "needs_setup" | "soon";
 };
 
+function hasItems(value: unknown): boolean {
+  return Array.isArray(value) && value.length > 0;
+}
+
+function hasProductsOrServices(suite: Suite | null): boolean {
+  return hasItems(suite?.brand?.services) || hasItems(suite?.brand?.products);
+}
+
+function isMarketingPlanReady(suite: Suite | null): boolean {
+  const strategy = suite?.strategy as Record<string, unknown> | null | undefined;
+  const intelligence = strategy?.marketing_intelligence as Record<string, unknown> | null | undefined;
+  const demandSupply = intelligence?.demand_supply as Record<string, unknown> | null | undefined;
+
+  return Boolean(
+    hasProductsOrServices(suite)
+    && hasItems(intelligence?.keywords)
+    && hasItems(intelligence?.competitors)
+    && hasItems(intelligence?.personas)
+    && demandSupply
+    && (hasItems(demandSupply.keyword_metrics) || hasItems(demandSupply.suggested_keywords) || demandSupply.summary)
+  );
+}
+
+function isGeneratedWorkPlanReady(suite: Suite | null): boolean {
+  const strategy = suite?.strategy as Record<string, unknown> | null | undefined;
+  const actionPlan = strategy?.marketing_action_plan as Record<string, unknown> | null | undefined;
+
+  return Boolean(
+    actionPlan
+    && (hasItems(actionPlan.social_items) || hasItems(actionPlan.ad_funnel_items))
+  );
+}
+
 export default function SuiteHomePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const t = useT();
@@ -213,7 +246,8 @@ export default function SuiteHomePage({ params }: { params: Promise<{ id: string
 
   const sections = useMemo(() => {
     const brandReady = Boolean(suite?.brand?.name && ((suite.brand?.services || []).length > 0 || (suite.brand?.products || []).length > 0));
-    const planReady = Boolean(suite?.strategy?.marketing_plan || (suite?.strategy as Record<string, unknown> | null | undefined)?.marketing_plan_deck);
+    const planReady = isMarketingPlanReady(suite);
+    const workPlansReady = isGeneratedWorkPlanReady(suite);
     const metaReady = Boolean(connections.facebook?.connected || connections.instagram?.connected);
     const googleReady = Boolean(connections.google_ads?.connected);
     const storageReady = Boolean(storage?.configured);
@@ -230,7 +264,7 @@ export default function SuiteHomePage({ params }: { params: Promise<{ id: string
         links: [
           { label: text.strategy.links.brand, href: `/suite/${id}/profile`, icon: <UserSquare2 size={16} />, status: brandReady ? "ready" : "needs_setup" },
           { label: text.strategy.links.plan, href: `/suite/${id}/marketing-plan`, icon: <BookOpenText size={16} />, status: planReady ? "ready" : "needs_setup" },
-          { label: text.strategy.links.workPlans, href: `/suite/${id}/marketing-plan`, icon: <ClipboardList size={16} />, status: planReady ? "ready" : "needs_setup" },
+          { label: text.strategy.links.workPlans, href: `/suite/${id}/marketing-plan`, icon: <ClipboardList size={16} />, status: workPlansReady ? "ready" : "needs_setup" },
           { label: text.strategy.links.logs, icon: <FileClock size={16} />, status: "soon" },
         ] satisfies SectionLink[],
       },
