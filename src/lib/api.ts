@@ -72,6 +72,28 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
+async function downloadFile(path: string, options: RequestInit = {}): Promise<{ blob: Blob; filename: string }> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: buildHeaders({ ...options, headers: { ...(options.headers || {}), Accept: "application/pdf" } }, token),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Request failed" }));
+    const detail = err.detail || err.message || "Request failed";
+    const message = typeof detail === "string" ? detail : JSON.stringify(detail);
+    throw new ApiError(message, res.status, detail);
+  }
+
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  return {
+    blob: await res.blob(),
+    filename: match?.[1] || "marketing-plan.pdf",
+  };
+}
+
 export const api = {
   auth: {
     signup: (data: { email: string; password: string; full_name: string }) =>
@@ -371,6 +393,8 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ password }),
       }),
+    downloadPdf: (suiteId: string) =>
+      downloadFile(`/suites/${suiteId}/marketing-plan/pdf`),
   },
 
   analytics: {

@@ -8,6 +8,7 @@ import {
   Check,
   Copy,
   Camera,
+  Download,
   Eye,
   FileSearch,
   Globe2,
@@ -27,7 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
-type StageSlug = "services" | "keywords" | "competitors" | "demand-supply" | "personas";
+type StageSlug = "services" | "keywords" | "competitors" | "demand-supply" | "personas" | "pdf";
 type BusyAction = StageSlug | "keywords-more" | "competitors-more" | "personas-more" | "save-services" | null;
 
 const labels = {
@@ -47,6 +48,9 @@ const labels = {
     demandDesc: "نقرأ الطلب والمنافسة من Google Ads Keyword Planner حسب البلد واللغة والكلمات.",
     personasTitle: "شخصيات العملاء",
     personasDesc: "نبني بروفايلات عملاء محتملين ونربط الحاجة بالعرض التسويقي.",
+    pdfTitle: "ملف الخطة التسويقية",
+    pdfDesc: "نجهّز ملف PDF قابل للتحميل من كل الأقسام التي تم توليدها.",
+    downloadPdf: "تحميل PDF",
     generate: "Generate",
     generateMore: "Generate More",
     openStage: "فتح الصفحة",
@@ -88,6 +92,7 @@ const labels = {
     need: "الحاجة",
     motivation: "الدافع",
     solution: "الحل من العرض",
+    pdfNeedsPersonas: "ولّد شخصيات العملاء أولاً حتى يصبح ملف الخطة جاهزاً للتحميل.",
   },
   en: {
     title: "Marketing Plan",
@@ -105,6 +110,9 @@ const labels = {
     demandDesc: "Read demand and competition from Google Ads Keyword Planner by country, language, and keywords.",
     personasTitle: "Customer Personas",
     personasDesc: "Build potential customer profiles and connect their needs to the marketing offer.",
+    pdfTitle: "Marketing Plan PDF",
+    pdfDesc: "Prepare a downloadable PDF from every generated section.",
+    downloadPdf: "Download PDF",
     generate: "Generate",
     generateMore: "Generate More",
     openStage: "Open page",
@@ -146,6 +154,7 @@ const labels = {
     need: "Need",
     motivation: "Motivation",
     solution: "Offer solution",
+    pdfNeedsPersonas: "Generate customer personas first so the plan file is ready to download.",
   },
   he: {
     title: "התכנית השיווקית",
@@ -163,6 +172,9 @@ const labels = {
     demandDesc: "קריאת ביקוש ותחרות מ-Google Ads Keyword Planner לפי מדינה, שפה ומילות מפתח.",
     personasTitle: "פרסונות לקוחות",
     personasDesc: "בניית פרופילים של לקוחות פוטנציאליים וחיבור הצורך להצעה השיווקית.",
+    pdfTitle: "קובץ PDF לתכנית",
+    pdfDesc: "הכנת קובץ PDF להורדה מכל החלקים שנוצרו.",
+    downloadPdf: "הורד PDF",
     generate: "Generate",
     generateMore: "Generate More",
     openStage: "פתח עמוד",
@@ -204,6 +216,7 @@ const labels = {
     need: "צורך",
     motivation: "מוטיבציה",
     solution: "פתרון ההצעה",
+    pdfNeedsPersonas: "צרו קודם פרסונות לקוחות כדי שקובץ התכנית יהיה מוכן להורדה.",
   },
 };
 
@@ -252,6 +265,11 @@ const stageTones: Record<StageSlug, { section: string; icon: string; accent: str
     section: "border-rose-200/80 bg-[linear-gradient(135deg,rgba(244,63,94,0.08),rgba(255,255,255,0)_42%)] dark:border-rose-500/20 dark:bg-[linear-gradient(135deg,rgba(244,63,94,0.14),rgba(0,0,0,0)_42%)]",
     icon: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200",
     accent: "bg-rose-500",
+  },
+  pdf: {
+    section: "border-indigo-200/80 bg-[linear-gradient(135deg,rgba(99,102,241,0.08),rgba(255,255,255,0)_42%)] dark:border-indigo-500/20 dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.14),rgba(0,0,0,0)_42%)]",
+    icon: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200",
+    accent: "bg-indigo-500",
   },
 };
 
@@ -387,6 +405,26 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     );
   }
 
+  async function downloadPdf() {
+    setBusy("pdf");
+    setError("");
+    try {
+      const { blob, filename } = await api.marketingPlans.downloadPdf(suiteId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const allStages = (
     <div className="w-full min-w-0 overflow-x-hidden space-y-4" dir={dir}>
       <ServicesStage text={text} suiteId={suiteId} services={services} saving={busy === "save-services"} onSave={saveServices} />
@@ -426,6 +464,13 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         onGenerate={generatePersonasInitial}
         onMore={generateMorePersonas}
       />
+      <MarketingPdfStage
+        text={text}
+        suiteId={suiteId}
+        ready={(intelligence?.personas || []).length > 0}
+        loading={busy === "pdf"}
+        onDownload={downloadPdf}
+      />
     </div>
   );
 
@@ -449,6 +494,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       )}
       {stage === "demand-supply" && <DemandSupplyStage text={text} suiteId={suiteId} intelligence={intelligence} loading={busy === "demand-supply"} onGenerate={() => run("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang }))} detail />}
       {stage === "personas" && <PersonasStage text={text} suiteId={suiteId} personas={intelligence?.personas || []} loading={busy === "personas"} loadingMore={busy === "personas-more"} onGenerate={generatePersonasInitial} onMore={generateMorePersonas} detail />}
+      {stage === "pdf" && <MarketingPdfStage text={text} suiteId={suiteId} ready={(intelligence?.personas || []).length > 0} loading={busy === "pdf"} onDownload={downloadPdf} detail />}
       {!stage && allStages}
     </div>
   );
@@ -836,6 +882,38 @@ function PersonasStage({
           )}
         </div>
       )}
+    </StageBox>
+  );
+}
+
+function MarketingPdfStage({
+  text,
+  suiteId,
+  ready,
+  loading,
+  onDownload,
+  detail,
+}: {
+  text: typeof labels.en;
+  suiteId: string;
+  ready: boolean;
+  loading: boolean;
+  onDownload: () => void;
+  detail?: boolean;
+}) {
+  return (
+    <StageBox title={text.pdfTitle} description={text.pdfDesc} icon={<Download size={18} />} suiteId={suiteId} slug="pdf" detail={detail}>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={onDownload} disabled={!ready || loading} className="gap-2">
+          {loading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+          {text.downloadPdf}
+        </Button>
+        {!ready && (
+          <p className="os-text-wrap text-sm text-muted-foreground" dir="auto">
+            {text.pdfNeedsPersonas}
+          </p>
+        )}
+      </div>
     </StageBox>
   );
 }

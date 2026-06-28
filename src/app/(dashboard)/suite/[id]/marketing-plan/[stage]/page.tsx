@@ -5,7 +5,7 @@ import { MarketingPlanStages } from "@/components/marketing-plan/MarketingPlanSt
 import { SuitePageShell } from "@/components/suite/SuitePageShell";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
-type StageSlug = "services" | "keywords" | "competitors" | "demand-supply" | "personas";
+type StageSlug = "services" | "keywords" | "competitors" | "demand-supply" | "personas" | "pdf";
 
 const stageTitles = {
   ar: {
@@ -14,6 +14,7 @@ const stageTitles = {
     competitors: "المنافسون",
     "demand-supply": "العرض والطلب",
     personas: "شخصيات العملاء",
+    pdf: "ملف الخطة التسويقية",
   },
   he: {
     services: "שירותים / מוצרים",
@@ -21,6 +22,7 @@ const stageTitles = {
     competitors: "מתחרים",
     "demand-supply": "ביקוש והיצע",
     personas: "פרסונות לקוחות",
+    pdf: "קובץ PDF לתכנית",
   },
   en: {
     services: "Services / Products",
@@ -28,11 +30,12 @@ const stageTitles = {
     competitors: "Competitors",
     "demand-supply": "Demand and Supply",
     personas: "Customer Personas",
+    pdf: "Marketing Plan PDF",
   },
 };
 
 function normalizeStage(value: string): StageSlug {
-  if (value === "services" || value === "keywords" || value === "competitors" || value === "demand-supply" || value === "personas") {
+  if (value === "services" || value === "keywords" || value === "competitors" || value === "demand-supply" || value === "personas" || value === "pdf") {
     return value;
   }
   return "services";
