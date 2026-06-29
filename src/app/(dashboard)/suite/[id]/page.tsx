@@ -226,6 +226,7 @@ function isGeneratedWorkPlanReady(suite: Suite | null): boolean {
       hasItems(actionPlan.social_items)
       || hasItems(actionPlan.ad_funnel_items)
       || hasItems((actionPlan.social_content_plan as Record<string, unknown> | undefined)?.selected_ids)
+      || hasItems((actionPlan.paid_content_plan as Record<string, unknown> | undefined)?.selected_ids)
     )
   );
 }

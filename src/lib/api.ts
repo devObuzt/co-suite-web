@@ -396,6 +396,16 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ selected_ids: selectedIds }),
       }),
+    generatePaidContentPlan: (suiteId: string, data?: { language?: string }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/paid-content-plan/generate`, {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }),
+    updatePaidContentPlanSelection: (suiteId: string, selectedIds: string[]) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/paid-content-plan/selection`, {
+        method: "POST",
+        body: JSON.stringify({ selected_ids: selectedIds }),
+      }),
     generatePaidFunnel: (suiteId: string, data?: { language?: string; near_term_focus?: string; upcoming_campaigns?: string[]; planning_notes?: string }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/paid-funnel/generate`, {
         method: "POST",
@@ -714,6 +724,7 @@ export interface MarketingActionPlan {
   social_items: MarketingActionItem[];
   ad_funnel_items: MarketingActionItem[];
   social_content_plan?: SocialContentWorkPlan;
+  paid_content_plan?: PaidContentWorkPlan;
   planning_questions?: string[];
   warnings?: string[];
 }
@@ -750,6 +761,49 @@ export interface SocialContentWorkPlan {
     candidate_count?: number;
   }>;
   candidates?: Record<string, SocialContentIdea[]>;
+  selected_ids?: string[];
+  warnings?: string[];
+}
+
+export interface PaidContentIdea {
+  id: string;
+  stage: "awareness" | "consideration" | "conversion" | "loyalty" | "advocacy" | string;
+  stage_label?: string;
+  stage_en?: string;
+  goal?: string;
+  idea?: string;
+  activities?: string[];
+  title: string;
+  ad_format?: "video" | "image_banner" | "carousel" | string;
+  channel?: string;
+  hook?: string;
+  visual_idea?: string;
+  copy?: string;
+  cta?: string;
+  required_assets?: string[];
+  extra_requirements?: string[];
+  prompt?: string;
+  rationale?: string;
+  provider?: string;
+}
+
+export interface PaidContentWorkPlan {
+  version?: string;
+  status?: string;
+  language?: string;
+  dialect?: string;
+  generated_at?: string;
+  stages?: Array<{
+    key: string;
+    stage?: string;
+    label?: string;
+    goal?: string;
+    idea?: string;
+    activities?: string[];
+    required_count?: number;
+    candidate_count?: number;
+  }>;
+  candidates?: Record<string, PaidContentIdea[]>;
   selected_ids?: string[];
   warnings?: string[];
 }
