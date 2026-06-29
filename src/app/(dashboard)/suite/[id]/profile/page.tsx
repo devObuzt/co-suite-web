@@ -22,6 +22,11 @@ type ProfileForm = {
   linkedin: string;
   referenceLinks: BrandReferenceLink[];
   productsServices: string;
+  audienceCountries: string;
+  audienceCities: string;
+  audienceAgeRange: string;
+  audienceGender: string;
+  audienceNeed: string;
   audienceNotes: string;
   audienceInterests: string;
   audienceBehaviors: string;
@@ -46,6 +51,11 @@ const emptyForm: ProfileForm = {
   linkedin: "",
   referenceLinks: [],
   productsServices: "",
+  audienceCountries: "",
+  audienceCities: "",
+  audienceAgeRange: "",
+  audienceGender: "",
+  audienceNeed: "",
   audienceNotes: "",
   audienceInterests: "",
   audienceBehaviors: "",
@@ -329,7 +339,16 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
         </ProfileSection>
 
         <ProfileSection title={t("suite.profile.section.audience")}>
-          <TextareaField label={t("suite.profile.field.audienceNote")} value={form.audienceNotes} onChange={(audienceNotes) => setForm({ ...form, audienceNotes })} rows={4} />
+          <div className="grid gap-3 md:grid-cols-2">
+            <TextField label={t("suite.profile.field.audienceCountries")} value={form.audienceCountries} onChange={(audienceCountries) => setForm({ ...form, audienceCountries })} placeholder={t("suite.profile.field.audienceCountriesPlaceholder")} />
+            <TextField label={t("suite.profile.field.audienceCities")} value={form.audienceCities} onChange={(audienceCities) => setForm({ ...form, audienceCities })} placeholder={t("suite.profile.field.audienceCitiesPlaceholder")} />
+            <TextField label={t("suite.profile.field.audienceAgeRange")} value={form.audienceAgeRange} onChange={(audienceAgeRange) => setForm({ ...form, audienceAgeRange })} placeholder={t("suite.profile.field.audienceAgeRangePlaceholder")} />
+            <TextField label={t("suite.profile.field.audienceGender")} value={form.audienceGender} onChange={(audienceGender) => setForm({ ...form, audienceGender })} placeholder={t("suite.profile.field.audienceGenderPlaceholder")} />
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <TextareaField label={t("suite.profile.field.audienceNeed")} value={form.audienceNeed} onChange={(audienceNeed) => setForm({ ...form, audienceNeed })} rows={4} placeholder={t("suite.profile.field.audienceNeedPlaceholder")} />
+            <TextareaField label={t("suite.profile.field.audienceNote")} value={form.audienceNotes} onChange={(audienceNotes) => setForm({ ...form, audienceNotes })} rows={4} />
+          </div>
           <div className="mt-3 grid gap-3 md:grid-cols-3">
             <TextareaField label={t("suite.profile.field.interests")} value={form.audienceInterests} onChange={(audienceInterests) => setForm({ ...form, audienceInterests })} />
             <TextareaField label={t("suite.profile.field.behaviors")} value={form.audienceBehaviors} onChange={(audienceBehaviors) => setForm({ ...form, audienceBehaviors })} />
@@ -467,6 +486,11 @@ function formFromBrand(brand: Brand): ProfileForm {
     linkedin: brand.social_links?.linkedin || "",
     referenceLinks: normalizeReferenceLinks(brand.reference_links || []),
     productsServices: toLines(services),
+    audienceCountries: toLines(brand.audience_location?.countries),
+    audienceCities: toLines(brand.audience_location?.cities),
+    audienceAgeRange: brand.audience_age_range || "",
+    audienceGender: brand.audience_gender || "",
+    audienceNeed: brand.audience_need || brand.audience_problem || "",
     audienceNotes: brand.audience_notes || brand.target_audience || "",
     audienceInterests: toLines(brand.audience_interests),
     audienceBehaviors: toLines(brand.audience_behaviors),
@@ -503,6 +527,15 @@ function brandFromForm(form: ProfileForm, current: Brand): Brand {
     audience_languages: form.audienceLanguages,
     audience_language_names: form.audienceLanguages.map((code) => LANGUAGES.find((lang) => lang.code === code)?.label || code),
     dialect: form.dialect.trim(),
+    audience_location: {
+      scope: form.audienceCountries.trim() || form.audienceCities.trim() ? "custom" : current.audience_location?.scope || "world",
+      countries: fromLines(form.audienceCountries),
+      cities: fromLines(form.audienceCities),
+    },
+    audience_age_range: form.audienceAgeRange.trim(),
+    audience_gender: form.audienceGender.trim(),
+    audience_need: form.audienceNeed.trim(),
+    audience_problem: form.audienceNeed.trim(),
     target_audience: form.audienceNotes.trim(),
     audience_notes: form.audienceNotes.trim(),
     audience_interests: fromLines(form.audienceInterests),

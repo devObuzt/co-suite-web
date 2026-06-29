@@ -1385,6 +1385,10 @@ export interface Brand {
   audience_languages?: string[];
   audience_language_names?: string[];
   audience_notes?: string;
+  audience_need?: string;
+  audience_problem?: string;
+  audience_age_range?: string;
+  audience_gender?: string;
   audience_behaviors?: string[];
   audience_social_statuses?: string[];
   niche?: string;
