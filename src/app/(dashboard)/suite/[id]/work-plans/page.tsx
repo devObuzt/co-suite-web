@@ -192,7 +192,7 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
         {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
         {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</div>}
 
-        <section className="grid gap-3 sm:grid-cols-2">
+        <section className="grid grid-cols-2 gap-3">
           <ModeButton
             active={mode === "social"}
             title="خطة محتوى للسوشيال ميديا"
@@ -259,7 +259,7 @@ function ModeButton({
       type="button"
       onClick={onClick}
       className={[
-        "min-h-[20vh] rounded-3xl border p-5 text-start shadow-sm transition",
+        "min-h-[25vh] rounded-3xl border p-4 text-start shadow-sm transition sm:p-5",
         active
           ? "border-[#2f80ff] bg-gradient-to-br from-[#2f80ff]/14 via-[#18b89d]/8 to-transparent"
           : "border-border bg-card hover:border-[#2f80ff]/50",
@@ -271,8 +271,8 @@ function ModeButton({
         </span>
         {active && <CheckCircle2 size={20} className="text-[#18b89d]" />}
       </div>
-      <h2 className="mt-5 text-2xl font-semibold tracking-normal">{title}</h2>
-      <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">{description}</p>
+      <h2 className="mt-4 text-xl font-semibold leading-7 tracking-normal sm:mt-5 sm:text-2xl">{title}</h2>
+      <p className="mt-2 max-w-md text-xs leading-5 text-muted-foreground sm:text-sm sm:leading-6">{description}</p>
     </button>
   );
 }
