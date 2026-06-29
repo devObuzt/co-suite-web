@@ -319,8 +319,9 @@ function SourceIcon({ competitor }: { competitor: MarketingCompetitor }) {
 }
 
 export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage?: StageSlug }) {
-  const { lang, dir } = useLanguage();
-  const text = labels[lang as keyof typeof labels] || labels.en;
+  const { lang, dir, t } = useLanguage();
+  const baseText = labels[lang as keyof typeof labels] || labels.en;
+  const text = useMemo(() => withAdminTextOverrides(baseText, t), [baseText, t]);
   const [suite, setSuite] = useState<Suite | null>(null);
   const [intelligence, setIntelligence] = useState<MarketingIntelligence | null>(null);
   const [busy, setBusy] = useState<BusyAction>(null);
@@ -570,6 +571,16 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       {!stage && allStages}
     </div>
   );
+}
+
+function withAdminTextOverrides(base: typeof labels.en, t: (key: string) => string): typeof labels.en {
+  return Object.fromEntries(
+    Object.entries(base).map(([key, value]) => {
+      const textKey = `marketingPlan.${key}`;
+      const override = t(textKey);
+      return [key, override === textKey ? value : override];
+    })
+  ) as typeof labels.en;
 }
 
 function StageBox({ title, description, icon, suiteId, slug, children, detail }: { title: string; description: string; icon: ReactNode; suiteId: string; slug: StageSlug; children: ReactNode; detail?: boolean }) {

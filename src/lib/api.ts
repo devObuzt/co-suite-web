@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 export type PaymentGateDetail = {
   code?: string;
@@ -433,6 +433,16 @@ export const api = {
     auditLogs: (period = "month") => request<AuditLog[]>(`/admin/audit-logs?period=${period}`),
     providerUsage: (period = "month") => request<ProviderUsageEvent[]>(`/admin/provider-usage?period=${period}`),
     providerUsageSummary: (period = "month") => request<ProviderUsageSummary[]>(`/admin/provider-usage/summary?period=${period}`),
+    appText: (language = "ar") => request<AdminAppTextResponse>(`/admin/app-text?language=${encodeURIComponent(language)}`),
+    updateAppText: (data: { language: string; key: string; value: string | null }) =>
+      request<AdminAppTextUpdateResponse>("/admin/app-text", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+  },
+
+  appText: {
+    get: (language: string) => request<AppTextPublicResponse>(`/app-text/${encodeURIComponent(language)}`),
   },
 
   connections: {
@@ -825,6 +835,34 @@ export interface AdminProvider {
   configured: boolean;
   models: string[];
   operations: string[];
+}
+
+export interface AppTextOverride {
+  id: string;
+  language: string;
+  key: string;
+  value: string;
+  updated_by_email?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AppTextPublicResponse {
+  language: string;
+  overrides: Record<string, string>;
+  updated_at?: string | null;
+}
+
+export interface AdminAppTextResponse {
+  language: string;
+  overrides: AppTextOverride[];
+}
+
+export interface AdminAppTextUpdateResponse {
+  ok: boolean;
+  language: string;
+  key: string;
+  override?: AppTextOverride | null;
 }
 
 export interface AdminBillingUsageEvent {

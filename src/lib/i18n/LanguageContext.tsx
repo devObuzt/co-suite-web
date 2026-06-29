@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { T, LANGUAGES, LangCode } from "./translations";
+import { api } from "@/lib/api";
 
 interface LanguageCtx {
   lang: LangCode;
@@ -18,6 +19,7 @@ const LanguageContext = createContext<LanguageCtx>({
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<LangCode>("en");
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const saved = (localStorage.getItem("co_suite_lang") || "en") as LangCode;
@@ -33,9 +35,24 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.dir = dir;
   }
 
+  useEffect(() => {
+    let canceled = false;
+    api.appText
+      .get(lang)
+      .then((res) => {
+        if (!canceled) setOverrides(res.overrides || {});
+      })
+      .catch(() => {
+        if (!canceled) setOverrides({});
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [lang]);
+
   const t = useCallback(
-    (key: string) => T[lang]?.[key] ?? T["en"]?.[key] ?? key,
-    [lang]
+    (key: string) => overrides[key] ?? T[lang]?.[key] ?? T["en"]?.[key] ?? key,
+    [lang, overrides]
   );
 
   const dir = (LANGUAGES.find((x) => x.code === lang)?.dir ?? "ltr") as "ltr" | "rtl";

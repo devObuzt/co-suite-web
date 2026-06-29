@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { api, AdminBillingUsageEvent, AdminProvider, AdminSummary, AdminUser, AdminUserDetail, AuditLog, ProviderUsageEvent, ProviderUsageSummary } from "@/lib/api";
+import { api, AdminBillingUsageEvent, AdminProvider, AdminSummary, AdminUser, AdminUserDetail, AppTextOverride, AuditLog, ProviderUsageEvent, ProviderUsageSummary } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Activity, CircleDollarSign, KeyRound, Loader2, RefreshCw, Search, ShieldCheck, UserCog, Users } from "lucide-react";
+import { LANGUAGES, LangCode } from "@/lib/i18n/translations";
+import { AdminTextCatalogRow, buildAdminTextCatalog } from "@/lib/i18n/adminTextCatalog";
+import { Activity, CircleDollarSign, KeyRound, Languages, Loader2, RefreshCw, RotateCcw, Save, Search, ShieldCheck, UserCog, Users } from "lucide-react";
 
 const PERIODS = [
   { value: "today", label: "Today" },
@@ -26,6 +28,11 @@ export default function AdminPage() {
   const [providerSummary, setProviderSummary] = useState<ProviderUsageSummary[]>([]);
   const [providers, setProviders] = useState<AdminProvider[]>([]);
   const [billingRows, setBillingRows] = useState<AdminBillingUsageEvent[]>([]);
+  const [textLanguage, setTextLanguage] = useState<LangCode>("ar");
+  const [textOverrides, setTextOverrides] = useState<AppTextOverride[]>([]);
+  const [textQuery, setTextQuery] = useState("");
+  const [textDrafts, setTextDrafts] = useState<Record<string, string>>({});
+  const [savingTextKey, setSavingTextKey] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
@@ -36,6 +43,20 @@ export default function AdminPage() {
     () => providerSummary.reduce((sum, item) => sum + item.actual_cost_usd, 0),
     [providerSummary]
   );
+  const textOverrideMap = useMemo(
+    () => Object.fromEntries(textOverrides.map((item) => [item.key, item.value])),
+    [textOverrides]
+  );
+  const textRows = useMemo(() => {
+    const q = textQuery.trim().toLocaleLowerCase();
+    return buildAdminTextCatalog(textLanguage).filter((row) => {
+      if (!q) return true;
+      const override = textOverrideMap[row.key] || "";
+      return [row.key, row.sourceLabel, row.defaultValue, override].some((value) =>
+        value.toLocaleLowerCase().includes(q)
+      );
+    });
+  }, [textLanguage, textOverrideMap, textQuery]);
 
   async function load(nextPeriod = period, nextQuery = query) {
     setError(null);
@@ -57,8 +78,16 @@ export default function AdminPage() {
     setLogs(l);
   }
 
+  async function loadAppText(language = textLanguage) {
+    const res = await api.admin.appText(language);
+    setTextOverrides(res.overrides || []);
+    setTextDrafts({});
+  }
+
   useEffect(() => {
-    load().catch((err) => setError(err instanceof Error ? err.message : "Could not load admin")).finally(() => setLoading(false));
+    Promise.all([load(), loadAppText("ar")])
+      .catch((err) => setError(err instanceof Error ? err.message : "Could not load admin"))
+      .finally(() => setLoading(false));
   }, []);
 
   async function reloadWithPeriod(value: string) {
@@ -70,6 +99,51 @@ export default function AdminPage() {
   async function searchUsers() {
     setLoading(true);
     await load(period, query).catch((err) => setError(err instanceof Error ? err.message : "Search failed")).finally(() => setLoading(false));
+  }
+
+  async function changeTextLanguage(value: string) {
+    const lang = value as LangCode;
+    setTextLanguage(lang);
+    setSavingTextKey("__language__");
+    setError(null);
+    try {
+      await loadAppText(lang);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load language texts");
+    } finally {
+      setSavingTextKey(null);
+    }
+  }
+
+  async function saveText(row: AdminTextCatalogRow) {
+    const value = textDrafts[row.key] ?? textOverrideMap[row.key] ?? row.defaultValue;
+    setSavingTextKey(row.key);
+    setNotice(null);
+    setError(null);
+    try {
+      await api.admin.updateAppText({ language: textLanguage, key: row.key, value });
+      await loadAppText(textLanguage);
+      setNotice("Text updated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Text update failed");
+    } finally {
+      setSavingTextKey(null);
+    }
+  }
+
+  async function resetText(row: AdminTextCatalogRow) {
+    setSavingTextKey(row.key);
+    setNotice(null);
+    setError(null);
+    try {
+      await api.admin.updateAppText({ language: textLanguage, key: row.key, value: null });
+      await loadAppText(textLanguage);
+      setNotice("Text reset to default.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Text reset failed");
+    } finally {
+      setSavingTextKey(null);
+    }
   }
 
   async function openUser(userId: string) {
@@ -164,6 +238,20 @@ export default function AdminPage() {
         <Metric icon={<CircleDollarSign size={18} />} label="Provider cost" value={`$${(summary?.provider_cost_usd ?? providerCost).toFixed(4)}`} note="internal" />
         <Metric icon={<CircleDollarSign size={18} />} label="Billed" value={`$${(summary?.billed_amount_usd ?? 0).toFixed(4)}`} note="customer ledger" />
       </section>
+
+      <LanguageTextPanel
+        rows={textRows}
+        language={textLanguage}
+        overrides={textOverrideMap}
+        drafts={textDrafts}
+        query={textQuery}
+        savingKey={savingTextKey}
+        onLanguageChange={changeTextLanguage}
+        onQueryChange={setTextQuery}
+        onDraftChange={(key, value) => setTextDrafts((current) => ({ ...current, [key]: value }))}
+        onSave={saveText}
+        onReset={resetText}
+      />
 
       <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
         <Panel title="Users" action={
@@ -405,6 +493,112 @@ function Panel({ title, action, children }: { title: string; action?: ReactNode;
       </div>
       {children}
     </section>
+  );
+}
+
+function LanguageTextPanel({
+  rows,
+  language,
+  overrides,
+  drafts,
+  query,
+  savingKey,
+  onLanguageChange,
+  onQueryChange,
+  onDraftChange,
+  onSave,
+  onReset,
+}: {
+  rows: AdminTextCatalogRow[];
+  language: LangCode;
+  overrides: Record<string, string>;
+  drafts: Record<string, string>;
+  query: string;
+  savingKey: string | null;
+  onLanguageChange: (value: string) => void;
+  onQueryChange: (value: string) => void;
+  onDraftChange: (key: string, value: string) => void;
+  onSave: (row: AdminTextCatalogRow) => void;
+  onReset: (row: AdminTextCatalogRow) => void;
+}) {
+  const grouped = useMemo(() => {
+    const groups = new Map<string, AdminTextCatalogRow[]>();
+    for (const row of rows) {
+      groups.set(row.sourceLabel, [...(groups.get(row.sourceLabel) || []), row]);
+    }
+    return [...groups.entries()];
+  }, [rows]);
+
+  return (
+    <Panel
+      title="Languages"
+      action={
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <select
+            value={language}
+            onChange={(event) => onLanguageChange(event.target.value)}
+            className="h-9 rounded-lg border border-input bg-background px-3 text-sm"
+            aria-label="Select language"
+          >
+            {LANGUAGES.map((item) => (
+              <option key={item.code} value={item.code}>{item.label}</option>
+            ))}
+          </select>
+          <Input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Search key, source, or text" className="w-full sm:w-72" />
+        </div>
+      }
+    >
+      <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+        <div className="flex items-center gap-2 font-semibold"><Languages size={15} /> Arabic is the first editable language here.</div>
+        <p className="mt-1 leading-6">
+          النصوص مرتبة حسب مصدرها في التطبيق. أي تعديل محفوظ هنا يتغلب على النص الافتراضي لكل استخدام مبني على مفاتيح الترجمة.
+        </p>
+      </div>
+      <div className="space-y-4" dir={language === "ar" || language === "he" ? "rtl" : "ltr"}>
+        {grouped.map(([source, items]) => (
+          <details key={source} open={query.length > 0 || source === "التنقل العام" || source === "الدخول والتسجيل"} className="rounded-lg border border-border bg-background">
+            <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 text-sm font-semibold">
+              <span>{source}</span>
+              <Badge variant="secondary">{items.length}</Badge>
+            </summary>
+            <div className="divide-y divide-border">
+              {items.map((row) => {
+                const hasOverride = Object.prototype.hasOwnProperty.call(overrides, row.key);
+                const effectiveValue = drafts[row.key] ?? overrides[row.key] ?? row.defaultValue;
+                const isSaving = savingKey === row.key;
+                return (
+                  <div key={row.key} className="grid gap-3 p-4 lg:grid-cols-[220px_minmax(0,1fr)_auto]">
+                    <div className="min-w-0">
+                      <div className="break-all font-mono text-xs text-muted-foreground" dir="ltr">{row.key}</div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        <Badge variant={hasOverride ? "outline" : "secondary"}>{hasOverride ? "Edited" : "Default"}</Badge>
+                      </div>
+                    </div>
+                    <textarea
+                      value={effectiveValue}
+                      onChange={(event) => onDraftChange(row.key, event.target.value)}
+                      className="min-h-20 w-full resize-y rounded-lg border border-input bg-card px-3 py-2 text-sm leading-6 outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                      dir="auto"
+                    />
+                    <div className="flex items-start gap-2">
+                      <Button type="button" size="sm" onClick={() => onSave(row)} disabled={isSaving} className="gap-1">
+                        {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                        Save
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => onReset(row)} disabled={isSaving || !hasOverride} className="gap-1">
+                        <RotateCcw size={13} />
+                        Reset
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </details>
+        ))}
+        {rows.length === 0 && <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No text keys found.</p>}
+      </div>
+    </Panel>
   );
 }
 
