@@ -275,6 +275,21 @@ const tagLabels = (text: typeof labels.en) => ({
   global_competitor: text.globalCompetitor,
 });
 
+const competitorTagPriority = ["good_competitor", "local_competitor", "global_competitor"];
+
+function normalizeCompetitorTags(tags: string[]) {
+  if (tags.includes("not_competitor")) return ["not_competitor"];
+  return competitorTagPriority.filter((tag) => tags.includes(tag));
+}
+
+function competitorScore(competitor: MarketingCompetitor) {
+  const tags = normalizeCompetitorTags(competitor.classification_tags || []);
+  if (tags.includes("not_competitor")) return -1;
+  const countScore = tags.length * 100;
+  const priorityScore = tags.reduce((score, tag) => score + (competitorTagPriority.length - competitorTagPriority.indexOf(tag)), 0);
+  return countScore + priorityScore;
+}
+
 const competitorSourceOrder = ["google_organic", "maps", "instagram", "facebook", "tiktok", "google_sponsored", "sponsored", "other"];
 
 const competitorSourceLabels: Record<string, string> = {
@@ -867,8 +882,19 @@ function CompetitorsStage({
   const grouped = useMemo(() => {
     const groups = new Map<string, MarketingCompetitor[]>();
     for (const competitor of competitors) {
+      if ((competitor.classification_tags || []).includes("not_competitor")) continue;
       const normalized = competitorGroupKey(competitor);
       groups.set(normalized, [...(groups.get(normalized) || []), competitor]);
+    }
+    for (const [source, items] of groups.entries()) {
+      groups.set(
+        source,
+        [...items].sort((a, b) => {
+          const scoreDiff = competitorScore(b) - competitorScore(a);
+          if (scoreDiff !== 0) return scoreDiff;
+          return competitors.indexOf(a) - competitors.indexOf(b);
+        })
+      );
     }
     const primarySources = competitorSourceOrder.slice(0, 5).map((source) => [source, groups.get(source) || []] as [string, MarketingCompetitor[]]);
     const extraSources = [...groups.entries()].filter(([source]) => !competitorSourceOrder.slice(0, 5).includes(source));
@@ -881,6 +907,7 @@ function CompetitorsStage({
   const firstPreviewGroup = grouped.find(([, items]) => items.length > 0) || grouped[0];
   const visibleGroups = detail || expanded || !firstPreviewGroup ? grouped : [firstPreviewGroup];
   const nonEmptyGroupCount = grouped.filter(([, items]) => items.length > 0).length;
+  const visibleCompetitorCount = grouped.reduce((total, [, items]) => total + items.length, 0);
   const hiddenGroupCount = Math.max(0, nonEmptyGroupCount - visibleGroups.filter(([, items]) => items.length > 0).length);
 
   async function addManualCompetitor(source: string) {
@@ -930,7 +957,7 @@ function CompetitorsStage({
         </div>
       )}
       <div className="mt-4 space-y-5">
-        {competitors.length === 0 ? (
+        {visibleCompetitorCount === 0 ? (
           <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noCompetitors}</p>
         ) : visibleGroups.map(([source, items]) => (
           <section key={source} className="min-w-0">
@@ -978,7 +1005,7 @@ function CompetitorsStage({
           </section>
         ))}
       </div>
-      {competitors.length > 0 && hiddenGroupCount > 0 && !detail && (
+      {visibleCompetitorCount > 0 && hiddenGroupCount > 0 && !detail && (
         <div className="mt-5 flex justify-center">
           <Button
             type="button"
@@ -1034,7 +1061,15 @@ function CompetitorCard({
     window.setTimeout(() => setCopied(false), 1200);
   }
   function toggleTag(tag: string) {
-    const next = tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag];
+    let next: string[];
+    if (tag === "not_competitor") {
+      next = tags.includes(tag) ? [] : ["not_competitor"];
+    } else {
+      const withoutNotCompetitor = tags.filter((item) => item !== "not_competitor");
+      next = withoutNotCompetitor.includes(tag)
+        ? withoutNotCompetitor.filter((item) => item !== tag)
+        : [...withoutNotCompetitor, tag];
+    }
     onTagsChange(competitor.id, next);
   }
   return (
