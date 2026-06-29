@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 type StageSlug = "services" | "keywords" | "competitors" | "demand-supply" | "personas" | "pdf";
-type BusyAction = StageSlug | "keywords-more" | "competitors-more" | "personas-more" | "save-services" | "save-keywords" | null;
+type BusyAction = StageSlug | "keywords-more" | "competitors-more" | "personas-more" | "save-services" | "save-keywords" | "save-competitors" | null;
 
 const labels = {
   ar: {
@@ -73,6 +73,14 @@ const labels = {
     noKeywords: "لم يتم توليد كلمات بعد.",
     noCompetitors: "لم يتم توليد منافسين بعد.",
     noSourceCompetitors: "لا توجد نتائج من هذا المصدر.",
+    newCompetitorName: "اسم المنافس",
+    newCompetitorUrl: "رابط المنافس",
+    newCompetitorDescription: "وصف مختصر أو ملاحظة",
+    addCompetitor: "إضافة منافس",
+    cancel: "إلغاء",
+    moveCompetitorUp: "رفع المنافس",
+    moveCompetitorDown: "تنزيل المنافس",
+    sourceOverview: "عرض كل المصادر",
     noDemand: "لم يتم توليد العرض والطلب بعد.",
     noPersonas: "لم يتم توليد شخصيات العملاء بعد.",
     loadingMorePersonas: "جاري جلب شخصيات إضافية...",
@@ -142,6 +150,14 @@ const labels = {
     noKeywords: "No keywords generated yet.",
     noCompetitors: "No competitors generated yet.",
     noSourceCompetitors: "No results from this source.",
+    newCompetitorName: "Competitor name",
+    newCompetitorUrl: "Competitor link",
+    newCompetitorDescription: "Short description or note",
+    addCompetitor: "Add competitor",
+    cancel: "Cancel",
+    moveCompetitorUp: "Move competitor up",
+    moveCompetitorDown: "Move competitor down",
+    sourceOverview: "View all sources",
     noDemand: "Demand and supply have not been generated yet.",
     noPersonas: "No customer personas generated yet.",
     loadingMorePersonas: "Loading more customer personas...",
@@ -211,6 +227,14 @@ const labels = {
     noKeywords: "עדיין לא נוצרו מילות מפתח.",
     noCompetitors: "עדיין לא נוצרו מתחרים.",
     noSourceCompetitors: "אין תוצאות ממקור זה.",
+    newCompetitorName: "שם המתחרה",
+    newCompetitorUrl: "קישור למתחרה",
+    newCompetitorDescription: "תיאור קצר או הערה",
+    addCompetitor: "הוסף מתחרה",
+    cancel: "ביטול",
+    moveCompetitorUp: "העלה מתחרה",
+    moveCompetitorDown: "הורד מתחרה",
+    sourceOverview: "הצג את כל המקורות",
     noDemand: "ביקוש והיצע עדיין לא נוצרו.",
     noPersonas: "עדיין לא נוצרו פרסונות לקוחות.",
     loadingMorePersonas: "טוען עוד פרסונות לקוחות...",
@@ -308,14 +332,18 @@ function shortUrl(url?: string) {
   }
 }
 
-function SourceIcon({ competitor }: { competitor: MarketingCompetitor }) {
-  const type = `${competitor.result_type || competitor.platform}`.toLowerCase();
+function SourceGlyph({ source }: { source?: string }) {
+  const type = `${source || ""}`.toLowerCase();
   if (type.includes("instagram")) return <Camera size={15} />;
   if (type.includes("maps")) return <MapPinned size={15} />;
   if (type.includes("facebook")) return <Globe2 size={15} />;
   if (type.includes("tiktok")) return <FileSearch size={15} />;
   if (type.includes("sponsored")) return <Target size={15} />;
   return <Search size={15} />;
+}
+
+function SourceIcon({ competitor }: { competitor: MarketingCompetitor }) {
+  return <SourceGlyph source={`${competitor.result_type || competitor.platform}`} />;
 }
 
 export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage?: StageSlug }) {
@@ -393,6 +421,19 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     setError("");
     try {
       const res = await api.marketingPlans.updateKeywords(suiteId, { keywords: next });
+      applyPlanResponse(res);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function saveCompetitors(next: MarketingCompetitor[]) {
+    setBusy("save-competitors");
+    setError("");
+    try {
+      const res = await api.marketingPlans.updateCompetitors(suiteId, { competitors: next });
       applyPlanResponse(res);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
@@ -498,12 +539,14 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         text={text}
         suiteId={suiteId}
         competitors={intelligence?.competitors || []}
-        warnings={intelligence?.warnings || []}
+        warnings={intelligence?.source_warnings || intelligence?.warnings || []}
         loading={busy === "competitors"}
         loadingMore={busy === "competitors-more"}
+        saving={busy === "save-competitors"}
         onGenerate={() => run("competitors", () => api.marketingPlans.generateCompetitors(suiteId, { language: lang }))}
         onMore={() => run("competitors-more", () => api.marketingPlans.generateMoreCompetitors(suiteId, { language: lang, existing_ids: (intelligence?.competitors || []).map((c) => c.id), existing_values: (intelligence?.competitors || []).map((c) => c.url || c.name) }))}
         onTagsChange={(competitorId, tags) => run("competitors", () => api.marketingPlans.updateCompetitor(suiteId, competitorId, { classification_tags: tags }))}
+        onSave={saveCompetitors}
       />
       <DemandSupplyStage
         text={text}
@@ -563,7 +606,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         <KeywordsStage text={text} suiteId={suiteId} keywords={intelligence?.keywords || []} loading={busy === "keywords"} loadingMore={busy === "keywords-more"} saving={busy === "save-keywords"} onGenerate={() => run("keywords", () => api.marketingPlans.generateKeywords(suiteId, { language: lang }))} onMore={() => run("keywords-more", () => api.marketingPlans.generateMoreKeywords(suiteId, { language: lang, existing_values: (intelligence?.keywords || []).map((k) => k.text) }))} onSave={saveKeywords} detail />
       )}
       {stage === "competitors" && (
-        <CompetitorsStage text={text} suiteId={suiteId} competitors={intelligence?.competitors || []} warnings={intelligence?.warnings || []} loading={busy === "competitors"} loadingMore={busy === "competitors-more"} onGenerate={() => run("competitors", () => api.marketingPlans.generateCompetitors(suiteId, { language: lang }))} onMore={() => run("competitors-more", () => api.marketingPlans.generateMoreCompetitors(suiteId, { language: lang }))} onTagsChange={(competitorId, tags) => run("competitors", () => api.marketingPlans.updateCompetitor(suiteId, competitorId, { classification_tags: tags }))} detail />
+        <CompetitorsStage text={text} suiteId={suiteId} competitors={intelligence?.competitors || []} warnings={intelligence?.source_warnings || intelligence?.warnings || []} loading={busy === "competitors"} loadingMore={busy === "competitors-more"} saving={busy === "save-competitors"} onGenerate={() => run("competitors", () => api.marketingPlans.generateCompetitors(suiteId, { language: lang }))} onMore={() => run("competitors-more", () => api.marketingPlans.generateMoreCompetitors(suiteId, { language: lang }))} onTagsChange={(competitorId, tags) => run("competitors", () => api.marketingPlans.updateCompetitor(suiteId, competitorId, { classification_tags: tags }))} onSave={saveCompetitors} detail />
       )}
       {stage === "demand-supply" && <DemandSupplyStage text={text} suiteId={suiteId} intelligence={intelligence} loading={busy === "demand-supply"} onGenerate={() => run("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang }))} detail />}
       {stage === "personas" && <PersonasStage text={text} suiteId={suiteId} personas={intelligence?.personas || []} loading={busy === "personas"} loadingMore={busy === "personas-more"} onGenerate={generatePersonasInitial} onMore={generateMorePersonas} detail />}
@@ -785,13 +828,46 @@ function KeywordsStage({
   );
 }
 
-function CompetitorsStage({ text, suiteId, competitors, warnings, loading, loadingMore, onGenerate, onMore, onTagsChange, detail }: { text: typeof labels.en; suiteId: string; competitors: MarketingCompetitor[]; warnings: string[]; loading: boolean; loadingMore: boolean; onGenerate: () => void; onMore: () => void; onTagsChange: (id: string, tags: string[]) => void; detail?: boolean }) {
+function competitorGroupKey(competitor: MarketingCompetitor) {
+  const key = `${competitor.result_type || competitor.platform || "other"}`.toLowerCase();
+  return key === "google" ? "google_organic" : key;
+}
+
+function CompetitorsStage({
+  text,
+  suiteId,
+  competitors,
+  warnings,
+  loading,
+  loadingMore,
+  saving,
+  onGenerate,
+  onMore,
+  onTagsChange,
+  onSave,
+  detail,
+}: {
+  text: typeof labels.en;
+  suiteId: string;
+  competitors: MarketingCompetitor[];
+  warnings: string[];
+  loading: boolean;
+  loadingMore: boolean;
+  saving: boolean;
+  onGenerate: () => void;
+  onMore: () => void;
+  onTagsChange: (id: string, tags: string[]) => void;
+  onSave: (next: MarketingCompetitor[]) => Promise<void>;
+  detail?: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [addingSource, setAddingSource] = useState<string | null>(null);
+  const [manual, setManual] = useState({ name: "", url: "", snippet: "" });
+  const isBusy = loading || loadingMore || saving;
   const grouped = useMemo(() => {
     const groups = new Map<string, MarketingCompetitor[]>();
     for (const competitor of competitors) {
-      const key = `${competitor.result_type || competitor.platform || "other"}`.toLowerCase();
-      const normalized = key === "google" ? "google_organic" : key;
+      const normalized = competitorGroupKey(competitor);
       groups.set(normalized, [...(groups.get(normalized) || []), competitor]);
     }
     const primarySources = competitorSourceOrder.slice(0, 5).map((source) => [source, groups.get(source) || []] as [string, MarketingCompetitor[]]);
@@ -804,13 +880,47 @@ function CompetitorsStage({ text, suiteId, competitors, warnings, loading, loadi
   }, [competitors]);
   const firstPreviewGroup = grouped.find(([, items]) => items.length > 0) || grouped[0];
   const visibleGroups = detail || expanded || !firstPreviewGroup ? grouped : [firstPreviewGroup];
-  const hiddenGroupCount = Math.max(0, grouped.filter(([, items]) => items.length > 0).length - visibleGroups.filter(([, items]) => items.length > 0).length);
+  const nonEmptyGroupCount = grouped.filter(([, items]) => items.length > 0).length;
+  const hiddenGroupCount = Math.max(0, nonEmptyGroupCount - visibleGroups.filter(([, items]) => items.length > 0).length);
+
+  async function addManualCompetitor(source: string) {
+    const name = manual.name.trim();
+    if (!name) return;
+    const newCompetitor: MarketingCompetitor = {
+      id: `competitor-manual-${Date.now()}`,
+      name,
+      title: name,
+      platform: source,
+      result_type: source,
+      url: manual.url.trim(),
+      snippet: manual.snippet.trim(),
+      reason: manual.snippet.trim(),
+      confidence: "manual",
+      classification_tags: [],
+    };
+    setManual({ name: "", url: "", snippet: "" });
+    setAddingSource(null);
+    await onSave([...competitors, newCompetitor]);
+  }
+
+  async function moveCompetitor(competitor: MarketingCompetitor, direction: -1 | 1) {
+    const source = competitorGroupKey(competitor);
+    const sourceItems = competitors.filter((item) => competitorGroupKey(item) === source);
+    const index = sourceItems.findIndex((item) => item.id === competitor.id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= sourceItems.length) return;
+    const reorderedSource = [...sourceItems];
+    const [item] = reorderedSource.splice(index, 1);
+    reorderedSource.splice(target, 0, item);
+    const queue = [...reorderedSource];
+    await onSave(competitors.map((item) => (competitorGroupKey(item) === source ? queue.shift() || item : item)));
+  }
 
   return (
     <StageBox title={text.competitorsTitle} description={text.competitorsDesc} icon={<Search size={18} />} suiteId={suiteId} slug="competitors" detail={detail}>
       <div className="flex min-w-0 flex-wrap gap-2">
-        <Button onClick={onGenerate} disabled={loading || loadingMore} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}{text.generate}</Button>
-        {competitors.length > 0 && <Button variant="outline" onClick={onMore} disabled={loading || loadingMore} className="gap-2">{loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.generateMore}</Button>}
+        <Button onClick={onGenerate} disabled={isBusy} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}{text.generate}</Button>
+        {competitors.length > 0 && <Button variant="outline" onClick={onMore} disabled={isBusy} className="gap-2">{loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.generateMore}</Button>}
       </div>
       {warnings.length > 0 && (
         <div className="mt-4 space-y-2">
@@ -825,15 +935,43 @@ function CompetitorsStage({ text, suiteId, competitors, warnings, loading, loadi
         ) : visibleGroups.map(([source, items]) => (
           <section key={source} className="min-w-0">
             <div className="mb-2 flex items-center justify-between gap-3">
-              <h3 className="text-sm font-bold text-foreground">{competitorSourceLabels[source] || source}</h3>
-              <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">{items.length}</span>
+              <div className="flex min-w-0 items-center gap-2">
+                <h3 className="text-sm font-bold text-foreground">{competitorSourceLabels[source] || source}</h3>
+                <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">{items.length}</span>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={() => setAddingSource((current) => current === source ? null : source)} disabled={isBusy} className="h-8 gap-1 px-2 text-xs">
+                <Plus size={13} />
+                {text.addCompetitor}
+              </Button>
             </div>
+            {addingSource === source && (
+              <div className="mb-3 grid gap-2 rounded-2xl border border-amber-200/70 bg-amber-50/60 p-3 dark:border-amber-500/20 dark:bg-amber-500/10 sm:grid-cols-[1fr_1fr_auto]">
+                <Input value={manual.name} onChange={(e) => setManual((value) => ({ ...value, name: e.target.value }))} placeholder={text.newCompetitorName} dir="auto" />
+                <Input value={manual.url} onChange={(e) => setManual((value) => ({ ...value, url: e.target.value }))} placeholder={text.newCompetitorUrl} dir="ltr" />
+                <div className="flex gap-2 sm:row-span-2 sm:flex-col">
+                  <Button type="button" onClick={() => addManualCompetitor(source)} disabled={isBusy || !manual.name.trim()} className="h-10 gap-2">
+                    {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+                    {text.addCompetitor}
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setAddingSource(null)} className="h-10">{text.cancel}</Button>
+                </div>
+                <Input value={manual.snippet} onChange={(e) => setManual((value) => ({ ...value, snippet: e.target.value }))} placeholder={text.newCompetitorDescription} dir="auto" className="sm:col-span-2" />
+              </div>
+            )}
             <div className="os-scroll-x flex snap-x gap-3 pb-2">
               {items.length === 0 ? (
                 <p className="w-[76%] max-w-80 shrink-0 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground sm:w-80">{text.noSourceCompetitors}</p>
-              ) : items.map((competitor) => (
+              ) : items.map((competitor, index) => (
                 <div key={competitor.id} className="w-[76%] max-w-80 shrink-0 snap-start sm:w-80">
-                  <CompetitorCard text={text} competitor={competitor} onTagsChange={onTagsChange} />
+                  <CompetitorCard
+                    text={text}
+                    competitor={competitor}
+                    onTagsChange={onTagsChange}
+                    onMoveUp={() => moveCompetitor(competitor, -1)}
+                    onMoveDown={() => moveCompetitor(competitor, 1)}
+                    moveUpDisabled={isBusy || index === 0}
+                    moveDownDisabled={isBusy || index === items.length - 1}
+                  />
                 </div>
               ))}
             </div>
@@ -841,9 +979,23 @@ function CompetitorsStage({ text, suiteId, competitors, warnings, loading, loadi
         ))}
       </div>
       {competitors.length > 0 && hiddenGroupCount > 0 && !detail && (
-        <Button type="button" variant="outline" size="sm" onClick={() => setExpanded(true)} className="mt-3">
-          {text.showAll} +{hiddenGroupCount}
-        </Button>
+        <div className="mt-5 flex justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setExpanded(true)}
+            className="min-h-12 w-full max-w-xl justify-between gap-3 rounded-2xl border-amber-300 bg-amber-50/80 px-4 text-amber-950 shadow-sm hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100"
+          >
+            <span className="font-bold">{text.sourceOverview} +{hiddenGroupCount}</span>
+            <span className="flex items-center gap-1.5">
+              {competitorSourceOrder.slice(0, 5).map((source) => (
+                <span key={source} className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-background/80 text-amber-800 shadow-sm dark:bg-background/30 dark:text-amber-100" title={competitorSourceLabels[source]}>
+                  <SourceGlyph source={source} />
+                </span>
+              ))}
+            </span>
+          </Button>
+        </div>
       )}
       {expanded && !detail && hiddenGroupCount === 0 && grouped.length > 1 && (
         <Button type="button" variant="ghost" size="sm" onClick={() => setExpanded(false)} className="mt-2">
@@ -854,7 +1006,23 @@ function CompetitorsStage({ text, suiteId, competitors, warnings, loading, loadi
   );
 }
 
-function CompetitorCard({ text, competitor, onTagsChange }: { text: typeof labels.en; competitor: MarketingCompetitor; onTagsChange: (id: string, tags: string[]) => void }) {
+function CompetitorCard({
+  text,
+  competitor,
+  onTagsChange,
+  onMoveUp,
+  onMoveDown,
+  moveUpDisabled,
+  moveDownDisabled,
+}: {
+  text: typeof labels.en;
+  competitor: MarketingCompetitor;
+  onTagsChange: (id: string, tags: string[]) => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  moveUpDisabled: boolean;
+  moveDownDisabled: boolean;
+}) {
   const [preview, setPreview] = useState(false);
   const [copied, setCopied] = useState(false);
   const tagText = tagLabels(text);
@@ -879,6 +1047,14 @@ function CompetitorCard({ text, competitor, onTagsChange }: { text: typeof label
           </div>
           <h3 className="os-text-wrap font-bold text-foreground" dir="auto">{competitor.title || competitor.name}</h3>
           <p className="os-text-wrap mt-2 text-sm leading-6 text-muted-foreground" dir="auto">{competitor.snippet || competitor.reason || competitor.evidence}</p>
+        </div>
+        <div className="flex shrink-0 flex-col gap-1">
+          <button type="button" aria-label={text.moveCompetitorUp} title={text.moveCompetitorUp} disabled={moveUpDisabled} onClick={onMoveUp} className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30">
+            <ArrowUp size={13} />
+          </button>
+          <button type="button" aria-label={text.moveCompetitorDown} title={text.moveCompetitorDown} disabled={moveDownDisabled} onClick={onMoveDown} className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30">
+            <ArrowDown size={13} />
+          </button>
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">

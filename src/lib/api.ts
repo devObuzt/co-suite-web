@@ -346,6 +346,11 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
+    updateCompetitors: (suiteId: string, data: { competitors: MarketingCompetitor[] }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/competitors`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
     generateKeywords: (suiteId: string, data?: { language?: string; existing_ids?: string[]; existing_values?: string[] }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/keywords/generate`, {
         method: "POST",
@@ -650,6 +655,7 @@ export interface MarketingIntelligence {
   personas?: MarketingPersona[];
   source_links: MarketingSourceLink[];
   warnings?: string[];
+  source_warnings?: string[];
   demand_supply?: MarketingDemandSupplyData;
 }
 
