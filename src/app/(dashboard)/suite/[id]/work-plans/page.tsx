@@ -398,9 +398,24 @@ function IdeaCard({ idea, selected, disabled, onClick }: { idea: SocialContentId
         </div>
         {selected && <BadgeCheck size={20} className="shrink-0 text-[#18b89d]" />}
       </div>
-      {idea.idea && <p className="mt-3 text-sm leading-6 text-muted-foreground" dir="auto">{idea.idea}</p>}
-      {idea.script && <p className="mt-3 rounded-xl bg-muted/60 p-3 text-sm leading-6" dir="auto">{idea.script}</p>}
-      {idea.cta && <p className="mt-3 text-xs font-semibold text-muted-foreground" dir="auto">{idea.cta}</p>}
+      {idea.idea && (
+        <div className="mt-3 space-y-1">
+          <p className="text-xs font-semibold text-muted-foreground">الفكرة</p>
+          <p className="text-sm leading-6 text-muted-foreground" dir="auto">{idea.idea}</p>
+        </div>
+      )}
+      {idea.script && (
+        <div className="mt-3 rounded-xl bg-muted/60 p-3">
+          <p className="mb-1 text-xs font-semibold text-muted-foreground">الصيغة / النص المقترح</p>
+          <p className="whitespace-pre-line text-sm leading-6" dir="auto">{idea.script}</p>
+        </div>
+      )}
+      {idea.cta && (
+        <div className="mt-3 space-y-1">
+          <p className="text-xs font-semibold text-muted-foreground">الدعوة للفعل</p>
+          <p className="text-sm leading-6 text-muted-foreground" dir="auto">{idea.cta}</p>
+        </div>
+      )}
     </button>
   );
 }
