@@ -421,7 +421,8 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         } catch (shareError) {
           const name = shareError instanceof DOMException ? shareError.name : "";
           if (name === "AbortError" || String(shareError).toLowerCase().includes("abort")) {
-            return;
+            // If the native share sheet is canceled or blocked, keep the PDF flow alive
+            // by falling back to the regular browser download below.
           }
         }
       }
