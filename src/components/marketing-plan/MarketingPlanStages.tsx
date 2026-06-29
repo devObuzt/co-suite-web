@@ -410,6 +410,14 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     setError("");
     try {
       const { blob, filename } = await api.marketingPlans.downloadPdf(suiteId);
+      const file = new File([blob], filename, { type: blob.type || "application/pdf" });
+      if (typeof navigator !== "undefined" && navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: filename,
+        });
+        return;
+      }
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
