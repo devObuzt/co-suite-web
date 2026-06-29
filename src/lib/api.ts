@@ -386,6 +386,16 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data || {}),
       }),
+    generateSocialContentPlan: (suiteId: string, data?: { language?: string; monthly_posts?: number }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/social-content-plan/generate`, {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }),
+    updateSocialContentPlanSelection: (suiteId: string, selectedIds: string[]) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/social-content-plan/selection`, {
+        method: "POST",
+        body: JSON.stringify({ selected_ids: selectedIds }),
+      }),
     generatePaidFunnel: (suiteId: string, data?: { language?: string; near_term_focus?: string; upcoming_campaigns?: string[]; planning_notes?: string }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/paid-funnel/generate`, {
         method: "POST",
@@ -703,7 +713,44 @@ export interface MarketingActionPlan {
   status?: string;
   social_items: MarketingActionItem[];
   ad_funnel_items: MarketingActionItem[];
+  social_content_plan?: SocialContentWorkPlan;
   planning_questions?: string[];
+  warnings?: string[];
+}
+
+export interface SocialContentIdea {
+  id: string;
+  type: "attraction" | "trust" | "sales" | string;
+  title: string;
+  format?: string;
+  hook_style?: string;
+  idea?: string;
+  script?: string;
+  cta?: string;
+  rationale?: string;
+  provider?: string;
+}
+
+export interface SocialContentWorkPlan {
+  version?: string;
+  status?: string;
+  language?: string;
+  dialect?: string;
+  generated_at?: string;
+  monthly_posts?: number;
+  cadence?: {
+    recommended_monthly_posts?: number;
+    recommended_note?: string;
+  };
+  content_mix?: Array<{
+    type: "attraction" | "trust" | "sales" | string;
+    label?: string;
+    percentage?: number;
+    required_count?: number;
+    candidate_count?: number;
+  }>;
+  candidates?: Record<string, SocialContentIdea[]>;
+  selected_ids?: string[];
   warnings?: string[];
 }
 

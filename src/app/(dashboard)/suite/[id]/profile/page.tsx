@@ -14,6 +14,7 @@ type ProfileForm = {
   name: string;
   category: string;
   audienceLanguages: string[];
+  dialect: string;
   website: string;
   instagram: string;
   facebook: string;
@@ -37,6 +38,7 @@ const emptyForm: ProfileForm = {
   name: "",
   category: "",
   audienceLanguages: [],
+  dialect: "",
   website: "",
   instagram: "",
   facebook: "",
@@ -307,6 +309,14 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
               {t("suite.profile.field.primaryLanguage")} {selectedLanguages[0].label}
             </p>
           )}
+          <div className="mt-4 max-w-xl">
+            <TextField
+              label={t("suite.profile.field.dialect")}
+              value={form.dialect}
+              onChange={(dialect) => setForm({ ...form, dialect })}
+              placeholder={t("suite.profile.field.dialectPlaceholder")}
+            />
+          </div>
         </ProfileSection>
 
         <ProfileSection title={t("suite.profile.section.products")}>
@@ -449,6 +459,7 @@ function formFromBrand(brand: Brand): ProfileForm {
     name: brand.name || "",
     category: brand.niche || brand.industry || "",
     audienceLanguages: brand.audience_languages || [],
+    dialect: brand.dialect || "",
     website: brand.website || "",
     instagram: brand.social_links?.instagram || "",
     facebook: brand.social_links?.facebook || "",
@@ -491,6 +502,7 @@ function brandFromForm(form: ProfileForm, current: Brand): Brand {
     reference_links: normalizeReferenceLinks(form.referenceLinks),
     audience_languages: form.audienceLanguages,
     audience_language_names: form.audienceLanguages.map((code) => LANGUAGES.find((lang) => lang.code === code)?.label || code),
+    dialect: form.dialect.trim(),
     target_audience: form.audienceNotes.trim(),
     audience_notes: form.audienceNotes.trim(),
     audience_interests: fromLines(form.audienceInterests),

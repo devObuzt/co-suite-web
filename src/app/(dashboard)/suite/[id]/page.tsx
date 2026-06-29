@@ -222,7 +222,11 @@ function isGeneratedWorkPlanReady(suite: Suite | null): boolean {
 
   return Boolean(
     actionPlan
-    && (hasItems(actionPlan.social_items) || hasItems(actionPlan.ad_funnel_items))
+    && (
+      hasItems(actionPlan.social_items)
+      || hasItems(actionPlan.ad_funnel_items)
+      || hasItems((actionPlan.social_content_plan as Record<string, unknown> | undefined)?.selected_ids)
+    )
   );
 }
 
@@ -264,7 +268,7 @@ export default function SuiteHomePage({ params }: { params: Promise<{ id: string
         links: [
           { label: text.strategy.links.brand, href: `/suite/${id}/profile`, icon: <UserSquare2 size={16} />, status: brandReady ? "ready" : "needs_setup" },
           { label: text.strategy.links.plan, href: `/suite/${id}/marketing-plan`, icon: <BookOpenText size={16} />, status: planReady ? "ready" : "needs_setup" },
-          { label: text.strategy.links.workPlans, href: `/suite/${id}/marketing-plan`, icon: <ClipboardList size={16} />, status: workPlansReady ? "ready" : "needs_setup" },
+          { label: text.strategy.links.workPlans, href: `/suite/${id}/work-plans`, icon: <ClipboardList size={16} />, status: workPlansReady ? "ready" : "needs_setup" },
           { label: text.strategy.links.logs, icon: <FileClock size={16} />, status: "soon" },
         ] satisfies SectionLink[],
       },

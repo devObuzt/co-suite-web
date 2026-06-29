@@ -425,6 +425,7 @@ export default function NewSuitePage() {
   // Step C
   const [orderedLangs, setOrderedLangs] = useState<string[]>([]);
   const [customLanguage, setCustomLanguage] = useState("");
+  const [audienceDialect, setAudienceDialect] = useState("");
   // Step D
   const [serviceItems, setServiceItems] = useState<string[]>([]);
   // Step E
@@ -614,6 +615,7 @@ export default function NewSuitePage() {
       setSelectedNicheIdx(foundNicheIdx);
       setSelectedResearchNiche(foundNicheIdx >= 0 ? "" : (researchedNiches[0] || ""));
       setOrderedLangs(res.brand?.audience_languages || []);
+      setAudienceDialect(res.brand?.dialect || "");
       setAudienceNotes(res.brand?.audience_notes || "");
       const audienceLocation = res.brand?.audience_location;
       setLocationScope("Custom");
@@ -1172,6 +1174,13 @@ export default function NewSuitePage() {
                   })}
                 </div>
               )}
+              <Input
+                value={audienceDialect}
+                onChange={(e) => setAudienceDialect(e.target.value)}
+                placeholder={t("suite.new.dialectPlaceholder")}
+                className="bg-background text-foreground text-sm"
+                dir="auto"
+              />
             </CardContent>
           </Card>
           <div className="flex gap-3">
@@ -1180,7 +1189,8 @@ export default function NewSuitePage() {
                 await saveStep("c", {
                   audience_languages: orderedLangs,
                   audience_language_names: orderedLangs.map(languageLabel),
-                  dialect: orderedLangs[0]?.startsWith("custom:") ? languageLabel(orderedLangs[0]) : (LANG_TO_DIALECT[orderedLangs[0]] || "English"),
+                  dialect: audienceDialect.trim()
+                    || (orderedLangs[0]?.startsWith("custom:") ? languageLabel(orderedLangs[0]) : (LANG_TO_DIALECT[orderedLangs[0]] || "English")),
                 });
               }
               setStep("step-d");

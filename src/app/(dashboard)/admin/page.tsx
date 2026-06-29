@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { api, AdminBillingUsageEvent, AdminProvider, AdminSummary, AdminUser, AdminUserDetail, AppTextOverride, AuditLog, ProviderUsageEvent, ProviderUsageSummary } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { LANGUAGES, LangCode } from "@/lib/i18n/translations";
 import { AdminTextCatalogRow, buildAdminTextCatalog } from "@/lib/i18n/adminTextCatalog";
-import { Activity, CircleDollarSign, KeyRound, Languages, Loader2, RefreshCw, RotateCcw, Save, Search, ShieldCheck, UserCog, Users } from "lucide-react";
+import { Activity, CircleDollarSign, KeyRound, Languages, Loader2, RefreshCw, RotateCcw, Save, Search, ShieldCheck, UserCog, Users, WandSparkles } from "lucide-react";
 
 const PERIODS = [
   { value: "today", label: "Today" },
@@ -211,6 +212,12 @@ export default function AdminPage() {
           <p className="mt-1 text-sm text-muted-foreground">Users, suites, logs, provider usage, tokens, and internal costs.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/admin/prompts"
+            className="inline-flex h-7 items-center justify-center gap-2 rounded-lg border border-border bg-background px-2.5 text-[0.8rem] font-medium hover:bg-muted"
+          >
+            <WandSparkles size={14} /> Prompts
+          </Link>
           {PERIODS.map((item) => (
             <Button key={item.value} variant={period === item.value ? "default" : "outline"} size="sm" onClick={() => reloadWithPeriod(item.value)}>
               {item.label}
