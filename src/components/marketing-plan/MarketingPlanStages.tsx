@@ -12,6 +12,7 @@ import {
   Eye,
   FileSearch,
   Globe2,
+  Info,
   Loader2,
   MapPinned,
   Package,
@@ -50,6 +51,8 @@ const labels = {
     personasDesc: "نبني بروفايلات عملاء محتملين ونربط الحاجة بالعرض التسويقي.",
     pdfTitle: "ملف الخطة التسويقية",
     pdfDesc: "نجهّز ملف PDF قابل للتحميل من كل الأقسام التي تم توليدها.",
+    showIntro: "عرض شرح الخطة",
+    hideIntro: "إخفاء شرح الخطة",
     downloadPdf: "تحميل PDF",
     generate: "Generate",
     generateMore: "Generate More",
@@ -112,6 +115,8 @@ const labels = {
     personasDesc: "Build potential customer profiles and connect their needs to the marketing offer.",
     pdfTitle: "Marketing Plan PDF",
     pdfDesc: "Prepare a downloadable PDF from every generated section.",
+    showIntro: "Show plan explanation",
+    hideIntro: "Hide plan explanation",
     downloadPdf: "Download PDF",
     generate: "Generate",
     generateMore: "Generate More",
@@ -174,6 +179,8 @@ const labels = {
     personasDesc: "בניית פרופילים של לקוחות פוטנציאליים וחיבור הצורך להצעה השיווקית.",
     pdfTitle: "קובץ PDF לתכנית",
     pdfDesc: "הכנת קובץ PDF להורדה מכל החלקים שנוצרו.",
+    showIntro: "הצג הסבר על התכנית",
+    hideIntro: "הסתר הסבר על התכנית",
     downloadPdf: "הורד PDF",
     generate: "Generate",
     generateMore: "Generate More",
@@ -301,6 +308,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
   const [intelligence, setIntelligence] = useState<MarketingIntelligence | null>(null);
   const [busy, setBusy] = useState<BusyAction>(null);
   const [error, setError] = useState("");
+  const [showIntro, setShowIntro] = useState(false);
 
   const load = useCallback(async () => {
     setError("");
@@ -497,8 +505,24 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
   return (
     <div className="w-full min-w-0 overflow-x-hidden space-y-5" dir={dir}>
       <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-border bg-card p-4 sm:p-5">
-        <h1 className="os-text-wrap text-2xl font-black text-foreground">{text.title}</h1>
-        <p className="os-text-wrap mt-1 text-sm text-muted-foreground">{text.desc}</p>
+        <div className="flex min-w-0 items-center justify-between gap-3">
+          <h1 className="os-text-wrap text-2xl font-black text-foreground">{text.title}</h1>
+          <button
+            type="button"
+            aria-label={showIntro ? text.hideIntro : text.showIntro}
+            title={showIntro ? text.hideIntro : text.showIntro}
+            aria-expanded={showIntro}
+            onClick={() => setShowIntro((value) => !value)}
+            className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm shadow-sm transition ${showIntro ? "border-[color:var(--brand-accent)] bg-[color:var(--brand-accent)]/10 text-[color:var(--brand-accent)]" : "border-border bg-background/80 text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+          >
+            <Info size={16} />
+          </button>
+        </div>
+        {showIntro && (
+          <p className="os-text-wrap mt-3 rounded-xl border border-border bg-background/70 p-3 text-sm leading-6 text-muted-foreground">
+            {text.desc}
+          </p>
+        )}
       </div>
       {error && <div className="os-text-wrap rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200">{error}</div>}
       {stage === "services" && <ServicesStage text={text} suiteId={suiteId} services={services} saving={busy === "save-services"} onSave={saveServices} detail />}

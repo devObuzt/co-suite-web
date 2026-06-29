@@ -7,16 +7,13 @@ import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 const copy = {
   ar: {
-    title: "الخطة التسويقية",
-    desc: "مراحل واضحة: خدمات، كلمات مفتاحية، منافسين، عرض وطلب.",
+    title: "الاستراتيجية",
   },
   he: {
-    title: "התכנית השיווקית",
-    desc: "שלבים ברורים: שירותים, מילות מפתח, מתחרים, ביקוש והיצע.",
+    title: "אסטרטגיה",
   },
   en: {
-    title: "Marketing Plan",
-    desc: "Clear stages: services, keywords, competitors, demand and supply.",
+    title: "Strategy",
   },
 };
 
@@ -26,7 +23,7 @@ export default function MarketingPlanPage({ params }: { params: Promise<{ id: st
   const text = copy[lang as keyof typeof copy] || copy.en;
 
   return (
-    <SuitePageShell title={text.title} description={text.desc}>
+    <SuitePageShell title={text.title}>
       <MarketingPlanStages suiteId={id} />
     </SuitePageShell>
   );
