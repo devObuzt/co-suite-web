@@ -412,11 +412,18 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       const { blob, filename } = await api.marketingPlans.downloadPdf(suiteId);
       const file = new File([blob], filename, { type: blob.type || "application/pdf" });
       if (typeof navigator !== "undefined" && navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: filename,
-        });
-        return;
+        try {
+          await navigator.share({
+            files: [file],
+            title: filename,
+          });
+          return;
+        } catch (shareError) {
+          const name = shareError instanceof DOMException ? shareError.name : "";
+          if (name === "AbortError" || String(shareError).toLowerCase().includes("abort")) {
+            return;
+          }
+        }
       }
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -883,7 +890,7 @@ function PersonasStage({
             </article>
           ))}
           {loadingMore && (
-            <article className="flex min-h-64 w-[78%] max-w-[22rem] shrink-0 snap-start flex-col items-center justify-center rounded-xl border border-dashed border-rose-200 bg-rose-50/60 p-4 text-center text-sm text-rose-900 sm:w-80 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-100">
+            <article key="personas-loading-more" className="flex min-h-64 w-[78%] max-w-[22rem] shrink-0 snap-start flex-col items-center justify-center rounded-xl border border-dashed border-rose-200 bg-rose-50/60 p-4 text-center text-sm text-rose-900 sm:w-80 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-100">
               <Loader2 size={22} className="mb-3 animate-spin" />
               <span className="os-text-wrap">{text.loadingMorePersonas}</span>
             </article>
