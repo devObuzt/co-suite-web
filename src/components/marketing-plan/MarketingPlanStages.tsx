@@ -4,6 +4,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
   ArrowUpRight,
   Check,
   Copy,
@@ -30,7 +32,7 @@ import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 type StageSlug = "services" | "keywords" | "competitors" | "demand-supply" | "personas" | "pdf";
-type BusyAction = StageSlug | "keywords-more" | "competitors-more" | "personas-more" | "save-services" | null;
+type BusyAction = StageSlug | "keywords-more" | "competitors-more" | "personas-more" | "save-services" | "save-keywords" | null;
 
 const labels = {
   ar: {
@@ -40,6 +42,11 @@ const labels = {
     servicesDesc: "هذه المرحلة تلقائية وتعتمد على بيانات السوت. أي تعديل هنا يحدّث السوت نفسه.",
     addService: "إضافة",
     newService: "خدمة أو منتج جديد",
+    newKeyword: "كلمة مفتاحية جديدة",
+    addKeyword: "إضافة كلمة",
+    moveKeywordUp: "رفع الكلمة",
+    moveKeywordDown: "تنزيل الكلمة",
+    removeKeyword: "حذف الكلمة",
     emptyServices: "لا توجد خدمات بعد. أضف أول خدمة حتى تعتمد عليها باقي المراحل.",
     keywordsTitle: "الكلمات المفتاحية",
     keywordsDesc: "نولّد كلمات ملائمة بناءً على فئة البزنس والخدمات واللغة.",
@@ -104,6 +111,11 @@ const labels = {
     servicesDesc: "This stage is automatic and updates the Suite profile directly.",
     addService: "Add",
     newService: "New service or product",
+    newKeyword: "New keyword",
+    addKeyword: "Add keyword",
+    moveKeywordUp: "Move keyword up",
+    moveKeywordDown: "Move keyword down",
+    removeKeyword: "Remove keyword",
     emptyServices: "No services yet. Add the first service so the next stages have context.",
     keywordsTitle: "Keywords",
     keywordsDesc: "Generate suitable keywords from the business category, services, and language.",
@@ -168,6 +180,11 @@ const labels = {
     servicesDesc: "שלב אוטומטי שמעדכן ישירות את פרופיל הסוויט.",
     addService: "הוסף",
     newService: "שירות או מוצר חדש",
+    newKeyword: "מילת מפתח חדשה",
+    addKeyword: "הוסף מילת מפתח",
+    moveKeywordUp: "העלה מילת מפתח",
+    moveKeywordDown: "הורד מילת מפתח",
+    removeKeyword: "מחק מילת מפתח",
     emptyServices: "עדיין אין שירותים. הוסף שירות ראשון כדי לתת הקשר לשלבים הבאים.",
     keywordsTitle: "מילות מפתח",
     keywordsDesc: "יצירת מילות מפתח לפי קטגוריית העסק, השירותים והשפה.",
@@ -370,6 +387,19 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     }
   }
 
+  async function saveKeywords(next: MarketingKeyword[]) {
+    setBusy("save-keywords");
+    setError("");
+    try {
+      const res = await api.marketingPlans.updateKeywords(suiteId, { keywords: next });
+      applyPlanResponse(res);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function run(action: BusyAction, fn: () => Promise<MarketingPlanResponse>) {
     setBusy(action);
     setError("");
@@ -458,8 +488,10 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         keywords={intelligence?.keywords || []}
         loading={busy === "keywords"}
         loadingMore={busy === "keywords-more"}
+        saving={busy === "save-keywords"}
         onGenerate={() => run("keywords", () => api.marketingPlans.generateKeywords(suiteId, { language: lang }))}
         onMore={() => run("keywords-more", () => api.marketingPlans.generateMoreKeywords(suiteId, { language: lang, existing_values: (intelligence?.keywords || []).map((k) => k.text) }))}
+        onSave={saveKeywords}
       />
       <CompetitorsStage
         text={text}
@@ -527,7 +559,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       {error && <div className="os-text-wrap rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200">{error}</div>}
       {stage === "services" && <ServicesStage text={text} suiteId={suiteId} services={services} saving={busy === "save-services"} onSave={saveServices} detail />}
       {stage === "keywords" && (
-        <KeywordsStage text={text} suiteId={suiteId} keywords={intelligence?.keywords || []} loading={busy === "keywords"} loadingMore={busy === "keywords-more"} onGenerate={() => run("keywords", () => api.marketingPlans.generateKeywords(suiteId, { language: lang }))} onMore={() => run("keywords-more", () => api.marketingPlans.generateMoreKeywords(suiteId, { language: lang, existing_values: (intelligence?.keywords || []).map((k) => k.text) }))} detail />
+        <KeywordsStage text={text} suiteId={suiteId} keywords={intelligence?.keywords || []} loading={busy === "keywords"} loadingMore={busy === "keywords-more"} saving={busy === "save-keywords"} onGenerate={() => run("keywords", () => api.marketingPlans.generateKeywords(suiteId, { language: lang }))} onMore={() => run("keywords-more", () => api.marketingPlans.generateMoreKeywords(suiteId, { language: lang, existing_values: (intelligence?.keywords || []).map((k) => k.text) }))} onSave={saveKeywords} detail />
       )}
       {stage === "competitors" && (
         <CompetitorsStage text={text} suiteId={suiteId} competitors={intelligence?.competitors || []} warnings={intelligence?.warnings || []} loading={busy === "competitors"} loadingMore={busy === "competitors-more"} onGenerate={() => run("competitors", () => api.marketingPlans.generateCompetitors(suiteId, { language: lang }))} onMore={() => run("competitors-more", () => api.marketingPlans.generateMoreCompetitors(suiteId, { language: lang }))} onTagsChange={(competitorId, tags) => run("competitors", () => api.marketingPlans.updateCompetitor(suiteId, competitorId, { classification_tags: tags }))} detail />
@@ -542,6 +574,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
 
 function StageBox({ title, description, icon, suiteId, slug, children, detail }: { title: string; description: string; icon: ReactNode; suiteId: string; slug: StageSlug; children: ReactNode; detail?: boolean }) {
   const tone = stageTones[slug];
+  const [showDescription, setShowDescription] = useState(false);
   return (
     <section className={`relative w-full min-w-0 max-w-full overflow-hidden rounded-2xl border bg-card p-4 shadow-sm sm:p-5 ${tone.section}`}>
       <span className={`absolute inset-x-0 top-0 h-1 ${tone.accent}`} />
@@ -550,15 +583,31 @@ function StageBox({ title, description, icon, suiteId, slug, children, detail }:
           <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone.icon}`}>{icon}</span>
           <div className="min-w-0">
             <h2 className="os-text-wrap text-xl font-black text-foreground">{title}</h2>
-            <p className="os-text-wrap mt-1 text-sm text-muted-foreground">{description}</p>
           </div>
         </div>
-        {!detail && (
-          <Link href={`/suite/${suiteId}/marketing-plan/${slug}`} aria-label={title} title={title} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background/80 text-foreground shadow-sm hover:bg-muted">
-            <ArrowUpRight size={15} />
-          </Link>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            aria-label={showDescription ? `Hide ${title}` : `Info ${title}`}
+            title={showDescription ? description : title}
+            aria-expanded={showDescription}
+            onClick={() => setShowDescription((value) => !value)}
+            className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border shadow-sm transition ${showDescription ? "border-[color:var(--brand-accent)] bg-[color:var(--brand-accent)]/10 text-[color:var(--brand-accent)]" : "border-border bg-background/80 text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+          >
+            <Info size={15} />
+          </button>
+          {!detail && (
+            <Link href={`/suite/${suiteId}/marketing-plan/${slug}`} aria-label={title} title={title} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background/80 text-foreground shadow-sm hover:bg-muted">
+              <ArrowUpRight size={15} />
+            </Link>
+          )}
+        </div>
       </div>
+      {showDescription && (
+        <p className="os-text-wrap mt-3 rounded-xl border border-border bg-background/70 p-3 text-sm leading-6 text-muted-foreground">
+          {description}
+        </p>
+      )}
       <div className="mt-5 min-w-0">{children}</div>
     </section>
   );
@@ -628,17 +677,92 @@ function ServicesStage({ text, suiteId, services, saving, onSave, detail }: { te
   );
 }
 
-function KeywordsStage({ text, suiteId, keywords, loading, loadingMore, onGenerate, onMore, detail }: { text: typeof labels.en; suiteId: string; keywords: MarketingKeyword[]; loading: boolean; loadingMore: boolean; onGenerate: () => void; onMore: () => void; detail?: boolean }) {
+function KeywordsStage({
+  text,
+  suiteId,
+  keywords,
+  loading,
+  loadingMore,
+  saving,
+  onGenerate,
+  onMore,
+  onSave,
+  detail,
+}: {
+  text: typeof labels.en;
+  suiteId: string;
+  keywords: MarketingKeyword[];
+  loading: boolean;
+  loadingMore: boolean;
+  saving: boolean;
+  onGenerate: () => void;
+  onMore: () => void;
+  onSave: (next: MarketingKeyword[]) => Promise<void>;
+  detail?: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [draft, setDraft] = useState("");
+  const visibleKeywords = expanded || detail ? keywords : keywords.slice(0, 10);
+  const isBusy = loading || loadingMore || saving;
+
+  async function addKeyword() {
+    const textValue = draft.trim();
+    if (!textValue) return;
+    const exists = keywords.some((keyword) => keyword.text.trim().toLocaleLowerCase() === textValue.toLocaleLowerCase());
+    setDraft("");
+    if (exists) return;
+    await onSave([
+      ...keywords,
+      {
+        id: `kw-manual-${Date.now()}`,
+        text: textValue,
+        intent: "manual",
+        source: "manual",
+        confidence: "manual",
+      },
+    ]);
+  }
+
+  async function moveKeyword(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= keywords.length) return;
+    const next = [...keywords];
+    const [item] = next.splice(index, 1);
+    next.splice(target, 0, item);
+    await onSave(next);
+  }
+
+  async function removeKeyword(id: string) {
+    await onSave(keywords.filter((keyword) => keyword.id !== id));
+  }
+
   return (
     <StageBox title={text.keywordsTitle} description={text.keywordsDesc} icon={<FileSearch size={18} />} suiteId={suiteId} slug="keywords" detail={detail}>
       <div className="flex min-w-0 flex-wrap gap-2">
-        <Button onClick={onGenerate} disabled={loading || loadingMore} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}{text.generate}</Button>
-        {keywords.length > 0 && <Button variant="outline" onClick={onMore} disabled={loading || loadingMore} className="gap-2">{loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.generateMore}</Button>}
+        <Button onClick={onGenerate} disabled={isBusy} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}{text.generate}</Button>
+        {keywords.length > 0 && <Button variant="outline" onClick={onMore} disabled={isBusy} className="gap-2">{loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.generateMore}</Button>}
       </div>
-      <div className={`relative mt-4 flex min-w-0 flex-wrap gap-2 overflow-hidden transition-[max-height] ${expanded || detail ? "max-h-none" : "max-h-[4.6rem]"}`}>
-        {keywords.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noKeywords}</p> : keywords.map((keyword) => (
-          <span key={keyword.id} className="os-text-wrap max-w-full rounded-2xl border border-border bg-background px-3 py-1.5 text-sm leading-5" dir="auto">{keyword.text}</span>
+      <div className="mt-4 flex min-w-0 flex-col gap-2 sm:flex-row">
+        <Input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={text.newKeyword} dir="auto" onKeyDown={(e) => { if (e.key === "Enter") void addKeyword(); }} />
+        <Button type="button" variant="outline" onClick={addKeyword} disabled={isBusy || !draft.trim()} className="w-full gap-2 sm:w-auto">
+          {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+          {text.addKeyword}
+        </Button>
+      </div>
+      <div className={`relative mt-4 flex min-w-0 flex-wrap gap-2 overflow-hidden transition-[max-height] ${expanded || detail ? "max-h-none" : "max-h-[8.4rem]"}`}>
+        {keywords.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noKeywords}</p> : visibleKeywords.map((keyword) => (
+          <span key={keyword.id} className="os-text-wrap inline-flex max-w-full items-center gap-1 rounded-2xl border border-border bg-background px-2 py-1.5 text-sm leading-5 shadow-sm" dir="auto">
+            <span className="min-w-0 px-1 font-semibold">{keyword.text}</span>
+            <button type="button" aria-label={text.moveKeywordUp} title={text.moveKeywordUp} disabled={isBusy || keywords.indexOf(keyword) === 0} onClick={() => moveKeyword(keywords.indexOf(keyword), -1)} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30">
+              <ArrowUp size={13} />
+            </button>
+            <button type="button" aria-label={text.moveKeywordDown} title={text.moveKeywordDown} disabled={isBusy || keywords.indexOf(keyword) === keywords.length - 1} onClick={() => moveKeyword(keywords.indexOf(keyword), 1)} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30">
+              <ArrowDown size={13} />
+            </button>
+            <button type="button" aria-label={text.removeKeyword} title={text.removeKeyword} disabled={isBusy} onClick={() => removeKeyword(keyword.id)} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-red-500/10 hover:text-red-600 disabled:opacity-30">
+              <X size={13} />
+            </button>
+          </span>
         ))}
       </div>
       {keywords.length > 10 && !detail && (

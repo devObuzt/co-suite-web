@@ -356,6 +356,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data || {}),
       }),
+    updateKeywords: (suiteId: string, data: { keywords: MarketingKeyword[] }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/keywords`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
     generateDemandSupply: (suiteId: string, data?: { language?: string; near_term_focus?: string; upcoming_campaigns?: string[]; planning_notes?: string }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/demand-supply/generate`, {
         method: "POST",
