@@ -317,6 +317,28 @@ export const api = {
       }),
   },
 
+  videoMontage: {
+    latest: (suiteId: string) =>
+      request<GenerationStatus>(`/suites/${suiteId}/video-montage/jobs/latest`),
+    get: (suiteId: string, jobId: string) =>
+      request<GenerationStatus>(`/suites/${suiteId}/video-montage/jobs/${jobId}`),
+    create: (
+      suiteId: string,
+      data: { mode: string; sourceUrl?: string; options: string[]; notes?: string; sourceFile?: File | null }
+    ) => {
+      const form = new FormData();
+      form.append("mode", data.mode);
+      form.append("source_url", data.sourceUrl || "");
+      form.append("options_json", JSON.stringify(data.options || []));
+      form.append("notes", data.notes || "");
+      if (data.sourceFile) form.append("source_file", data.sourceFile);
+      return request<GenerationStatus>(`/suites/${suiteId}/video-montage/jobs`, {
+        method: "POST",
+        body: form,
+      });
+    },
+  },
+
   marketingPlans: {
     get: (suiteId: string) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan`),
