@@ -102,7 +102,7 @@ function extractVideoMontageResult(status: GenerationStatus | null): VideoMontag
 export default function VideoMontagePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [mode, setMode] = useState<VideoMode>("talking_head");
-  const [selectedOptions, setSelectedOptions] = useState<string[]>(["captions", "dead_spaces", "music"]);
+  const [selectedOptions, setSelectedOptions] = useState<string[]>(options.map((option) => option.id));
   const [notes, setNotes] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceFile, setSourceFile] = useState<File | null>(null);
