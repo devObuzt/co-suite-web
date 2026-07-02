@@ -60,9 +60,14 @@ const stretchedTitle = (title: string) => {
   return stretchArabicWord(word);
 };
 
+const sceneProgress = (frame: number, durationInFrames: number) =>
+  Math.max(0, Math.min(1, frame / Math.max(1, durationInFrames)));
+
 const SceneBackground = ({scene, durationInFrames}: {scene: Scene; durationInFrames: number}) => {
   const frame = useCurrentFrame();
-  const pulse = interpolate(frame % 90, [0, 45, 90], [0, 1, 0]);
+  const progress = sceneProgress(frame, durationInFrames);
+  const pulse = (Math.sin(frame / 18) + 1) / 2;
+  const slowPulse = (Math.sin(frame / 56) + 1) / 2;
   const entrance = interpolate(frame, [0, TRANSITION_FRAMES], [1.08, 1], {
     extrapolateRight: 'clamp',
   });
@@ -90,20 +95,52 @@ const SceneBackground = ({scene, durationInFrames}: {scene: Scene; durationInFra
         <Img
           src={publicAsset(backgroundImage)}
           style={{
-            filter: 'saturate(1.08) contrast(1.04)',
+            filter: 'saturate(1.16) contrast(1.08) brightness(0.86)',
             height: '100%',
             inset: 0,
             objectFit: 'cover',
             position: 'absolute',
-            transform: `scale(${(1.03 + pulse * 0.015) * entrance * exit})`,
+            transform: `translate3d(${interpolate(progress, [0, 1], [-18, 18])}px, ${interpolate(
+              slowPulse,
+              [0, 1],
+              [-14, 14],
+            )}px, 0) scale(${(1.08 + pulse * 0.028) * entrance * exit})`,
             width: '100%',
           }}
         />
       ) : null}
       <div
         style={{
+          backgroundImage:
+            'linear-gradient(90deg, rgba(255,255,255,.09) 1px, transparent 1px), linear-gradient(180deg, rgba(255,255,255,.06) 1px, transparent 1px)',
+          backgroundSize: '108px 108px',
+          inset: '-10%',
+          opacity: 0.08 + slowPulse * 0.035,
+          position: 'absolute',
+          transform: `translate3d(${interpolate(progress, [0, 1], [-36, 36])}px, ${interpolate(
+            progress,
+            [0, 1],
+            [24, -24],
+          )}px, 0) rotate(-4deg)`,
+        }}
+      />
+      <div
+        style={{
+          background: `radial-gradient(circle at ${72 - pulse * 34}% ${20 + slowPulse * 44}%, ${
+            scene.palette[1]
+          }55 0, transparent 22%), radial-gradient(circle at ${18 + pulse * 48}% ${
+            68 - slowPulse * 18
+          }%, ${scene.palette[2]}26 0, transparent 24%)`,
+          filter: 'blur(4px)',
+          inset: 0,
+          opacity: 0.68,
+          position: 'absolute',
+        }}
+      />
+      <div
+        style={{
           background:
-            'linear-gradient(180deg, #02040a66 0%, transparent 28%, transparent 62%, #02040aaa 100%)',
+            'linear-gradient(180deg, #02040a44 0%, transparent 30%, transparent 64%, #02040a99 100%)',
           inset: 0,
           position: 'absolute',
         }}
@@ -145,35 +182,35 @@ const BehindPersonText = ({scene}: {scene: Scene}) => {
     [1, 0],
     {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
   );
-  const scale = interpolate(frame, [0, 18, 90], [0.86, 1, 1.035], {
+  const scale = interpolate(frame, [0, 18, 90], [0.82, 1, 1.045], {
     extrapolateRight: 'clamp',
   });
-  const y = interpolate(frame, [0, 18], [-32, 0], {extrapolateRight: 'clamp'});
+  const y = interpolate(frame, [0, 18], [-44, 0], {extrapolateRight: 'clamp'});
 
   return (
     <AbsoluteFill
       style={{
         alignItems: 'center',
         justifyContent: 'flex-start',
-        padding: '160px 22px 0',
+        padding: '132px 0 0',
         zIndex: 1,
       }}
     >
       <div
         style={{
           borderRadius: 24,
-          color: scene.palette[1],
-          filter: `drop-shadow(0 22px 34px ${scene.palette[0]}ee) drop-shadow(0 0 18px ${scene.palette[1]}cc) drop-shadow(0 0 42px ${scene.palette[1]}88)`,
+          color: scene.palette[2],
+          filter: `drop-shadow(0 16px 0 ${scene.palette[0]}dd) drop-shadow(0 20px 34px #000e) drop-shadow(0 0 22px ${scene.palette[1]}dd) drop-shadow(0 0 58px ${scene.palette[1]}99)`,
           fontFamily: manifest.style.arabicFontFamily,
-          fontSize: displayTitle.length > 24 ? 126 : 146,
+          fontSize: displayTitle.length > 24 ? 152 : 182,
           fontWeight: 800,
           letterSpacing: 0,
-          lineHeight: 0.9,
-          maxWidth: 1080,
-          opacity: introOpacity * outroOpacity,
+          lineHeight: 0.82,
+          minWidth: 1420,
+          opacity: introOpacity * outroOpacity * 0.86,
           textAlign: 'center',
-          textShadow: `0 4px 0 ${scene.palette[0]}dd, 0 12px 30px #000e, 0 0 34px ${scene.palette[1]}cc`,
-          transform: `translateY(${y}px) scale(${scale})`,
+          textShadow: `0 4px 0 ${scene.palette[1]}cc, 0 9px 0 ${scene.palette[0]}cc, 0 20px 38px #000f, 0 0 36px ${scene.palette[1]}ee`,
+          transform: `translateY(${y}px) scaleX(1.12) scale(${scale})`,
           whiteSpace: 'nowrap',
         }}
       >
@@ -218,7 +255,7 @@ const TransitionEffects = ({
         style={{
           background: scene.palette[1],
           inset: 0,
-          opacity: transitionOpacity * 0.08,
+          opacity: transitionOpacity * 0.12,
           position: 'absolute',
         }}
       />
@@ -228,7 +265,7 @@ const TransitionEffects = ({
           filter: `blur(${8 + transitionOpacity * 8}px)`,
           height: '125%',
           left: 0,
-          opacity: sweepOpacity * transitionOpacity,
+          opacity: (sweepOpacity + 0.18) * transitionOpacity,
           position: 'absolute',
           top: '-12%',
           transform: `translateX(${sweepX}px) rotate(12deg)`,
@@ -256,20 +293,20 @@ const Captions = ({scene}: {scene: Scene}) => {
     <AbsoluteFill
       style={{
         justifyContent: 'flex-end',
-        padding: '0 72px 126px',
+        padding: '0 66px 104px',
         zIndex: 3,
       }}
     >
       <div
         style={{
           alignSelf: 'center',
-          backgroundColor: '#05070bcc',
+          backgroundColor: '#05070bc0',
           border: `2px solid ${scene.palette[2]}55`,
           borderRadius: 18,
-          boxShadow: '0 22px 70px #0009',
+          boxShadow: `0 18px 58px #0009, 0 0 26px ${scene.palette[1]}55`,
           color: '#fff',
           fontFamily: manifest.style.arabicFontFamily,
-          fontSize: scene.caption.length > 95 ? 44 : 56,
+          fontSize: scene.caption.length > 95 ? 42 : 52,
           fontWeight: 800,
           lineHeight: 1.14,
           maxWidth: 930,
@@ -346,6 +383,21 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
           )}.png`,
         )
       : null;
+  const progress = sceneProgress(frame, durationInFrames);
+  const float = Math.sin(frame / 22);
+  const subjectScale = interpolate(progress, [0, 0.5, 1], [1.035, 1.075, 1.045]);
+  const subjectX = interpolate(progress, [0, 1], [-10, 10]);
+  const subjectY = float * 5;
+  const subjectStyle: React.CSSProperties = {
+    height: '100%',
+    inset: 0,
+    objectFit: 'cover',
+    position: 'absolute',
+    transform: `translate3d(${subjectX}px, ${subjectY}px, 0) scale(${subjectScale})`,
+    transformOrigin: '50% 46%',
+    width: '100%',
+    zIndex: 2,
+  };
 
   return (
     <AbsoluteFill>
@@ -354,28 +406,14 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
       {frameSrc ? (
         <Img
           src={frameSrc}
-          style={{
-            height: '100%',
-            inset: 0,
-            objectFit: 'cover',
-            position: 'absolute',
-            width: '100%',
-            zIndex: 2,
-          }}
+          style={subjectStyle}
         />
       ) : (
         <OffthreadVideo
           src={publicAsset(manifest.source.publicPath)}
           startFrom={startFrom}
           endAt={endAt}
-          style={{
-            height: '100%',
-            inset: 0,
-            objectFit: 'cover',
-            position: 'absolute',
-            width: '100%',
-            zIndex: 2,
-          }}
+          style={subjectStyle}
         />
       )}
       <Audio src={publicAsset(sourceAudioPath)} startFrom={startFrom} endAt={endAt} />
@@ -386,13 +424,12 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
 };
 export const AiMontage = () => {
   const {fps} = useVideoConfig();
-  let cursor = 0;
-  const timedScenes = manifest.scenes.map((scene) => {
+  const timedScenes = manifest.scenes.reduce<Array<{duration: number; from: number; scene: Scene}>>((items, scene) => {
     const duration = sourceFrames(scene.sourceEnd - scene.sourceStart, fps);
-    const from = cursor;
-    cursor += duration;
-    return {duration, from, scene};
-  });
+    const previous = items.at(-1);
+    const from = previous ? previous.from + previous.duration : 0;
+    return [...items, {duration, from, scene}];
+  }, []);
   const backgroundMusic = manifest.audio.backgroundMusic;
   const soundEffects = manifest.audio.soundEffects ?? [];
 
