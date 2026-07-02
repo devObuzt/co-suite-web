@@ -393,10 +393,27 @@ export const AiMontage = () => {
     cursor += duration;
     return {duration, from, scene};
   });
+  const backgroundMusic = manifest.audio.backgroundMusic;
+  const soundEffects = manifest.audio.soundEffects ?? [];
 
   return (
     <AbsoluteFill style={{backgroundColor: '#08090d'}}>
       <style>{styles}</style>
+      {backgroundMusic?.publicPath ? (
+        <Audio
+          src={publicAsset(backgroundMusic.publicPath)}
+          volume={backgroundMusic.volume ?? 0.28}
+        />
+      ) : null}
+      {soundEffects.map((effect, index) => (
+        <Sequence
+          key={`sfx-${index}`}
+          from={Math.max(0, sourceFrames(effect.at ?? 0, fps))}
+          durationInFrames={Math.max(1, sourceFrames(0.7, fps))}
+        >
+          <Audio src={publicAsset(effect.publicPath)} volume={effect.volume ?? 0.35} />
+        </Sequence>
+      ))}
       {timedScenes.map(({duration, from, scene}) => {
         return (
           <Sequence key={scene.id} from={from} durationInFrames={duration}>
