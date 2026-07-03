@@ -40,11 +40,19 @@ type VideoMontageResult = {
   package_url?: string;
   source_warning?: string;
   video_montage?: {
+    source_url?: string;
     render?: {
       rendered?: boolean;
       output_url?: string;
       reason?: string;
       capabilities_applied?: string[];
+      scenes?: Array<{
+        id?: string;
+        start?: number;
+        end?: number;
+        caption?: string;
+        behindText?: string;
+      }>;
     };
     package_url?: string;
     source_warning?: string;
@@ -106,6 +114,8 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   const [notes, setNotes] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [captionOverrides, setCaptionOverrides] = useState<string[]>([]);
+  const [titleOverrides, setTitleOverrides] = useState<string[]>([]);
   const [status, setStatus] = useState<GenerationStatus | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -117,6 +127,8 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   const outputUrl = absoluteApiUrl(result?.output_url || result?.video_montage?.render?.output_url || null);
   const packageUrl = absoluteApiUrl(result?.package_url || result?.video_montage?.package_url || null);
   const renderReason = result?.video_montage?.render?.reason || result?.source_warning || result?.video_montage?.source_warning;
+  const renderedScenes = result?.video_montage?.render?.scenes || [];
+  const effectiveSourceUrl = sourceUrl.trim() || result?.video_montage?.source_url || "";
 
   useEffect(() => {
     let cancelled = false;
@@ -145,6 +157,12 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     return () => window.clearInterval(interval);
   }, [id, status?.is_active, status?.job_id]);
 
+  useEffect(() => {
+    if (!renderedScenes.length) return;
+    setCaptionOverrides((current) => current.length ? current : renderedScenes.map((scene) => scene.caption || ""));
+    setTitleOverrides((current) => current.length ? current : renderedScenes.map((scene) => scene.behindText || ""));
+  }, [renderedScenes]);
+
   function toggleOption(optionId: string) {
     setSelectedOptions((current) => (
       current.includes(optionId)
@@ -155,7 +173,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
 
   async function startMontage() {
     setError(null);
-    if (!sourceFile && !sourceUrl.trim()) {
+    if (!sourceFile && !effectiveSourceUrl) {
       setError("ارفع ملف فيديو أو ضع رابط مباشر للفيديو قبل تشغيل المونتاج.");
       return;
     }
@@ -163,10 +181,12 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     try {
       const next = await api.videoMontage.create(id, {
         mode,
-        sourceUrl,
+        sourceUrl: effectiveSourceUrl,
         options: selectedOptions,
         notes,
         sourceFile,
+        captionOverrides,
+        titleOverrides,
       });
       setStatus(next);
     } catch (err) {
@@ -270,7 +290,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                 value={sourceUrl}
                 onChange={(event) => setSourceUrl(event.target.value)}
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                placeholder="https://example.com/video.mp4"
+                placeholder={result?.video_montage?.source_url || "https://example.com/video.mp4"}
                 dir="ltr"
               />
             </div>
@@ -374,6 +394,65 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
             <p className="os-text-wrap mt-4 rounded-2xl border border-[#f8d84a]/35 bg-[#f8d84a]/12 p-3 text-sm leading-6 text-[#8a6200]">
               {renderReason}
             </p>
+          )}
+
+          {renderedScenes.length > 0 && (
+            <div className="mt-5 rounded-3xl border border-[#2f80ff]/25 bg-[#2f80ff]/5 p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 className="text-xl font-black text-foreground">تعديل يدوي للنصوص</h3>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    عدّل الكابشن أو عنوان 3D لكل مشهد، ثم اضغط تشغيل المونتاج لإعادة الرندر بنفس المصدر.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCaptionOverrides(renderedScenes.map((scene) => scene.caption || ""));
+                    setTitleOverrides(renderedScenes.map((scene) => scene.behindText || ""));
+                  }}
+                  className="inline-flex min-h-10 items-center justify-center rounded-xl border border-border bg-background px-3 text-xs font-black text-foreground hover:bg-muted"
+                >
+                  استرجاع النص الحالي
+                </button>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {renderedScenes.map((scene, index) => (
+                  <div key={scene.id || index} className="rounded-2xl border border-border bg-background p-3">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-black text-muted-foreground">
+                        مشهد {index + 1}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {Number(scene.start || 0).toFixed(1)}s - {Number(scene.end || 0).toFixed(1)}s
+                      </span>
+                    </div>
+                    <label className="block text-xs font-bold text-muted-foreground">عنوان 3D</label>
+                    <input
+                      value={titleOverrides[index] ?? scene.behindText ?? ""}
+                      onChange={(event) => {
+                        const next = [...titleOverrides];
+                        next[index] = event.target.value;
+                        setTitleOverrides(next);
+                      }}
+                      className="mt-1 h-11 w-full rounded-xl border border-border bg-card px-3 text-sm font-bold text-foreground outline-none focus:border-[#2f80ff]"
+                      dir="auto"
+                    />
+                    <label className="mt-3 block text-xs font-bold text-muted-foreground">الكابشن</label>
+                    <textarea
+                      value={captionOverrides[index] ?? scene.caption ?? ""}
+                      onChange={(event) => {
+                        const next = [...captionOverrides];
+                        next[index] = event.target.value;
+                        setCaptionOverrides(next);
+                      }}
+                      className="mt-1 min-h-20 w-full resize-y rounded-xl border border-border bg-card px-3 py-2 text-sm leading-6 text-foreground outline-none focus:border-[#2f80ff]"
+                      dir="auto"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {outputUrl && (

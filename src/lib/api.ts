@@ -324,12 +324,22 @@ export const api = {
       request<GenerationStatus>(`/suites/${suiteId}/video-montage/jobs/${jobId}`),
     create: (
       suiteId: string,
-      data: { mode: string; sourceUrl?: string; options: string[]; notes?: string; sourceFile?: File | null }
+      data: {
+        mode: string;
+        sourceUrl?: string;
+        options: string[];
+        notes?: string;
+        sourceFile?: File | null;
+        captionOverrides?: string[];
+        titleOverrides?: string[];
+      }
     ) => {
       const form = new FormData();
       form.append("mode", data.mode);
       form.append("source_url", data.sourceUrl || "");
       form.append("options_json", JSON.stringify(data.options || []));
+      form.append("caption_overrides_json", JSON.stringify(data.captionOverrides || []));
+      form.append("title_overrides_json", JSON.stringify(data.titleOverrides || []));
       form.append("notes", data.notes || "");
       if (data.sourceFile) form.append("source_file", data.sourceFile);
       return request<GenerationStatus>(`/suites/${suiteId}/video-montage/jobs`, {
