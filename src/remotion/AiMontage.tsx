@@ -13,11 +13,13 @@ import {
 import manifest from './manifest.generated.json';
 
 type Scene = (typeof manifest.scenes)[number];
+type AttentionBeat = {at: number; type: 'zoom' | 'flash' | 'overlay' | 'parallax' | string};
 
 const sourceFrames = (seconds: number, fps: number) => Math.round(seconds * fps);
 const TRANSITION_FRAMES = 12;
 const BRIDGE_FRAMES = 14;
-const publicAsset = (path: string) => staticFile(path.replace(/^\//, ''));
+const publicAsset = (path: string) =>
+  /^https?:\/\//.test(path) ? path : staticFile(path.replace(/^\//, ''));
 const sourceAudioPath =
   'sourcePublicPath' in manifest.audio
     ? manifest.audio.sourcePublicPath
@@ -77,9 +79,36 @@ const behindTitleLayout = (title: string) => {
 const sceneProgress = (frame: number, durationInFrames: number) =>
   Math.max(0, Math.min(1, frame / Math.max(1, durationInFrames)));
 
+const attentionBeatsForScene = (scene: Scene, durationInFrames: number, fps: number): AttentionBeat[] => {
+  if ('attentionBeats' in scene && Array.isArray(scene.attentionBeats)) {
+    return scene.attentionBeats as AttentionBeat[];
+  }
+  const seconds = durationInFrames / fps;
+  const count = Math.max(1, Math.floor(seconds / 2.7));
+  return Array.from({length: count}, (_, index) => ({
+    at: Math.min(seconds - 0.2, 0.55 + index * 2.8),
+    type: ['zoom', 'flash', 'overlay', 'parallax'][index % 4],
+  }));
+};
+
+const beatPulse = (frame: number, fps: number, beats: AttentionBeat[], types?: string[]) => {
+  return beats.reduce((value, beat) => {
+    if (types && !types.includes(beat.type)) return value;
+    const beatFrame = Math.round((beat.at || 0) * fps);
+    const distance = Math.abs(frame - beatFrame);
+    if (distance > 18) return value;
+    return Math.max(value, interpolate(distance, [0, 18], [1, 0], {extrapolateRight: 'clamp'}));
+  }, 0);
+};
+
 const SceneBackground = ({scene, durationInFrames}: {scene: Scene; durationInFrames: number}) => {
   const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
   const progress = sceneProgress(frame, durationInFrames);
+  const beats = attentionBeatsForScene(scene, durationInFrames, fps);
+  const beat = beatPulse(frame, fps, beats);
+  const parallaxBeat = beatPulse(frame, fps, beats, ['parallax', 'overlay']);
+  const flashBeat = beatPulse(frame, fps, beats, ['flash']);
   const pulse = (Math.sin(frame / 18) + 1) / 2;
   const slowPulse = (Math.sin(frame / 56) + 1) / 2;
   const entrance = interpolate(frame, [0, TRANSITION_FRAMES], [1.08, 1], {
@@ -109,16 +138,16 @@ const SceneBackground = ({scene, durationInFrames}: {scene: Scene; durationInFra
         <Img
           src={publicAsset(backgroundImage)}
           style={{
-            filter: 'saturate(1.16) contrast(1.08) brightness(0.86)',
+            filter: `saturate(${1.16 + beat * 0.18}) contrast(${1.08 + beat * 0.1}) brightness(${0.86 + flashBeat * 0.12})`,
             height: '100%',
             inset: 0,
             objectFit: 'cover',
             position: 'absolute',
-            transform: `translate3d(${interpolate(progress, [0, 1], [-18, 18])}px, ${interpolate(
+            transform: `translate3d(${interpolate(progress, [0, 1], [-18, 18]) + parallaxBeat * 28}px, ${interpolate(
               slowPulse,
               [0, 1],
               [-14, 14],
-            )}px, 0) scale(${(1.08 + pulse * 0.028) * entrance * exit})`,
+            ) - parallaxBeat * 20}px, 0) scale(${(1.08 + pulse * 0.028 + beat * 0.035) * entrance * exit})`,
             width: '100%',
           }}
         />
@@ -136,6 +165,29 @@ const SceneBackground = ({scene, durationInFrames}: {scene: Scene; durationInFra
             [0, 1],
             [24, -24],
           )}px, 0) rotate(-4deg)`,
+        }}
+      />
+      <div
+        style={{
+          background: `radial-gradient(circle at ${50 + Math.sin(frame / 11) * 22}% ${34 + Math.cos(frame / 13) * 20}%, #ffffff99 0, ${scene.palette[1]}66 9%, transparent 28%)`,
+          filter: 'blur(18px)',
+          inset: 0,
+          opacity: beat * 0.32,
+          position: 'absolute',
+          transform: `scale(${1 + beat * 0.06})`,
+        }}
+      />
+      <div
+        style={{
+          background: `linear-gradient(100deg, transparent 0%, ${scene.palette[2]}88 48%, transparent 100%)`,
+          filter: 'blur(5px)',
+          height: '125%',
+          left: '-25%',
+          opacity: flashBeat * 0.42,
+          position: 'absolute',
+          top: '-12%',
+          transform: `translateX(${interpolate(flashBeat, [0, 1], [-240, 760])}px) rotate(12deg)`,
+          width: 180,
         }}
       />
       <div
@@ -401,10 +453,15 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
         )
       : null;
   const progress = sceneProgress(frame, durationInFrames);
+  const beats = attentionBeatsForScene(scene, durationInFrames, fps);
+  const zoomBeat = beatPulse(frame, fps, beats, ['zoom']);
+  const overlayBeat = beatPulse(frame, fps, beats, ['overlay']);
+  const flashBeat = beatPulse(frame, fps, beats, ['flash']);
   const float = Math.sin(frame / 22);
-  const subjectScale = interpolate(progress, [0, 0.5, 1], [1.035, 1.075, 1.045]);
-  const subjectX = interpolate(progress, [0, 1], [-10, 10]);
-  const subjectY = float * 5;
+  const subjectScale =
+    interpolate(progress, [0, 0.5, 1], [1.035, 1.075, 1.045]) + zoomBeat * 0.07;
+  const subjectX = interpolate(progress, [0, 1], [-10, 10]) + overlayBeat * 12;
+  const subjectY = float * 5 - zoomBeat * 16;
   const subjectStyle: React.CSSProperties = {
     height: '100%',
     inset: 0,
@@ -435,6 +492,30 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
       )}
       <Audio src={publicAsset(sourceAudioPath)} startFrom={startFrom} endAt={endAt} />
       <Captions scene={scene} />
+      <AbsoluteFill style={{pointerEvents: 'none', zIndex: 3}}>
+        <div
+          style={{
+            border: `3px solid ${scene.palette[2]}55`,
+            borderRadius: 38,
+            inset: 70,
+            opacity: overlayBeat * 0.7,
+            position: 'absolute',
+            transform: `scale(${1 - overlayBeat * 0.035})`,
+          }}
+        />
+        <div
+          style={{
+            background: `linear-gradient(90deg, transparent, ${scene.palette[1]}aa, transparent)`,
+            bottom: 360,
+            height: 8,
+            left: 120,
+            opacity: (overlayBeat + flashBeat) * 0.62,
+            position: 'absolute',
+            right: 120,
+            transform: `translateY(${overlayBeat * -22}px)`,
+          }}
+        />
+      </AbsoluteFill>
       <TransitionEffects scene={scene} durationInFrames={durationInFrames} />
     </AbsoluteFill>
   );

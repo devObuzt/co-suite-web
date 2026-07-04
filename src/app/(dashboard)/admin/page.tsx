@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { api, AdminBillingUsageEvent, AdminProvider, AdminSummary, AdminUser, AdminUserDetail, AppTextOverride, AuditLog, ProviderUsageEvent, ProviderUsageSummary } from "@/lib/api";
+import { api, AdminBillingUsageEvent, AdminProvider, AdminSummary, AdminUser, AdminUserDetail, AppTextOverride, AuditLog, CreativeAsset, ProviderUsageEvent, ProviderUsageSummary } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { LANGUAGES, LangCode } from "@/lib/i18n/translations";
 import { AdminTextCatalogRow, buildAdminTextCatalog } from "@/lib/i18n/adminTextCatalog";
-import { Activity, CircleDollarSign, KeyRound, Languages, Loader2, RefreshCw, RotateCcw, Save, Search, ShieldCheck, UserCog, Users, WandSparkles } from "lucide-react";
+import { Activity, CircleDollarSign, KeyRound, Languages, Loader2, RefreshCw, RotateCcw, Save, Search, ShieldCheck, Tags, Upload, UserCog, Users, WandSparkles } from "lucide-react";
 
 const PERIODS = [
   { value: "today", label: "Today" },
@@ -17,6 +17,14 @@ const PERIODS = [
   { value: "week", label: "Week" },
   { value: "month", label: "Month" },
   { value: "all", label: "All" },
+];
+
+const CREATIVE_ASSET_KINDS = [
+  { value: "music", label: "Music" },
+  { value: "sfx", label: "SFX" },
+  { value: "transition", label: "Transitions" },
+  { value: "visual_image", label: "Visual images" },
+  { value: "visual_video", label: "Visual videos" },
 ];
 
 export default function AdminPage() {
@@ -28,6 +36,11 @@ export default function AdminPage() {
   const [providerRows, setProviderRows] = useState<ProviderUsageEvent[]>([]);
   const [providerSummary, setProviderSummary] = useState<ProviderUsageSummary[]>([]);
   const [providers, setProviders] = useState<AdminProvider[]>([]);
+  const [creativeAssets, setCreativeAssets] = useState<CreativeAsset[]>([]);
+  const [creativeKind, setCreativeKind] = useState("transition");
+  const [creativeFile, setCreativeFile] = useState<File | null>(null);
+  const [creativeTitle, setCreativeTitle] = useState("");
+  const [savingCreativeId, setSavingCreativeId] = useState<string | null>(null);
   const [billingRows, setBillingRows] = useState<AdminBillingUsageEvent[]>([]);
   const [textLanguage, setTextLanguage] = useState<LangCode>("ar");
   const [textOverrides, setTextOverrides] = useState<AppTextOverride[]>([]);
@@ -61,7 +74,7 @@ export default function AdminPage() {
 
   async function load(nextPeriod = period, nextQuery = query) {
     setError(null);
-    const [s, u, catalog, billing, ps, pr, l] = await Promise.all([
+    const [s, u, catalog, billing, ps, pr, l, ca] = await Promise.all([
       api.admin.summary(nextPeriod),
       api.admin.users(nextQuery),
       api.admin.providers(),
@@ -69,6 +82,7 @@ export default function AdminPage() {
       api.admin.providerUsageSummary(nextPeriod),
       api.admin.providerUsage(nextPeriod),
       api.admin.auditLogs(nextPeriod),
+      api.admin.creativeAssets(),
     ]);
     setSummary(s);
     setUsers(u);
@@ -77,6 +91,7 @@ export default function AdminPage() {
     setProviderSummary(ps);
     setProviderRows(pr);
     setLogs(l);
+    setCreativeAssets(ca);
   }
 
   async function loadAppText(language = textLanguage) {
@@ -203,6 +218,59 @@ export default function AdminPage() {
     }
   }
 
+  async function uploadCreativeAsset() {
+    if (!creativeFile) {
+      setError("Choose a creative asset file first.");
+      return;
+    }
+    setSavingCreativeId("__upload__");
+    setNotice(null);
+    setError(null);
+    try {
+      await api.admin.uploadCreativeAsset({ kind: creativeKind, title: creativeTitle, file: creativeFile });
+      setCreativeFile(null);
+      setCreativeTitle("");
+      setCreativeAssets(await api.admin.creativeAssets());
+      setNotice("Creative asset uploaded and auto-classified.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Creative asset upload failed");
+    } finally {
+      setSavingCreativeId(null);
+    }
+  }
+
+  async function updateCreativeTags(asset: CreativeAsset, rawTags: string) {
+    setSavingCreativeId(asset.id);
+    setNotice(null);
+    setError(null);
+    try {
+      const tags = rawTags.split(",").map((item) => item.trim()).filter(Boolean);
+      await api.admin.updateCreativeAsset(asset.id, { tags });
+      setCreativeAssets(await api.admin.creativeAssets());
+      setNotice("Creative asset tags updated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Creative asset update failed");
+    } finally {
+      setSavingCreativeId(null);
+    }
+  }
+
+  async function deactivateCreative(asset: CreativeAsset) {
+    if (!window.confirm(`Disable ${asset.title}? Existing renders will keep their generated files.`)) return;
+    setSavingCreativeId(asset.id);
+    setNotice(null);
+    setError(null);
+    try {
+      await api.admin.deactivateCreativeAsset(asset.id);
+      setCreativeAssets(await api.admin.creativeAssets());
+      setNotice("Creative asset disabled.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Creative asset disable failed");
+    } finally {
+      setSavingCreativeId(null);
+    }
+  }
+
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-6">
       <header className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
@@ -258,6 +326,20 @@ export default function AdminPage() {
         onDraftChange={(key, value) => setTextDrafts((current) => ({ ...current, [key]: value }))}
         onSave={saveText}
         onReset={resetText}
+      />
+
+      <CreativeAssetsPanel
+        assets={creativeAssets}
+        kind={creativeKind}
+        title={creativeTitle}
+        file={creativeFile}
+        savingId={savingCreativeId}
+        onKindChange={setCreativeKind}
+        onTitleChange={setCreativeTitle}
+        onFileChange={setCreativeFile}
+        onUpload={uploadCreativeAsset}
+        onUpdateTags={updateCreativeTags}
+        onDeactivate={deactivateCreative}
       />
 
       <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
@@ -604,6 +686,136 @@ function LanguageTextPanel({
           </details>
         ))}
         {rows.length === 0 && <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No text keys found.</p>}
+      </div>
+    </Panel>
+  );
+}
+
+function CreativeAssetsPanel({
+  assets,
+  kind,
+  title,
+  file,
+  savingId,
+  onKindChange,
+  onTitleChange,
+  onFileChange,
+  onUpload,
+  onUpdateTags,
+  onDeactivate,
+}: {
+  assets: CreativeAsset[];
+  kind: string;
+  title: string;
+  file: File | null;
+  savingId: string | null;
+  onKindChange: (value: string) => void;
+  onTitleChange: (value: string) => void;
+  onFileChange: (value: File | null) => void;
+  onUpload: () => void;
+  onUpdateTags: (asset: CreativeAsset, rawTags: string) => void;
+  onDeactivate: (asset: CreativeAsset) => void;
+}) {
+  const counts = useMemo(() => {
+    return CREATIVE_ASSET_KINDS.map((item) => ({
+      ...item,
+      count: assets.filter((asset) => asset.kind === item.value).length,
+      uses: assets.filter((asset) => asset.kind === item.value).reduce((sum, asset) => sum + asset.usage_count, 0),
+    }));
+  }, [assets]);
+  const visible = assets.filter((asset) => asset.kind === kind);
+
+  return (
+    <Panel
+      title="Creative Asset Library"
+      action={
+        <div className="flex flex-wrap items-center gap-2">
+          {CREATIVE_ASSET_KINDS.map((item) => (
+            <Button key={item.value} type="button" size="sm" variant={kind === item.value ? "default" : "outline"} onClick={() => onKindChange(item.value)}>
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      }
+    >
+      <div className="mb-4 grid gap-3 md:grid-cols-5">
+        {counts.map((item) => (
+          <div key={item.value} className="rounded-lg border border-border bg-background p-3">
+            <div className="text-xs text-muted-foreground">{item.label}</div>
+            <div className="mt-2 text-xl font-semibold">{item.count}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{item.uses} uses</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mb-4 rounded-lg border border-dashed border-border bg-background p-4">
+        <div className="grid gap-3 md:grid-cols-[160px_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium">Kind</span>
+            <select value={kind} onChange={(event) => onKindChange(event.target.value)} className="h-9 rounded-lg border border-input bg-card px-3">
+              {CREATIVE_ASSET_KINDS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium">Title</span>
+            <Input value={title} onChange={(event) => onTitleChange(event.target.value)} placeholder="Optional display title" />
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium">File</span>
+            <input type="file" onChange={(event) => onFileChange(event.target.files?.[0] || null)} className="text-sm" />
+          </label>
+          <Button type="button" onClick={onUpload} disabled={!file || savingId === "__upload__"} className="gap-2">
+            {savingId === "__upload__" ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+            Upload
+          </Button>
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Use <strong>Transitions</strong> for lighting, classic cuts, noisy/glitch hits, whooshes, and scene-change accents. Music remains long background beds.
+        </p>
+      </div>
+
+      <div className="os-scroll-x">
+        <table className="w-full min-w-[920px] text-sm">
+          <thead className="border-b border-border text-left text-xs text-muted-foreground">
+            <tr><th className="py-2 pr-3">Asset</th><th className="py-2 pr-3">Tags</th><th className="py-2 pr-3">Use cases</th><th className="py-2 pr-3">Usage</th><th className="py-2 pr-3">Actions</th></tr>
+          </thead>
+          <tbody>
+            {visible.map((asset) => (
+              <tr key={asset.id} className="border-b border-border/60 align-top">
+                <td className="py-3 pr-3">
+                  <div className="font-medium">{asset.title}</div>
+                  <a href={asset.storage_url} target="_blank" rel="noreferrer" className="mt-1 block max-w-[260px] truncate text-xs text-primary">{asset.storage_url}</a>
+                  <div className="mt-1 text-xs text-muted-foreground">{asset.content_type || asset.kind}</div>
+                </td>
+                <td className="py-3 pr-3">
+                  <div className="mb-2 flex flex-wrap gap-1">{asset.tags.map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}</div>
+                  <Input
+                    defaultValue={asset.tags.join(", ")}
+                    onBlur={(event) => {
+                      if (event.currentTarget.value !== asset.tags.join(", ")) onUpdateTags(asset, event.currentTarget.value);
+                    }}
+                    disabled={savingId === asset.id}
+                    placeholder="energy, fashion, shock..."
+                  />
+                </td>
+                <td className="py-3 pr-3">
+                  <div className="flex flex-wrap gap-1">{asset.use_cases.map((item) => <Badge key={item} variant="outline">{item}</Badge>)}</div>
+                </td>
+                <td className="py-3 pr-3">
+                  <div className="font-semibold">{asset.usage_count}</div>
+                  <div className="text-xs text-muted-foreground">{asset.last_used_at ? formatDate(asset.last_used_at) : "not used yet"}</div>
+                </td>
+                <td className="py-3 pr-3">
+                  <Button type="button" size="sm" variant="outline" onClick={() => onDeactivate(asset)} disabled={savingId === asset.id} className="gap-1">
+                    {savingId === asset.id ? <Loader2 size={13} className="animate-spin" /> : <Tags size={13} />}
+                    Disable
+                  </Button>
+                </td>
+              </tr>
+            ))}
+            {visible.length === 0 && <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No active assets for this kind yet.</td></tr>}
+          </tbody>
+        </table>
       </div>
     </Panel>
   );

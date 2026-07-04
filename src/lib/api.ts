@@ -490,6 +490,19 @@ export const api = {
     auditLogs: (period = "month") => request<AuditLog[]>(`/admin/audit-logs?period=${period}`),
     providerUsage: (period = "month") => request<ProviderUsageEvent[]>(`/admin/provider-usage?period=${period}`),
     providerUsageSummary: (period = "month") => request<ProviderUsageSummary[]>(`/admin/provider-usage/summary?period=${period}`),
+    creativeAssets: (kind = "") =>
+      request<CreativeAsset[]>(`/admin/creative-assets${kind ? `?kind=${encodeURIComponent(kind)}` : ""}`),
+    uploadCreativeAsset: (data: { kind: string; title?: string; file: File }) => {
+      const form = new FormData();
+      form.append("kind", data.kind);
+      form.append("title", data.title || data.file.name);
+      form.append("file", data.file);
+      return request<CreativeAsset>("/admin/creative-assets/upload", { method: "POST", body: form });
+    },
+    updateCreativeAsset: (assetId: string, data: Partial<Pick<CreativeAsset, "title" | "tags" | "use_cases" | "classification" | "active">>) =>
+      request<CreativeAsset>(`/admin/creative-assets/${assetId}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deactivateCreativeAsset: (assetId: string) =>
+      request<{ ok: boolean; deactivated: boolean }>(`/admin/creative-assets/${assetId}`, { method: "DELETE" }),
     appText: (language = "ar") => request<AdminAppTextResponse>(`/admin/app-text?language=${encodeURIComponent(language)}`),
     updateAppText: (data: { language: string; key: string; value: string | null }) =>
       request<AdminAppTextUpdateResponse>("/admin/app-text", {
@@ -1086,6 +1099,25 @@ export interface ProviderUsageSummary {
   total_tokens: number;
   actual_cost_usd: number;
   successes: number;
+}
+
+export interface CreativeAsset {
+  id: string;
+  kind: string;
+  title: string;
+  storage_url: string;
+  source_url?: string | null;
+  content_type?: string | null;
+  duration_seconds?: number | null;
+  tags: string[];
+  use_cases: string[];
+  classification: Record<string, unknown>;
+  active: boolean;
+  usage_count: number;
+  last_used_at?: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Connections {
