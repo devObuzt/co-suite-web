@@ -45,11 +45,11 @@ const ARABIC_WORD = /[\u0600-\u06FF]+/g;
 const stretchArabicWord = (word: string) => {
   const letters = Array.from(word);
   if (letters.length <= 3) {
-    return `${letters.slice(0, -1).join('')}${TATWEEL.repeat(4)}${letters.at(-1)}`;
+    return `${letters.slice(0, -1).join('')}${TATWEEL.repeat(10)}${letters.at(-1)}`;
   }
 
   const splitAt = Math.max(2, Math.ceil(letters.length * 0.58));
-  return `${letters.slice(0, splitAt).join('')}${TATWEEL.repeat(5)}${letters
+  return `${letters.slice(0, splitAt).join('')}${TATWEEL.repeat(12)}${letters
     .slice(splitAt)
     .join('')}`;
 };
@@ -60,12 +60,18 @@ const stretchedTitle = (title: string) => {
   return stretchArabicWord(word);
 };
 
-const behindTitleFontSize = (title: string) => {
+const behindTitleLayout = (title: string) => {
   const length = Array.from(title).length;
-  if (length > 22) return 90;
-  if (length > 17) return 104;
-  if (length > 13) return 118;
-  return 132;
+  const width = 972; // 90% of the 1080px vertical canvas.
+  const scaleX = length > 22 ? 1.02 : length > 17 ? 1.08 : 1.14;
+  const preferred = length > 24 ? 126 : length > 20 ? 144 : length > 16 ? 164 : 188;
+  const safe = Math.floor(width / Math.max(1, length * 0.46 * scaleX));
+
+  return {
+    fontSize: Math.max(112, Math.min(preferred, safe)),
+    scaleX,
+    width,
+  };
 };
 
 const sceneProgress = (frame: number, durationInFrames: number) =>
@@ -181,7 +187,7 @@ const BehindPersonText = ({scene}: {scene: Scene}) => {
   const {fps} = useVideoConfig();
   const durationInFrames = sourceFrames(scene.sourceEnd - scene.sourceStart, fps);
   const displayTitle = stretchedTitle(scene.behindText);
-  const titleFontSize = behindTitleFontSize(displayTitle);
+  const titleLayout = behindTitleLayout(displayTitle);
   const introOpacity = interpolate(frame, [0, 14, 70], [0, 0.92, 0.78], {
     extrapolateRight: 'clamp',
   });
@@ -211,18 +217,18 @@ const BehindPersonText = ({scene}: {scene: Scene}) => {
           color: scene.palette[2],
           filter: `drop-shadow(0 16px 0 ${scene.palette[0]}dd) drop-shadow(0 20px 34px #000e) drop-shadow(0 0 22px ${scene.palette[1]}dd) drop-shadow(0 0 58px ${scene.palette[1]}99)`,
           fontFamily: manifest.style.arabicFontFamily,
-          fontSize: titleFontSize,
+          fontSize: titleLayout.fontSize,
           fontWeight: 800,
           letterSpacing: 0,
           lineHeight: 0.9,
-          maxWidth: 920,
+          maxWidth: titleLayout.width,
           opacity: introOpacity * outroOpacity * 0.86,
           overflowWrap: 'anywhere',
           textAlign: 'center',
           textShadow: `0 4px 0 ${scene.palette[1]}cc, 0 9px 0 ${scene.palette[0]}cc, 0 20px 38px #000f, 0 0 36px ${scene.palette[1]}ee`,
-          transform: `translateY(${y}px) scale(${scale})`,
-          width: 920,
-          whiteSpace: 'normal',
+          transform: `translateY(${y}px) scaleX(${titleLayout.scaleX}) scale(${scale})`,
+          width: titleLayout.width,
+          whiteSpace: 'nowrap',
         }}
       >
         {displayTitle}
