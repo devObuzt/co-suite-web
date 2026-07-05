@@ -1,7 +1,7 @@
 "use client";
 
 import React, { use, useEffect, useMemo, useState } from "react";
-import { api, Brand, BrandReferenceLink, Suite } from "@/lib/api";
+import { api, Brand, BrandReferenceLink, ContentRule, Suite } from "@/lib/api";
 import { LANGUAGES } from "@/lib/i18n/translations";
 import { useLanguage, useT } from "@/lib/i18n/LanguageContext";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,6 @@ type ProfileForm = {
   esp: string;
   uspPoints: string;
   espPoints: string;
-  contentRules: string;
   personaName: string;
 };
 
@@ -64,7 +63,6 @@ const emptyForm: ProfileForm = {
   esp: "",
   uspPoints: "",
   espPoints: "",
-  contentRules: "",
   personaName: "",
 };
 
@@ -451,13 +449,7 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
         </ProfileSection>
 
         <ProfileSection title={t("suite.profile.section.rules")}>
-          <TextareaField
-            label={t("suite.profile.field.oneRulePerLine")}
-            value={form.contentRules}
-            onChange={(contentRules) => setForm({ ...form, contentRules })}
-            rows={6}
-            placeholder={t("suite.profile.rulesPlaceholder")}
-          />
+          <ContentRulesManager suiteId={id} />
         </ProfileSection>
 
         <div className="sticky bottom-3 z-10 flex justify-end">
@@ -499,7 +491,6 @@ function formFromBrand(brand: Brand): ProfileForm {
     esp: brand.esp || "",
     uspPoints: toLines(brand.usp_points),
     espPoints: toLines(brand.esp_points),
-    contentRules: (brand.content_rules || []).map((rule) => rule.text).join("\n"),
   };
 }
 
@@ -546,7 +537,8 @@ function brandFromForm(form: ProfileForm, current: Brand): Brand {
     esp,
     usp_points: fromLines(form.uspPoints),
     esp_points: fromLines(form.espPoints),
-    content_rules: fromLines(form.contentRules).map((text) => ({ text, source: "profile_edit" })),
+    // content_rules are managed via the dedicated content-rules endpoints; never overwrite here.
+    content_rules: current.content_rules,
   };
 }
 
@@ -623,6 +615,230 @@ function toLines(value?: string[]): string {
 
 function toggleValue(values: string[], value: string): string[] {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+}
+
+function ContentRulesManager({ suiteId }: { suiteId: string }) {
+  const t = useT();
+  const [rules, setRules] = useState<ContentRule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<"replace" | "guideline">("replace");
+  const [fromText, setFromText] = useState("");
+  const [toText, setToText] = useState("");
+  const [guidelineText, setGuidelineText] = useState("");
+  const [teachText, setTeachText] = useState("");
+  const [suggestions, setSuggestions] = useState<ContentRule[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    api.suites.contentRules(suiteId)
+      .then((res) => setRules(res.rules || []))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Load failed"))
+      .finally(() => setLoading(false));
+  }, [suiteId]);
+
+  async function addRule() {
+    const input = mode === "replace"
+      ? { from: fromText.trim(), to: toText.trim() }
+      : { text: guidelineText.trim() };
+    if (mode === "replace" ? !input.from || !input.to : !input.text) return;
+    setBusy("add");
+    setError("");
+    try {
+      const res = await api.suites.addContentRules(suiteId, [input]);
+      setRules(res.rules || []);
+      setFromText("");
+      setToText("");
+      setGuidelineText("");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function deleteRule(ruleId: string) {
+    setBusy(`delete-${ruleId}`);
+    setError("");
+    try {
+      const res = await api.suites.deleteContentRule(suiteId, ruleId);
+      setRules(res.rules || []);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Delete failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function teach() {
+    const feedback = teachText.trim();
+    if (!feedback) return;
+    setBusy("teach");
+    setError("");
+    try {
+      const res = await api.suites.teachContentRules(suiteId, { feedback });
+      setSuggestions(res.suggestions || []);
+      if (!res.suggestions?.length) setError(t("suite.profile.rules.noSuggestions"));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Teach failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function confirmSuggestion(rule: ContentRule) {
+    setBusy(`confirm-${rule.id}`);
+    setError("");
+    try {
+      const res = await api.suites.addContentRules(
+        suiteId,
+        [{ text: rule.type === "guideline" ? rule.text : "", from: rule.from || "", to: rule.to || "" }],
+        "taught"
+      );
+      setRules(res.rules || []);
+      setSuggestions((current) => current.filter((item) => item.id !== rule.id));
+      setTeachText("");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function ruleLabel(rule: ContentRule) {
+    if (rule.type === "replace") {
+      return `"${rule.from}" ← "${rule.to}"`;
+    }
+    return rule.text;
+  }
+
+  if (loading) {
+    return <div className="text-sm text-muted-foreground">{t("suite.profile.rules.loading")}</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {error && <div className="rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-800">{error}</div>}
+
+      <div className="rounded-lg border border-border bg-muted/30 p-3">
+        <p className="text-xs font-medium text-muted-foreground">{t("suite.profile.rules.teachTitle")}</p>
+        <div className="mt-2 flex gap-2">
+          <input
+            value={teachText}
+            onChange={(e) => setTeachText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && teach()}
+            placeholder={t("suite.profile.rules.teachPlaceholder")}
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            dir="auto"
+          />
+          <Button type="button" onClick={teach} disabled={busy === "teach" || !teachText.trim()} className="shrink-0 gap-2">
+            {busy === "teach" ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            {t("suite.profile.rules.teach")}
+          </Button>
+        </div>
+        {suggestions.length > 0 && (
+          <div className="mt-3 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">{t("suite.profile.rules.suggestionsTitle")}</p>
+            {suggestions.map((rule) => (
+              <div key={rule.id} className="flex items-center justify-between gap-2 rounded-md border border-border bg-background p-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Badge variant={rule.type === "replace" ? "default" : "secondary"}>
+                    {rule.type === "replace" ? t("suite.profile.rules.replaceType") : t("suite.profile.rules.guidelineType")}
+                  </Badge>
+                  <span className="truncate text-sm" dir="auto">{ruleLabel(rule)}</span>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <Button type="button" size="sm" onClick={() => confirmSuggestion(rule)} disabled={busy === `confirm-${rule.id}`}>
+                    {busy === `confirm-${rule.id}` ? <Loader2 size={13} className="animate-spin" /> : t("suite.profile.rules.confirm")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setSuggestions((current) => current.filter((item) => item.id !== rule.id))}
+                  >
+                    <X size={13} />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {rules.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{t("suite.profile.rules.empty")}</p>
+      ) : (
+        <ul className="space-y-2">
+          {rules.map((rule) => (
+            <li key={rule.id} className="flex items-center justify-between gap-2 rounded-md border border-border p-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <Badge variant={rule.type === "replace" ? "default" : "secondary"}>
+                  {rule.type === "replace" ? t("suite.profile.rules.replaceType") : t("suite.profile.rules.guidelineType")}
+                </Badge>
+                <span className="truncate text-sm" dir="auto" title={ruleLabel(rule)}>{ruleLabel(rule)}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => deleteRule(rule.id)}
+                disabled={busy === `delete-${rule.id}`}
+                className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"
+                aria-label={t("suite.profile.rules.delete")}
+                title={t("suite.profile.rules.delete")}
+              >
+                {busy === `delete-${rule.id}` ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="rounded-lg border border-dashed border-border p-3">
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setMode("replace")}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${mode === "replace" ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+          >
+            {t("suite.profile.rules.replaceType")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("guideline")}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${mode === "guideline" ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+          >
+            {t("suite.profile.rules.guidelineType")}
+          </button>
+        </div>
+        <div className="mt-2 flex flex-wrap items-end gap-2">
+          {mode === "replace" ? (
+            <>
+              <div className="min-w-36 flex-1">
+                <TextField label={t("suite.profile.rules.from")} value={fromText} onChange={setFromText} placeholder="شيقل" />
+              </div>
+              <div className="min-w-36 flex-1">
+                <TextField label={t("suite.profile.rules.to")} value={toText} onChange={setToText} placeholder="شيكل" />
+              </div>
+            </>
+          ) : (
+            <div className="min-w-52 flex-1">
+              <TextField
+                label={t("suite.profile.rules.guidelineType")}
+                value={guidelineText}
+                onChange={setGuidelineText}
+                placeholder={t("suite.profile.rulesPlaceholder")}
+              />
+            </div>
+          )}
+          <Button type="button" variant="outline" onClick={addRule} disabled={busy === "add"} className="gap-2">
+            {busy === "add" ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            {t("suite.profile.rules.add")}
+          </Button>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">{t("suite.profile.rules.hint")}</p>
+      </div>
+    </div>
+  );
 }
 
 function ProfileSection({ title, children }: { title: string; children: React.ReactNode }) {

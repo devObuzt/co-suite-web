@@ -3,7 +3,7 @@
 import { use, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { BadgeCheck, CheckCircle2, Image, Layers3, Loader2, Megaphone, PlaySquare, Save, Sparkles, Target } from "lucide-react";
-import { api, MarketingPlanResponse, PaidContentIdea, PaidContentWorkPlan, SocialContentIdea, SocialContentWorkPlan } from "@/lib/api";
+import { api, ContentRule, MarketingPlanResponse, PaidContentIdea, PaidContentWorkPlan, SocialContentIdea, SocialContentWorkPlan } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SuitePageShell } from "@/components/suite/SuitePageShell";
@@ -191,6 +191,8 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
 
         {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
         {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</div>}
+
+        <TeachRulesBox suiteId={id} />
 
         <section className="grid grid-cols-2 gap-3">
           <ModeButton
@@ -578,4 +580,98 @@ function formatLabel(format?: string) {
   if (format === "image_banner") return "صورة / بانر";
   if (format === "carousel") return "كاروسيل";
   return "فيديو";
+}
+
+function TeachRulesBox({ suiteId }: { suiteId: string }) {
+  const [feedback, setFeedback] = useState("");
+  const [suggestions, setSuggestions] = useState<ContentRule[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+
+  async function teach() {
+    const text = feedback.trim();
+    if (!text) return;
+    setBusy("teach");
+    setMessage("");
+    try {
+      const res = await api.suites.teachContentRules(suiteId, { feedback: text });
+      setSuggestions(res.suggestions || []);
+      if (!res.suggestions?.length) setMessage("ما لقينا قاعدة قابلة للتعميم. جرب صيغة ثانية.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Teach failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function confirm(rule: ContentRule) {
+    setBusy(`confirm-${rule.id}`);
+    setMessage("");
+    try {
+      await api.suites.addContentRules(
+        suiteId,
+        [{ text: rule.type === "guideline" ? rule.text : "", from: rule.from || "", to: rule.to || "" }],
+        "taught"
+      );
+      setSuggestions((current) => current.filter((item) => item.id !== rule.id));
+      setFeedback("");
+      setMessage("انحفظت القاعدة — رح تنطبق على كل توليد جاي.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-border bg-card/60 p-3">
+      <p className="text-xs font-semibold text-muted-foreground">
+        علّم النظام — ملاحظة على المحتوى بتتحول لقاعدة دائمة (مثلًا: بدل شيقل اكتب شيكل)
+      </p>
+      <div className="mt-2 flex gap-2">
+        <input
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && teach()}
+          placeholder="اكتب ملاحظتك هون..."
+          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          dir="auto"
+        />
+        <Button type="button" onClick={teach} disabled={busy === "teach" || !feedback.trim()} variant="outline" className="shrink-0 gap-2">
+          {busy === "teach" ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+          علّم النظام
+        </Button>
+      </div>
+      {message && <p className="mt-2 text-xs text-muted-foreground" dir="auto">{message}</p>}
+      {suggestions.length > 0 && (
+        <div className="mt-3 space-y-2">
+          {suggestions.map((rule) => (
+            <div key={rule.id} className="flex items-center justify-between gap-2 rounded-md border border-border bg-background p-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <Badge variant={rule.type === "replace" ? "default" : "secondary"}>
+                  {rule.type === "replace" ? "استبدال" : "تعليمة"}
+                </Badge>
+                <span className="truncate text-sm" dir="auto">
+                  {rule.type === "replace" ? `"${rule.from}" ← "${rule.to}"` : rule.text}
+                </span>
+              </div>
+              <div className="flex shrink-0 gap-1">
+                <Button type="button" size="sm" onClick={() => confirm(rule)} disabled={busy === `confirm-${rule.id}`}>
+                  {busy === `confirm-${rule.id}` ? <Loader2 size={13} className="animate-spin" /> : "احفظ"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSuggestions((current) => current.filter((item) => item.id !== rule.id))}
+                >
+                  تجاهل
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
 }

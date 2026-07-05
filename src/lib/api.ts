@@ -165,6 +165,22 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    contentRules: (suiteId: string) =>
+      request<{ rules: ContentRule[] }>(`/suites/${suiteId}/content-rules`),
+    addContentRules: (suiteId: string, rules: ContentRuleInput[], source = "manual") =>
+      request<{ ok: boolean; rules: ContentRule[] }>(`/suites/${suiteId}/content-rules`, {
+        method: "POST",
+        body: JSON.stringify({ rules, source }),
+      }),
+    deleteContentRule: (suiteId: string, ruleId: string) =>
+      request<{ ok: boolean; rules: ContentRule[] }>(`/suites/${suiteId}/content-rules/${ruleId}`, {
+        method: "DELETE",
+      }),
+    teachContentRules: (suiteId: string, data: { feedback?: string; original?: string; edited?: string }) =>
+      request<{ suggestions: ContentRule[] }>(`/suites/${suiteId}/content-rules/teach`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
   },
 
   onboarding: {
@@ -1574,10 +1590,27 @@ export interface Brand {
   logo_style?: "icon_only" | "with_name" | "initials";
   logo_source?: "uploaded" | "ai-generated" | "scraped";
   fonts_by_language?: Record<string, Array<{ name: string; url: string; format: string }>>;
-  content_rules?: Array<{ text: string; source?: string; post_id?: string; created_at?: string }>;
+  content_rules?: ContentRule[];
   social_loops?: SocialLoop[];
   brand_personas?: BrandPersona[];
   research_debug?: ResearchDebug;
+}
+
+export interface ContentRule {
+  id: string;
+  type: "replace" | "guideline";
+  text: string;
+  from?: string;
+  to?: string;
+  source?: string;
+  post_id?: string;
+  created_at?: string;
+}
+
+export interface ContentRuleInput {
+  text?: string;
+  from?: string;
+  to?: string;
 }
 
 export interface ResearchSourceReport {
