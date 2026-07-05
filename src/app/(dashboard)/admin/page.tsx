@@ -42,6 +42,7 @@ export default function AdminPage() {
   const [creativeFile, setCreativeFile] = useState<File | null>(null);
   const [creativeTitle, setCreativeTitle] = useState("");
   const [savingCreativeId, setSavingCreativeId] = useState<string | null>(null);
+  const [seedingCreativeAssets, setSeedingCreativeAssets] = useState(false);
   const [billingRows, setBillingRows] = useState<AdminBillingUsageEvent[]>([]);
   const [textLanguage, setTextLanguage] = useState<LangCode>("ar");
   const [textOverrides, setTextOverrides] = useState<AppTextOverride[]>([]);
@@ -240,6 +241,21 @@ export default function AdminPage() {
     }
   }
 
+  async function seedCreativeBuiltins() {
+    setSeedingCreativeAssets(true);
+    setNotice(null);
+    setError(null);
+    try {
+      const res = await api.admin.seedCreativeBuiltins();
+      setCreativeAssets(await api.admin.creativeAssets());
+      setNotice(res.seeded > 0 ? `Seeded ${res.seeded} built-in creative assets.` : "Built-in creative assets are already synced.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Built-in creative asset seed failed");
+    } finally {
+      setSeedingCreativeAssets(false);
+    }
+  }
+
   async function updateCreativeTags(asset: CreativeAsset, rawTags: string) {
     setSavingCreativeId(asset.id);
     setNotice(null);
@@ -339,6 +355,8 @@ export default function AdminPage() {
         onTitleChange={setCreativeTitle}
         onFileChange={setCreativeFile}
         onUpload={uploadCreativeAsset}
+        onSeedBuiltins={seedCreativeBuiltins}
+        seedingBuiltins={seedingCreativeAssets}
         onUpdateTags={updateCreativeTags}
         onDeactivate={deactivateCreative}
       />
@@ -702,6 +720,8 @@ function CreativeAssetsPanel({
   onTitleChange,
   onFileChange,
   onUpload,
+  onSeedBuiltins,
+  seedingBuiltins,
   onUpdateTags,
   onDeactivate,
 }: {
@@ -714,6 +734,8 @@ function CreativeAssetsPanel({
   onTitleChange: (value: string) => void;
   onFileChange: (value: File | null) => void;
   onUpload: () => void;
+  onSeedBuiltins: () => void;
+  seedingBuiltins: boolean;
   onUpdateTags: (asset: CreativeAsset, rawTags: string) => void;
   onDeactivate: (asset: CreativeAsset) => void;
 }) {
@@ -769,6 +791,13 @@ function CreativeAssetsPanel({
             {savingId === "__upload__" ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
             Upload
           </Button>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={onSeedBuiltins} disabled={seedingBuiltins} className="gap-2">
+            {seedingBuiltins ? <Loader2 size={14} className="animate-spin" /> : <WandSparkles size={14} />}
+            Seed built-ins
+          </Button>
+          <span className="text-xs text-muted-foreground">Sync the packaged music, SFX, and video transition library into the database.</span>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
           Use <strong>Transitions</strong> for lighting, classic cuts, noisy/glitch hits, whooshes, and scene-change accents. Music remains long background beds.

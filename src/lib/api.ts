@@ -492,6 +492,8 @@ export const api = {
     providerUsageSummary: (period = "month") => request<ProviderUsageSummary[]>(`/admin/provider-usage/summary?period=${period}`),
     creativeAssets: (kind = "") =>
       request<CreativeAsset[]>(`/admin/creative-assets${kind ? `?kind=${encodeURIComponent(kind)}` : ""}`),
+    seedCreativeBuiltins: () =>
+      request<{ ok: boolean; seeded: number }>("/admin/creative-assets/seed-builtins", { method: "POST", body: "{}" }),
     uploadCreativeAsset: (data: { kind: string; title?: string; file: File }) => {
       const form = new FormData();
       form.append("kind", data.kind);
