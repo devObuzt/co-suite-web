@@ -543,6 +543,17 @@ export const AiMontage = () => {
   }, []);
   const backgroundMusic = manifest.audio.backgroundMusic;
   const soundEffects = manifest.audio.soundEffects ?? [];
+  const visualTransitions =
+    'visualTransitions' in manifest && Array.isArray(manifest.visualTransitions)
+      ? (manifest.visualTransitions as Array<{
+          publicPath: string;
+          at?: number;
+          duration?: number;
+          volume?: number;
+          assetId?: string;
+          kind?: string;
+        }>)
+      : [];
 
   return (
     <AbsoluteFill style={{backgroundColor: '#08090d'}}>
@@ -560,6 +571,27 @@ export const AiMontage = () => {
           durationInFrames={Math.max(1, sourceFrames(0.7, fps))}
         >
           <Audio src={publicAsset(effect.publicPath)} volume={effect.volume ?? 0.35} />
+        </Sequence>
+      ))}
+      {visualTransitions.map((effect, index) => (
+        <Sequence
+          key={`visual-transition-${effect.assetId ?? index}`}
+          from={Math.max(0, sourceFrames((effect.at ?? 0) - (effect.duration ?? 0.7) / 2, fps))}
+          durationInFrames={Math.max(1, sourceFrames(effect.duration ?? 0.7, fps))}
+        >
+          <AbsoluteFill style={{mixBlendMode: 'screen', opacity: 0.82, zIndex: 12}}>
+            <OffthreadVideo
+              src={publicAsset(effect.publicPath)}
+              style={{
+                height: '100%',
+                inset: 0,
+                objectFit: 'cover',
+                position: 'absolute',
+                width: '100%',
+              }}
+              volume={effect.volume ?? 0.25}
+            />
+          </AbsoluteFill>
         </Sequence>
       ))}
       {timedScenes.map(({duration, from, scene}) => {

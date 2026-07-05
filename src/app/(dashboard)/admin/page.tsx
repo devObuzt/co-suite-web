@@ -23,6 +23,7 @@ const CREATIVE_ASSET_KINDS = [
   { value: "music", label: "Music" },
   { value: "sfx", label: "SFX" },
   { value: "transition", label: "Transitions" },
+  { value: "transition_video", label: "Video transitions" },
   { value: "visual_image", label: "Visual images" },
   { value: "visual_video", label: "Visual videos" },
 ];
