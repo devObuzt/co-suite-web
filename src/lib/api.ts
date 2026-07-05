@@ -52,7 +52,7 @@ function buildHeaders(options: RequestInit, token: string | null): HeadersInit {
 
 function clearInvalidSession(path: string, token: string | null): void {
   if (typeof window === "undefined" || !token) return;
-  if (path.startsWith("/auth/")) return;
+  if (path === "/auth/login" || path === "/auth/signup") return;
   if (path.startsWith("/marketing-plans/share/")) return;
 
   localStorage.removeItem("cosuite_token");
