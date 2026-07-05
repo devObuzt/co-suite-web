@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 type StageSlug = "services" | "keywords" | "competitors" | "demand-supply" | "personas" | "pdf";
-type BusyAction = StageSlug | "keywords-more" | "competitors-more" | "personas-more" | "save-services" | "save-keywords" | "save-competitors" | null;
+type BusyAction = StageSlug | "keywords-more" | "competitors-more" | "demand-supply-more" | "personas-more" | "save-services" | "save-keywords" | "save-competitors" | null;
 
 const labels = {
   ar: {
@@ -568,7 +568,9 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         suiteId={suiteId}
         intelligence={intelligence}
         loading={busy === "demand-supply"}
+        loadingMore={busy === "demand-supply-more"}
         onGenerate={() => run("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang }))}
+        onMore={() => run("demand-supply-more", () => api.marketingPlans.generateMoreDemandSupply(suiteId, { language: lang }))}
       />
       <PersonasStage
         text={text}
@@ -623,7 +625,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       {stage === "competitors" && (
         <CompetitorsStage text={text} suiteId={suiteId} competitors={intelligence?.competitors || []} warnings={intelligence?.source_warnings || intelligence?.warnings || []} loading={busy === "competitors"} loadingMore={busy === "competitors-more"} saving={busy === "save-competitors"} onGenerate={() => run("competitors", () => api.marketingPlans.generateCompetitors(suiteId, { language: lang }))} onMore={() => run("competitors-more", () => api.marketingPlans.generateMoreCompetitors(suiteId, { language: lang }))} onTagsChange={(competitorId, tags) => run("competitors", () => api.marketingPlans.updateCompetitor(suiteId, competitorId, { classification_tags: tags }))} onSave={saveCompetitors} detail />
       )}
-      {stage === "demand-supply" && <DemandSupplyStage text={text} suiteId={suiteId} intelligence={intelligence} loading={busy === "demand-supply"} onGenerate={() => run("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang }))} detail />}
+      {stage === "demand-supply" && <DemandSupplyStage text={text} suiteId={suiteId} intelligence={intelligence} loading={busy === "demand-supply"} loadingMore={busy === "demand-supply-more"} onGenerate={() => run("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang }))} onMore={() => run("demand-supply-more", () => api.marketingPlans.generateMoreDemandSupply(suiteId, { language: lang }))} detail />}
       {stage === "personas" && <PersonasStage text={text} suiteId={suiteId} personas={intelligence?.personas || []} loading={busy === "personas"} loadingMore={busy === "personas-more"} onGenerate={generatePersonasInitial} onMore={generateMorePersonas} detail />}
       {stage === "pdf" && <MarketingPdfStage text={text} suiteId={suiteId} ready={(intelligence?.personas || []).length > 0} loading={busy === "pdf"} onDownload={downloadPdf} detail />}
       {!stage && allStages}
@@ -1119,7 +1121,7 @@ function CompetitorCard({
   );
 }
 
-function DemandSupplyStage({ text, suiteId, intelligence, loading, onGenerate, detail }: { text: typeof labels.en; suiteId: string; intelligence: MarketingIntelligence | null; loading: boolean; onGenerate: () => void; detail?: boolean }) {
+function DemandSupplyStage({ text, suiteId, intelligence, loading, loadingMore, onGenerate, onMore, detail }: { text: typeof labels.en; suiteId: string; intelligence: MarketingIntelligence | null; loading: boolean; loadingMore?: boolean; onGenerate: () => void; onMore?: () => void; detail?: boolean }) {
   const demand = intelligence?.demand_signals || [];
   const supply = intelligence?.supply_signals || [];
   const opportunities = intelligence?.opportunities || [];
@@ -1129,7 +1131,15 @@ function DemandSupplyStage({ text, suiteId, intelligence, loading, onGenerate, d
   const hasData = Boolean(summary?.analyzed_keywords || keywordMetrics.length || planner?.warning || demand.length || supply.length || opportunities.length);
   return (
     <StageBox title={text.demandTitle} description={text.demandDesc} icon={<Target size={18} />} suiteId={suiteId} slug="demand-supply" detail={detail}>
-      <Button onClick={onGenerate} disabled={loading} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Target size={15} />}{text.generate}</Button>
+      <div className="flex min-w-0 flex-wrap gap-2">
+        <Button onClick={onGenerate} disabled={loading || loadingMore} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Target size={15} />}{text.generate}</Button>
+        {hasData && onMore && (planner?.remaining_terms ?? 0) > 0 && (
+          <Button variant="outline" onClick={onMore} disabled={loading || loadingMore} className="gap-2">
+            {loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+            {text.generateMore} ({planner?.remaining_terms})
+          </Button>
+        )}
+      </div>
       {!hasData ? <p className="mt-4 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noDemand}</p> : (
         <div className="mt-4 space-y-4">
           <div className="grid gap-3 md:grid-cols-4">

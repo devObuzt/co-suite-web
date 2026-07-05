@@ -433,6 +433,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data || {}),
       }),
+    generateMoreDemandSupply: (suiteId: string, data?: { language?: string }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/demand-supply/generate-more`, {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }),
     generatePersonas: (suiteId: string, data?: { language?: string; existing_ids?: string[]; existing_values?: string[] }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/personas/generate`, {
         method: "POST",
@@ -722,6 +727,9 @@ export interface MarketingDemandSupplyData {
   keyword_metrics?: MarketingDemandSupplyKeyword[];
   suggested_keywords?: MarketingDemandSupplyKeyword[];
   warning?: string;
+  checked_terms?: string[];
+  remaining_terms?: number;
+  last_seeds?: { keywords?: string[]; services?: string[] };
 }
 
 export interface MarketingPersona {
