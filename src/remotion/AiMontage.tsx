@@ -123,11 +123,29 @@ const SceneBackground = ({scene, durationInFrames}: {scene: Scene; durationInFra
   const [base, accent, light] = scene.palette;
   const backgroundImage =
     'backgroundImagePublicPath' in scene ? scene.backgroundImagePublicPath : null;
+  const backgroundVideo =
+    'backgroundVideoPublicPath' in scene
+      ? (scene as {backgroundVideoPublicPath?: string | null}).backgroundVideoPublicPath
+      : null;
+  const hasBackgroundMedia = Boolean(backgroundImage || backgroundVideo);
+  const mediaStyle: React.CSSProperties = {
+    filter: `saturate(${1.16 + beat * 0.18}) contrast(${1.08 + beat * 0.1}) brightness(${0.86 + flashBeat * 0.12})`,
+    height: '100%',
+    inset: 0,
+    objectFit: 'cover',
+    position: 'absolute',
+    transform: `translate3d(${interpolate(progress, [0, 1], [-18, 18]) + parallaxBeat * 28}px, ${interpolate(
+      slowPulse,
+      [0, 1],
+      [-14, 14],
+    ) - parallaxBeat * 20}px, 0) scale(${(1.08 + pulse * 0.028 + beat * 0.035) * entrance * exit})`,
+    width: '100%',
+  };
 
   return (
     <AbsoluteFill
       style={{
-        background: backgroundImage
+        background: hasBackgroundMedia
           ? '#07090d'
           : `radial-gradient(circle at ${30 + pulse * 35}% 22%, ${accent} 0, transparent 31%),
           linear-gradient(145deg, ${base}, #0a0d13 62%, ${light})`,
@@ -135,20 +153,15 @@ const SceneBackground = ({scene, durationInFrames}: {scene: Scene; durationInFra
       }}
     >
       {backgroundImage ? (
-        <Img
-          src={publicAsset(backgroundImage)}
+        <Img src={publicAsset(backgroundImage)} style={mediaStyle} />
+      ) : null}
+      {backgroundVideo ? (
+        <OffthreadVideo
+          muted
+          src={publicAsset(backgroundVideo)}
           style={{
-            filter: `saturate(${1.16 + beat * 0.18}) contrast(${1.08 + beat * 0.1}) brightness(${0.86 + flashBeat * 0.12})`,
-            height: '100%',
-            inset: 0,
-            objectFit: 'cover',
-            position: 'absolute',
-            transform: `translate3d(${interpolate(progress, [0, 1], [-18, 18]) + parallaxBeat * 28}px, ${interpolate(
-              slowPulse,
-              [0, 1],
-              [-14, 14],
-            ) - parallaxBeat * 20}px, 0) scale(${(1.08 + pulse * 0.028 + beat * 0.035) * entrance * exit})`,
-            width: '100%',
+            ...mediaStyle,
+            opacity: 0.82,
           }}
         />
       ) : null}
