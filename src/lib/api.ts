@@ -50,6 +50,30 @@ function buildHeaders(options: RequestInit, token: string | null): HeadersInit {
   return headers;
 }
 
+function clearInvalidSession(path: string, token: string | null): void {
+  if (typeof window === "undefined" || !token) return;
+  if (path.startsWith("/auth/")) return;
+  if (path.startsWith("/marketing-plans/share/")) return;
+
+  localStorage.removeItem("cosuite_token");
+  localStorage.removeItem("cosuite-auth");
+  const next = `${window.location.pathname}${window.location.search}`;
+  if (!window.location.pathname.startsWith("/login")) {
+    window.location.assign(`/login?next=${encodeURIComponent(next)}`);
+  }
+}
+
+function isInvalidSession(status: number, detail: unknown): boolean {
+  if (status !== 401) return false;
+  const text =
+    typeof detail === "string"
+      ? detail
+      : detail && typeof detail === "object" && "message" in detail
+        ? String((detail as { message?: unknown }).message || "")
+        : JSON.stringify(detail || "");
+  return /invalid token|user not found|not authenticated|could not validate/i.test(text);
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const res = await fetch(`${API_BASE}${path}`, {
@@ -60,13 +84,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Request failed" }));
     const detail = err.detail || err.message || "Request failed";
+    if (isInvalidSession(res.status, detail)) {
+      clearInvalidSession(path, token);
+    }
     const message =
       typeof detail === "string"
         ? detail
         : typeof detail === "object" && detail && "message" in detail
           ? String((detail as { message?: unknown }).message || JSON.stringify(detail))
           : JSON.stringify(detail);
-    throw new ApiError(message, res.status, detail);
+    throw new ApiError(isInvalidSession(res.status, detail) ? "انتهت الجلسة. سجّل الدخول من جديد." : message, res.status, detail);
   }
 
   return res.json();
@@ -82,8 +109,11 @@ async function downloadFile(path: string, options: RequestInit = {}): Promise<{ 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Request failed" }));
     const detail = err.detail || err.message || "Request failed";
+    if (isInvalidSession(res.status, detail)) {
+      clearInvalidSession(path, token);
+    }
     const message = typeof detail === "string" ? detail : JSON.stringify(detail);
-    throw new ApiError(message, res.status, detail);
+    throw new ApiError(isInvalidSession(res.status, detail) ? "انتهت الجلسة. سجّل الدخول من جديد." : message, res.status, detail);
   }
 
   const disposition = res.headers.get("Content-Disposition") || "";
