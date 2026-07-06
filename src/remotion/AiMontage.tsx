@@ -474,14 +474,17 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
   const subjectScale =
     interpolate(progress, [0, 0.5, 1], [1.035, 1.075, 1.045]) + zoomBeat * 0.07;
   const subjectX = interpolate(progress, [0, 1], [-10, 10]) + overlayBeat * 12;
-  const subjectY = float * 5 - zoomBeat * 16;
+  // Keep the cutout bottom-anchored: source footage often ends mid-leg or is
+  // occluded near the frame bottom, so the matte's bottom edge must never rise
+  // above the canvas edge. Scale from the bottom and only drift downward.
+  const subjectY = Math.abs(float) * 4 + zoomBeat * 10;
   const subjectStyle: React.CSSProperties = {
     height: '100%',
     inset: 0,
     objectFit: 'cover',
     position: 'absolute',
     transform: `translate3d(${subjectX}px, ${subjectY}px, 0) scale(${subjectScale})`,
-    transformOrigin: '50% 46%',
+    transformOrigin: '50% 100%',
     width: '100%',
     zIndex: 2,
   };
