@@ -329,7 +329,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                 <span>3x</span>
               </div>
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                الزوم مثبّت على أسفل الكادر — بيقصّ الأطراف العلوية والجانبية (مفيد لإخفاء أجسام على حواف التصوير).
+                الزوم مثبّت على مستوى الوجه — بيقصّ الأسفل والجوانب (مفيد لإخفاء أجسام أسفل الكادر) مع الحفاظ على الرأس.
               </p>
               {previewSrc ? (
                 <div className="mx-auto mt-4 aspect-[9/16] w-40 overflow-hidden rounded-xl border border-border bg-black">
@@ -341,7 +341,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                     autoPlay
                     playsInline
                     className="h-full w-full object-cover"
-                    style={{ transform: `scale(${zoom})`, transformOrigin: "50% 100%" }}
+                    style={{ transform: `scale(${zoom})`, transformOrigin: "50% 25%" }}
                   />
                 </div>
               ) : (

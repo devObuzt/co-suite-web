@@ -518,9 +518,10 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
   const subjectScale =
     (interpolate(progress, [0, 0.5, 1], [1.035, 1.075, 1.045]) + zoomBeat * 0.07) * userZoom;
   const subjectX = interpolate(progress, [0, 1], [-10, 10]) + overlayBeat * 12;
-  // Keep the cutout bottom-anchored: source footage often ends mid-leg or is
-  // occluded near the frame bottom, so the matte's bottom edge must never rise
-  // above the canvas edge. Scale from the bottom and only drift downward.
+  // Scale from face height (~25% down the canvas): any zoom > 1 then pushes
+  // the matte's bottom edge BELOW the canvas (hiding mid-leg cuts and objects
+  // near the frame bottom) while keeping the head in view. Vertical drift is
+  // downward-only so the cut edge never rises into the frame.
   const subjectY = Math.abs(float) * 4 + zoomBeat * 10;
   const subjectStyle: React.CSSProperties = {
     height: '100%',
@@ -528,7 +529,7 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
     objectFit: 'cover',
     position: 'absolute',
     transform: `translate3d(${subjectX}px, ${subjectY}px, 0) scale(${subjectScale})`,
-    transformOrigin: '50% 100%',
+    transformOrigin: '50% 25%',
     width: '100%',
     zIndex: 2,
   };
