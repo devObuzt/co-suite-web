@@ -471,7 +471,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data || {}),
       }),
-    generateSocialContentPlan: (suiteId: string, data?: { language?: string; monthly_posts?: number }) =>
+    generateSocialContentPlan: (suiteId: string, data?: { language?: string; monthly_posts?: number; plan_type?: "weekly" | "monthly" }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/social-content-plan/generate`, {
         method: "POST",
         body: JSON.stringify(data || {}),
@@ -481,6 +481,24 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ selected_ids: selectedIds }),
       }),
+    updateSocialContentItem: (suiteId: string, itemId: string, data: { title?: string; idea?: string; script?: string; cta?: string }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/social-content-plan/items/${itemId}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    generateSocialContentItem: (suiteId: string, itemId: string) =>
+      request<GenerationStatus>(`/suites/${suiteId}/marketing-plan/social-content-plan/items/${itemId}/generate`, {
+        method: "POST",
+        body: "{}",
+      }),
+    generateSocialContentItems: (suiteId: string, itemIds?: string[]) =>
+      request<MarketingPlanResponse & { queued_job_ids: string[]; skipped: Array<{ item_id: string; reason: string }>; payment_required: boolean }>(
+        `/suites/${suiteId}/marketing-plan/social-content-plan/generate-items`,
+        {
+          method: "POST",
+          body: JSON.stringify({ item_ids: itemIds || [] }),
+        }
+      ),
     generatePaidContentPlan: (suiteId: string, data?: { language?: string }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/paid-content-plan/generate`, {
         method: "POST",
@@ -832,6 +850,22 @@ export interface MarketingActionPlan {
   warnings?: string[];
 }
 
+export interface SocialIdeaIntervention {
+  type?: string;
+  label?: string;
+  instructions?: string;
+  required_assets?: string[];
+}
+
+export interface SocialIdeaGeneration {
+  status?: "idle" | "queued" | "generating" | "ready" | "failed" | string;
+  job_id?: string;
+  post_id?: string | null;
+  queued_at?: string;
+  generated_at?: string;
+  error?: string;
+}
+
 export interface SocialContentIdea {
   id: string;
   type: "attraction" | "trust" | "sales" | string;
@@ -842,7 +876,25 @@ export interface SocialContentIdea {
   script?: string;
   cta?: string;
   rationale?: string;
+  production_mode?: string;
+  ai_capability?: "ai" | "user_recommended" | "user_required" | string;
+  user_intervention?: SocialIdeaIntervention | null;
+  generation?: SocialIdeaGeneration;
+  scheduled_date?: string | null;
+  edited_by_user?: boolean;
   provider?: string;
+}
+
+export interface SocialPlanScheduleDay {
+  date: string;
+  item_ids: string[];
+}
+
+export interface SocialPlanSchedule {
+  plan_type?: "weekly" | "monthly" | string;
+  start_date?: string;
+  end_date?: string;
+  days?: SocialPlanScheduleDay[];
 }
 
 export interface SocialContentWorkPlan {
@@ -851,7 +903,9 @@ export interface SocialContentWorkPlan {
   language?: string;
   dialect?: string;
   generated_at?: string;
+  plan_type?: "weekly" | "monthly" | string;
   monthly_posts?: number;
+  schedule?: SocialPlanSchedule;
   cadence?: {
     recommended_monthly_posts?: number;
     recommended_note?: string;
