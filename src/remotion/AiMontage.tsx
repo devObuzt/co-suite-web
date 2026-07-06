@@ -358,10 +358,24 @@ const TransitionEffects = ({
   );
 };
 
+type CaptionChunk = {
+  start: number;
+  end: number;
+  words: Array<{text: string; start: number}>;
+};
+
 const Captions = ({scene}: {scene: Scene}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const durationInFrames = sourceFrames(scene.sourceEnd - scene.sourceStart, fps);
+  const seconds = frame / fps;
+  const chunks = ((scene as {captionChunks?: CaptionChunk[]}).captionChunks ?? []).filter(
+    (chunk) => Array.isArray(chunk.words) && chunk.words.length > 0,
+  );
+  const activeChunk = chunks.length
+    ? chunks.find((chunk) => seconds >= chunk.start && seconds < chunk.end) ??
+      chunks[chunks.length - 1]
+    : null;
   const y = interpolate(frame, [0, 12], [28, 0], {extrapolateRight: 'clamp'});
   const introOpacity = interpolate(frame, [0, 10], [0, 1], {extrapolateRight: 'clamp'});
   const outroOpacity = interpolate(
@@ -375,11 +389,13 @@ const Captions = ({scene}: {scene: Scene}) => {
     <AbsoluteFill
       style={{
         justifyContent: 'flex-end',
-        padding: '0 66px 104px',
+        // Keep captions above the Reels/TikTok profile-name and action UI.
+        padding: '0 66px 430px',
         zIndex: 3,
       }}
     >
       <div
+        dir="rtl"
         style={{
           alignSelf: 'center',
           backgroundColor: '#05070bc0',
@@ -388,7 +404,7 @@ const Captions = ({scene}: {scene: Scene}) => {
           boxShadow: `0 18px 58px #0009, 0 0 26px ${scene.palette[1]}55`,
           color: '#fff',
           fontFamily: manifest.style.arabicFontFamily,
-          fontSize: scene.caption.length > 95 ? 42 : 52,
+          fontSize: activeChunk ? 56 : scene.caption.length > 95 ? 42 : 52,
           fontWeight: 800,
           lineHeight: 1.14,
           maxWidth: 930,
@@ -398,7 +414,31 @@ const Captions = ({scene}: {scene: Scene}) => {
           transform: `translateY(${y}px)`,
         }}
       >
-        {scene.caption}
+        {activeChunk
+          ? activeChunk.words.map((word, index) => (
+              <span
+                key={`${activeChunk.start}-${index}`}
+                style={{
+                  display: 'inline-block',
+                  margin: '0 5px',
+                  opacity: interpolate(
+                    seconds,
+                    [word.start - 0.06, word.start + 0.08],
+                    [0, 1],
+                    {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
+                  ),
+                  transform: `translateY(${interpolate(
+                    seconds,
+                    [word.start - 0.06, word.start + 0.12],
+                    [10, 0],
+                    {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
+                  )}px)`,
+                }}
+              >
+                {word.text}
+              </span>
+            ))
+          : scene.caption}
       </div>
     </AbsoluteFill>
   );
@@ -471,8 +511,12 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
   const overlayBeat = beatPulse(frame, fps, beats, ['overlay']);
   const flashBeat = beatPulse(frame, fps, beats, ['flash']);
   const float = Math.sin(frame / 22);
+  const userZoom = Math.min(
+    3,
+    Math.max(1, Number((manifest.style as {subjectZoom?: number}).subjectZoom ?? 1)),
+  );
   const subjectScale =
-    interpolate(progress, [0, 0.5, 1], [1.035, 1.075, 1.045]) + zoomBeat * 0.07;
+    (interpolate(progress, [0, 0.5, 1], [1.035, 1.075, 1.045]) + zoomBeat * 0.07) * userZoom;
   const subjectX = interpolate(progress, [0, 1], [-10, 10]) + overlayBeat * 12;
   // Keep the cutout bottom-anchored: source footage often ends mid-leg or is
   // occluded near the frame bottom, so the matte's bottom edge must never rise
@@ -564,7 +608,7 @@ export const AiMontage = () => {
       {backgroundMusic?.publicPath ? (
         <Audio
           src={publicAsset(backgroundMusic.publicPath)}
-          volume={backgroundMusic.volume ?? 0.28}
+          volume={backgroundMusic.volume ?? 0.14}
         />
       ) : null}
       {soundEffects.map((effect, index) => (
@@ -573,7 +617,7 @@ export const AiMontage = () => {
           from={Math.max(0, sourceFrames(effect.at ?? 0, fps))}
           durationInFrames={Math.max(1, sourceFrames(0.7, fps))}
         >
-          <Audio src={publicAsset(effect.publicPath)} volume={effect.volume ?? 0.35} />
+          <Audio src={publicAsset(effect.publicPath)} volume={effect.volume ?? 0.2} />
         </Sequence>
       ))}
       {visualTransitions.map((effect, index) => (

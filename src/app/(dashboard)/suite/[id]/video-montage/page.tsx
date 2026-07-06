@@ -114,6 +114,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   const [notes, setNotes] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [zoom, setZoom] = useState(1);
   const [captionOverrides, setCaptionOverrides] = useState<string[]>([]);
   const [titleOverrides, setTitleOverrides] = useState<string[]>([]);
   const [status, setStatus] = useState<GenerationStatus | null>(null);
@@ -122,6 +123,11 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   const [error, setError] = useState<string | null>(null);
 
   const activeMode = useMemo(() => modes.find((item) => item.id === mode) || modes[0], [mode]);
+  const previewSrc = useMemo(() => {
+    if (sourceFile) return URL.createObjectURL(sourceFile);
+    const url = sourceUrl.trim();
+    return /^https?:\/\/.+\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(url) ? url : "";
+  }, [sourceFile, sourceUrl]);
   const isActive = Boolean(status?.is_active);
   const result = extractVideoMontageResult(status);
   const outputUrl = absoluteApiUrl(result?.output_url || result?.video_montage?.render?.output_url || null);
@@ -187,6 +193,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
         sourceFile,
         captionOverrides,
         titleOverrides,
+        zoom,
       });
       setStatus(next);
     } catch (err) {
@@ -293,6 +300,55 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                 placeholder={result?.video_montage?.source_url || "https://example.com/video.mp4"}
                 dir="ltr"
               />
+            </div>
+            <div className="mt-5 rounded-2xl border border-border bg-background p-4">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-foreground" htmlFor="montage-zoom">
+                  زوم على الشخصية
+                </label>
+                <span className="rounded-lg bg-[#2f80ff]/10 px-2.5 py-1 text-sm font-bold text-[#2f80ff]" dir="ltr">
+                  {zoom.toFixed(2)}x
+                </span>
+              </div>
+              <input
+                id="montage-zoom"
+                type="range"
+                min={1}
+                max={3}
+                step={0.25}
+                value={zoom}
+                onChange={(event) => setZoom(Number(event.target.value))}
+                className="mt-3 w-full accent-[#2f80ff]"
+                dir="ltr"
+              />
+              <div className="mt-1 flex justify-between text-[11px] text-muted-foreground" dir="ltr">
+                <span>1x</span>
+                <span>1.5x</span>
+                <span>2x</span>
+                <span>2.5x</span>
+                <span>3x</span>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                الزوم مثبّت على أسفل الكادر — بيقصّ الأطراف العلوية والجانبية (مفيد لإخفاء أجسام على حواف التصوير).
+              </p>
+              {previewSrc ? (
+                <div className="mx-auto mt-4 aspect-[9/16] w-40 overflow-hidden rounded-xl border border-border bg-black">
+                  <video
+                    key={previewSrc}
+                    src={previewSrc}
+                    muted
+                    loop
+                    autoPlay
+                    playsInline
+                    className="h-full w-full object-cover"
+                    style={{ transform: `scale(${zoom})`, transformOrigin: "50% 100%" }}
+                  />
+                </div>
+              ) : (
+                <p className="mt-3 text-center text-xs text-muted-foreground">
+                  ارفع فيديو أو حط رابط حتى تشوف معاينة الزوم مباشرة.
+                </p>
+              )}
             </div>
             <label className="mt-4 block text-sm font-semibold text-foreground" htmlFor="montage-notes">
               ملاحظات المونتاج

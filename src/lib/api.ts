@@ -378,12 +378,14 @@ export const api = {
         sourceFile?: File | null;
         captionOverrides?: string[];
         titleOverrides?: string[];
+        zoom?: number;
       }
     ) => {
       const form = new FormData();
       form.append("mode", data.mode);
       form.append("source_url", data.sourceUrl || "");
       form.append("options_json", JSON.stringify(data.options || []));
+      form.append("zoom", String(data.zoom ?? 1));
       form.append("caption_overrides_json", JSON.stringify(data.captionOverrides || []));
       form.append("title_overrides_json", JSON.stringify(data.titleOverrides || []));
       form.append("notes", data.notes || "");
