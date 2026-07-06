@@ -126,6 +126,8 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   const previewSrc = useMemo(() => {
     if (sourceFile) return URL.createObjectURL(sourceFile);
     const url = sourceUrl.trim();
+    const driveMatch = url.match(/drive\.google\.com\/(?:file\/d\/|uc\?[^ ]*id=)([\w-]+)/);
+    if (driveMatch) return `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
     return /^https?:\/\/.+\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(url) ? url : "";
   }, [sourceFile, sourceUrl]);
   const isActive = Boolean(status?.is_active);
