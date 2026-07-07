@@ -379,6 +379,8 @@ export const api = {
         captionOverrides?: string[];
         titleOverrides?: string[];
         zoom?: number;
+        offsetX?: number;
+        offsetY?: number;
       }
     ) => {
       const form = new FormData();
@@ -386,6 +388,8 @@ export const api = {
       form.append("source_url", data.sourceUrl || "");
       form.append("options_json", JSON.stringify(data.options || []));
       form.append("zoom", String(data.zoom ?? 1));
+      form.append("subject_offset_x", String(data.offsetX ?? 0));
+      form.append("subject_offset_y", String(data.offsetY ?? 0));
       form.append("caption_overrides_json", JSON.stringify(data.captionOverrides || []));
       form.append("title_overrides_json", JSON.stringify(data.titleOverrides || []));
       form.append("notes", data.notes || "");

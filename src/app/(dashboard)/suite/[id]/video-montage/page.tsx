@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   BadgeCheck,
@@ -115,6 +115,8 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [offsetX, setOffsetX] = useState(0);
+  const [offsetY, setOffsetY] = useState(0);
   const [captionOverrides, setCaptionOverrides] = useState<string[]>([]);
   const [titleOverrides, setTitleOverrides] = useState<string[]>([]);
   const [status, setStatus] = useState<GenerationStatus | null>(null);
@@ -123,13 +125,32 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   const [error, setError] = useState<string | null>(null);
 
   const activeMode = useMemo(() => modes.find((item) => item.id === mode) || modes[0], [mode]);
-  const previewSrc = useMemo(() => {
-    if (sourceFile) return URL.createObjectURL(sourceFile);
+  const preview = useMemo(() => {
+    if (sourceFile) return { kind: "video" as const, src: URL.createObjectURL(sourceFile) };
     const url = sourceUrl.trim();
     const driveMatch = url.match(/drive\.google\.com\/(?:file\/d\/|uc\?[^ ]*id=)([\w-]+)/);
-    if (driveMatch) return `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
-    return /^https?:\/\/.+\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(url) ? url : "";
+    // Browsers can't play uc?export=download (Google returns HTML), so embed
+    // Drive's own preview player and scale/offset the whole frame instead.
+    if (driveMatch) return { kind: "drive" as const, src: `https://drive.google.com/file/d/${driveMatch[1]}/preview` };
+    if (/^https?:\/\/.+\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(url)) return { kind: "video" as const, src: url };
+    return null;
   }, [sourceFile, sourceUrl]);
+  const previewDragRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
+  const handlePreviewPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    previewDragRef.current = { x: offsetX, y: offsetY, startX: event.clientX, startY: event.clientY };
+  };
+  const handlePreviewPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = previewDragRef.current;
+    if (!drag) return;
+    const box = event.currentTarget.getBoundingClientRect();
+    setOffsetX(Math.max(-40, Math.min(40, drag.x + ((event.clientX - drag.startX) / box.width) * 100)));
+    setOffsetY(Math.max(-40, Math.min(40, drag.y + ((event.clientY - drag.startY) / box.height) * 100)));
+  };
+  const handlePreviewPointerUp = () => {
+    previewDragRef.current = null;
+  };
+  const subjectTransform = `translate(${offsetX}%, ${offsetY}%) scale(${zoom})`;
   const isActive = Boolean(status?.is_active);
   const result = extractVideoMontageResult(status);
   const outputUrl = absoluteApiUrl(result?.output_url || result?.video_montage?.render?.output_url || null);
@@ -196,6 +217,8 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
         captionOverrides,
         titleOverrides,
         zoom,
+        offsetX,
+        offsetY,
       });
       setStatus(next);
     } catch (err) {
@@ -333,19 +356,54 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
                 الزوم مثبّت على مستوى الوجه — بيقصّ الأسفل والجوانب (مفيد لإخفاء أجسام أسفل الكادر) مع الحفاظ على الرأس.
               </p>
-              {previewSrc ? (
-                <div className="mx-auto mt-4 aspect-[9/16] w-40 overflow-hidden rounded-xl border border-border bg-black">
-                  <video
-                    key={previewSrc}
-                    src={previewSrc}
-                    muted
-                    loop
-                    autoPlay
-                    playsInline
-                    className="h-full w-full object-cover"
-                    style={{ transform: `scale(${zoom})`, transformOrigin: "50% 25%" }}
-                  />
-                </div>
+              {preview ? (
+                <>
+                  <div
+                    className="mx-auto mt-4 aspect-[9/16] w-48 touch-none cursor-grab overflow-hidden rounded-xl border border-border bg-black active:cursor-grabbing"
+                    onPointerDown={handlePreviewPointerDown}
+                    onPointerMove={handlePreviewPointerMove}
+                    onPointerUp={handlePreviewPointerUp}
+                    onPointerCancel={handlePreviewPointerUp}
+                  >
+                    {preview.kind === "video" ? (
+                      <video
+                        key={preview.src}
+                        src={preview.src}
+                        muted
+                        loop
+                        autoPlay
+                        playsInline
+                        className="h-full w-full object-cover"
+                        style={{ transform: subjectTransform, transformOrigin: "50% 25%" }}
+                      />
+                    ) : (
+                      <iframe
+                        key={preview.src}
+                        src={preview.src}
+                        className="pointer-events-none h-full w-full"
+                        style={{ transform: subjectTransform, transformOrigin: "50% 25%", border: 0 }}
+                        allow="autoplay"
+                      />
+                    )}
+                  </div>
+                  <div className="mt-2 flex items-center justify-center gap-3 text-xs text-muted-foreground" dir="ltr">
+                    <span>X: {offsetX.toFixed(0)}%</span>
+                    <span>Y: {offsetY.toFixed(0)}%</span>
+                    <button
+                      type="button"
+                      className="rounded-lg border border-border px-2 py-0.5 font-semibold text-foreground transition hover:border-[#2f80ff]"
+                      onClick={() => {
+                        setOffsetX(0);
+                        setOffsetY(0);
+                      }}
+                    >
+                      تصفير
+                    </button>
+                  </div>
+                  <p className="mt-1 text-center text-xs text-muted-foreground">
+                    اسحب المعاينة لتحريك وضعية الشخصية (يمين/شمال/فوق/تحت) — الوضعية والزوم بينطبقوا على المونتاج النهائي.
+                  </p>
+                </>
               ) : (
                 <p className="mt-3 text-center text-xs text-muted-foreground">
                   ارفع فيديو أو حط رابط حتى تشوف معاينة الزوم مباشرة.

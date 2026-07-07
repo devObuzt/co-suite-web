@@ -511,10 +511,15 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
   const overlayBeat = beatPulse(frame, fps, beats, ['overlay']);
   const flashBeat = beatPulse(frame, fps, beats, ['flash']);
   const float = Math.sin(frame / 22);
-  const userZoom = Math.min(
-    3,
-    Math.max(1, Number((manifest.style as {subjectZoom?: number}).subjectZoom ?? 1)),
-  );
+  const montageStyle = manifest.style as {
+    subjectZoom?: number;
+    subjectOffsetXPct?: number;
+    subjectOffsetYPct?: number;
+  };
+  const userZoom = Math.min(3, Math.max(1, Number(montageStyle.subjectZoom ?? 1)));
+  const {width: canvasWidth, height: canvasHeight} = useVideoConfig();
+  const userOffsetX = (Math.max(-40, Math.min(40, Number(montageStyle.subjectOffsetXPct ?? 0))) / 100) * canvasWidth;
+  const userOffsetY = (Math.max(-40, Math.min(40, Number(montageStyle.subjectOffsetYPct ?? 0))) / 100) * canvasHeight;
   const subjectScale =
     (interpolate(progress, [0, 0.5, 1], [1.035, 1.075, 1.045]) + zoomBeat * 0.07) * userZoom;
   const subjectX = interpolate(progress, [0, 1], [-10, 10]) + overlayBeat * 12;
@@ -528,7 +533,7 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
     inset: 0,
     objectFit: 'cover',
     position: 'absolute',
-    transform: `translate3d(${subjectX}px, ${subjectY}px, 0) scale(${subjectScale})`,
+    transform: `translate3d(${subjectX + userOffsetX}px, ${subjectY + userOffsetY}px, 0) scale(${subjectScale})`,
     transformOrigin: '50% 25%',
     width: '100%',
     zIndex: 2,
