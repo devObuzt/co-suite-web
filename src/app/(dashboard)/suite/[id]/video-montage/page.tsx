@@ -117,6 +117,8 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   const [zoom, setZoom] = useState(1);
   const [offsetX, setOffsetX] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
+  const [stagedUrl, setStagedUrl] = useState("");
+  const [staging, setStaging] = useState(false);
   const [captionOverrides, setCaptionOverrides] = useState<string[]>([]);
   const [titleOverrides, setTitleOverrides] = useState<string[]>([]);
   const [status, setStatus] = useState<GenerationStatus | null>(null);
@@ -127,6 +129,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   const activeMode = useMemo(() => modes.find((item) => item.id === mode) || modes[0], [mode]);
   const preview = useMemo(() => {
     if (sourceFile) return { kind: "video" as const, src: URL.createObjectURL(sourceFile) };
+    if (stagedUrl) return { kind: "video" as const, src: stagedUrl };
     const url = sourceUrl.trim();
     const driveMatch = url.match(/drive\.google\.com\/(?:file\/d\/|uc\?[^ ]*id=)([\w-]+)/);
     // Browsers can't play uc?export=download (Google returns HTML), so embed
@@ -134,7 +137,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     if (driveMatch) return { kind: "drive" as const, src: `https://drive.google.com/file/d/${driveMatch[1]}/preview` };
     if (/^https?:\/\/.+\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(url)) return { kind: "video" as const, src: url };
     return null;
-  }, [sourceFile, sourceUrl]);
+  }, [sourceFile, sourceUrl, stagedUrl]);
   const previewDragRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
   const handlePreviewPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -149,6 +152,20 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   };
   const handlePreviewPointerUp = () => {
     previewDragRef.current = null;
+  };
+  const handleStagePreview = async () => {
+    const url = sourceUrl.trim();
+    if (!url || staging) return;
+    setStaging(true);
+    setError(null);
+    try {
+      const res = await api.videoMontage.stageSource(id, url);
+      setStagedUrl(res.staged_url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تعذر تجهيز المعاينة.");
+    } finally {
+      setStaging(false);
+    }
   };
   const subjectTransform = `translate(${offsetX}%, ${offsetY}%) scale(${zoom})`;
   const isActive = Boolean(status?.is_active);
@@ -210,7 +227,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     try {
       const next = await api.videoMontage.create(id, {
         mode,
-        sourceUrl: effectiveSourceUrl,
+        sourceUrl: stagedUrl || effectiveSourceUrl,
         options: selectedOptions,
         notes,
         sourceFile,
@@ -320,7 +337,10 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
               <input
                 id="video-link"
                 value={sourceUrl}
-                onChange={(event) => setSourceUrl(event.target.value)}
+                onChange={(event) => {
+                  setSourceUrl(event.target.value);
+                  setStagedUrl("");
+                }}
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 placeholder={result?.video_montage?.source_url || "https://example.com/video.mp4"}
                 dir="ltr"
@@ -386,6 +406,16 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                       />
                     )}
                   </div>
+                  {preview.kind === "drive" ? (
+                    <button
+                      type="button"
+                      disabled={staging}
+                      onClick={handleStagePreview}
+                      className="mx-auto mt-3 block rounded-xl bg-[#2f80ff] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#2568cc] disabled:opacity-60"
+                    >
+                      {staging ? "عم نجهز المعاينة الدقيقة… (حتى دقيقة)" : "جهّز معاينة دقيقة من الرابط"}
+                    </button>
+                  ) : null}
                   <div className="mt-2 flex items-center justify-center gap-3 text-xs text-muted-foreground" dir="ltr">
                     <span>X: {offsetX.toFixed(0)}%</span>
                     <span>Y: {offsetY.toFixed(0)}%</span>

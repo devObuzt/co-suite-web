@@ -249,10 +249,31 @@ const SceneBackground = ({scene, durationInFrames}: {scene: Scene; durationInFra
 
 const BehindPersonText = ({scene}: {scene: Scene}) => {
   const frame = useCurrentFrame();
-  const {fps} = useVideoConfig();
+  const {fps, height: canvasHeight} = useVideoConfig();
   const durationInFrames = sourceFrames(scene.sourceEnd - scene.sourceStart, fps);
   const displayTitle = stretchedTitle(scene.behindText);
   const titleLayout = behindTitleLayout(displayTitle);
+  // Pin the title to the subject's head: mirror the subject transform
+  // (face-height origin + user zoom/offset) applied to the measured top of
+  // the alpha matte, so the title stays just above the head wherever the
+  // user places the subject.
+  const styleCfg = manifest.style as {
+    subjectZoom?: number;
+    subjectOffsetYPct?: number;
+  };
+  const subjectTopRel = Number(
+    (manifest.source as {subjectTopRel?: number | null}).subjectTopRel ?? 0.08,
+  );
+  const userZoom = Math.min(3, Math.max(1, Number(styleCfg.subjectZoom ?? 1)));
+  const offsetYPx =
+    (Math.max(-40, Math.min(40, Number(styleCfg.subjectOffsetYPct ?? 0))) / 100) * canvasHeight;
+  const originY = canvasHeight * 0.25;
+  const headTopPx =
+    originY + (subjectTopRel * canvasHeight - originY) * 1.055 * userZoom + offsetYPx;
+  const titlePaddingTop = Math.max(
+    46,
+    Math.min(canvasHeight * 0.45, headTopPx - titleLayout.fontSize * 0.78),
+  );
   const introOpacity = interpolate(frame, [0, 14, 70], [0, 0.92, 0.78], {
     extrapolateRight: 'clamp',
   });
@@ -272,7 +293,7 @@ const BehindPersonText = ({scene}: {scene: Scene}) => {
       style={{
         alignItems: 'center',
         justifyContent: 'flex-start',
-        padding: '132px 0 0',
+        padding: `${titlePaddingTop}px 0 0`,
         zIndex: 1,
       }}
     >

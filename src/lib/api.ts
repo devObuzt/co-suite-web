@@ -366,6 +366,11 @@ export const api = {
   videoMontage: {
     latest: (suiteId: string) =>
       request<GenerationStatus>(`/suites/${suiteId}/video-montage/jobs/latest`),
+    stageSource: (suiteId: string, sourceUrl: string) =>
+      request<{ staged_url: string }>(`/suites/${suiteId}/video-montage/stage-source`, {
+        method: "POST",
+        body: JSON.stringify({ source_url: sourceUrl }),
+      }),
     get: (suiteId: string, jobId: string) =>
       request<GenerationStatus>(`/suites/${suiteId}/video-montage/jobs/${jobId}`),
     create: (
