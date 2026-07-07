@@ -227,7 +227,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     try {
       const next = await api.videoMontage.create(id, {
         mode,
-        sourceUrl: stagedUrl || effectiveSourceUrl,
+        sourceUrl: sourceFile ? "" : stagedUrl || effectiveSourceUrl,
         options: selectedOptions,
         notes,
         sourceFile,
@@ -317,7 +317,10 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                 type="file"
                 accept="video/*"
                 className="sr-only"
-                onChange={(event) => setSourceFile(event.target.files?.[0] || null)}
+                onChange={(event) => {
+                  setSourceFile(event.target.files?.[0] || null);
+                  setStagedUrl("");
+                }}
               />
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-background text-[#2f80ff] shadow-sm">
                 <Upload size={22} />
