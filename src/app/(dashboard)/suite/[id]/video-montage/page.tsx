@@ -168,6 +168,18 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     }
   };
   const subjectTransform = `translate(${offsetX}%, ${offsetY}%) scale(${zoom})`;
+  useEffect(() => {
+    const url = sourceUrl.trim();
+    const isDrive = /drive\.google\.com\/(?:file\/d\/|uc\?[^ ]*id=)/.test(url);
+    if (!sourceFile && !stagedUrl && !staging && isDrive) {
+      const timer = setTimeout(() => {
+        void handleStagePreview();
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceUrl, sourceFile, stagedUrl, staging]);
   const isActive = Boolean(status?.is_active);
   const result = extractVideoMontageResult(status);
   const outputUrl = absoluteApiUrl(result?.output_url || result?.video_montage?.render?.output_url || null);
@@ -400,23 +412,23 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                         style={{ transform: subjectTransform, transformOrigin: "50% 25%" }}
                       />
                     ) : (
-                      <iframe
-                        key={preview.src}
-                        src={preview.src}
-                        className="pointer-events-none h-full w-full"
-                        style={{ transform: subjectTransform, transformOrigin: "50% 25%", border: 0 }}
-                        allow="autoplay"
-                      />
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-black/85 p-4 text-center">
+                        <span className={`h-8 w-8 rounded-full border-2 border-[#2f80ff] border-t-transparent ${staging ? "animate-spin" : "opacity-40"}`} />
+                        <p className="text-xs leading-5 text-white/80">
+                          {staging
+                            ? "عم نجهز معاينة دقيقة من الرابط… بتاخد لحد دقيقة"
+                            : "المعاينة الدقيقة رح تتجهز تلقائيًا…"}
+                        </p>
+                      </div>
                     )}
                   </div>
-                  {preview.kind === "drive" ? (
+                  {preview.kind === "drive" && !staging ? (
                     <button
                       type="button"
-                      disabled={staging}
                       onClick={handleStagePreview}
-                      className="mx-auto mt-3 block rounded-xl bg-[#2f80ff] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#2568cc] disabled:opacity-60"
+                      className="mx-auto mt-3 block rounded-xl bg-[#2f80ff] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#2568cc]"
                     >
-                      {staging ? "عم نجهز المعاينة الدقيقة… (حتى دقيقة)" : "جهّز معاينة دقيقة من الرابط"}
+                      إعادة محاولة تجهيز المعاينة
                     </button>
                   ) : null}
                   <div className="mt-2 flex items-center justify-center gap-3 text-xs text-muted-foreground" dir="ltr">
