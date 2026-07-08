@@ -119,6 +119,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   const [offsetY, setOffsetY] = useState(0);
   const [stagedUrl, setStagedUrl] = useState("");
   const [staging, setStaging] = useState(false);
+  const [stageFailedUrl, setStageFailedUrl] = useState("");
   const [captionOverrides, setCaptionOverrides] = useState<string[]>([]);
   const [titleOverrides, setTitleOverrides] = useState<string[]>([]);
   const [status, setStatus] = useState<GenerationStatus | null>(null);
@@ -162,6 +163,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
       const res = await api.videoMontage.stageSource(id, url);
       setStagedUrl(res.staged_url);
     } catch (err) {
+      setStageFailedUrl(url);
       setError(err instanceof Error ? err.message : "تعذر تجهيز المعاينة.");
     } finally {
       setStaging(false);
@@ -171,7 +173,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   useEffect(() => {
     const url = sourceUrl.trim();
     const isDrive = /drive\.google\.com\/(?:file\/d\/|uc\?[^ ]*id=)/.test(url);
-    if (!sourceFile && !stagedUrl && !staging && isDrive) {
+    if (!sourceFile && !stagedUrl && !staging && isDrive && url !== stageFailedUrl) {
       const timer = setTimeout(() => {
         void handleStagePreview();
       }, 800);
@@ -179,7 +181,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     }
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceUrl, sourceFile, stagedUrl, staging]);
+  }, [sourceUrl, sourceFile, stagedUrl, staging, stageFailedUrl]);
   const isActive = Boolean(status?.is_active);
   const result = extractVideoMontageResult(status);
   const outputUrl = absoluteApiUrl(result?.output_url || result?.video_montage?.render?.output_url || null);
@@ -355,6 +357,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                 onChange={(event) => {
                   setSourceUrl(event.target.value);
                   setStagedUrl("");
+                  setStageFailedUrl("");
                 }}
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 placeholder={result?.video_montage?.source_url || "https://example.com/video.mp4"}
@@ -417,7 +420,9 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                         <p className="text-xs leading-5 text-white/80">
                           {staging
                             ? "عم نجهز معاينة دقيقة من الرابط… بتاخد لحد دقيقة"
-                            : "المعاينة الدقيقة رح تتجهز تلقائيًا…"}
+                            : stageFailedUrl
+                              ? "ما قدرنا نجيب الفيديو من هالرابط — جرّب إعادة المحاولة، أو ارفع الملف مباشرة (أضمن)."
+                              : "المعاينة الدقيقة رح تتجهز تلقائيًا…"}
                         </p>
                       </div>
                     )}
