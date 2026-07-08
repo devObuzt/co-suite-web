@@ -323,6 +323,29 @@ export default function AdminPage() {
         </div>
       )}
 
+      <section className="grid gap-3 md:grid-cols-2">
+        <Link
+          href="/admin/services"
+          className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 transition hover:border-primary/50 hover:bg-muted"
+        >
+          <Tags size={18} className="text-primary" />
+          <div>
+            <div className="font-semibold">الخدمات — كتالوج startbyconnec</div>
+            <div className="text-xs text-muted-foreground">Manage catalog items, pricing, and cycles.</div>
+          </div>
+        </Link>
+        <Link
+          href="/admin/leads"
+          className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 transition hover:border-primary/50 hover:bg-muted"
+        >
+          <Users size={18} className="text-primary" />
+          <div>
+            <div className="font-semibold">الليدات — طلبات الخدمة</div>
+            <div className="text-xs text-muted-foreground">Review leads and service requests.</div>
+          </div>
+        </Link>
+      </section>
+
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <Metric icon={<Users size={18} />} label="Users" value={summary?.users ?? 0} note={`${summary?.active_users ?? 0} active`} />
         <Metric icon={<UserCog size={18} />} label="Suites" value={summary?.suites ?? 0} note="owned workspaces" />
@@ -373,7 +396,9 @@ export default function AdminPage() {
               <thead className="border-b border-border text-left text-xs text-muted-foreground">
                 <tr>
                   <th className="py-2 pr-3">User</th>
+                  <th className="py-2 pr-3">Phone</th>
                   <th className="py-2 pr-3">Status</th>
+                  <th className="py-2 pr-3">Approval</th>
                   <th className="py-2 pr-3">Suites</th>
                   <th className="py-2 pr-3">Created</th>
                   <th className="py-2 pr-3 text-right">Actions</th>
@@ -386,12 +411,18 @@ export default function AdminPage() {
                       <div className="font-medium">{item.full_name}</div>
                       <div className="text-xs text-muted-foreground">{item.email}</div>
                     </td>
+                    <td className="py-3 pr-3 text-muted-foreground">{item.phone || "—"}</td>
                     <td className="py-3 pr-3">
                       <div className="flex flex-wrap gap-1">
                         <Badge variant={item.is_active ? "outline" : "destructive"}>{item.is_active ? "active" : "inactive"}</Badge>
                         {item.is_super_admin && <Badge>admin</Badge>}
                         {item.is_verified && <Badge variant="secondary">verified</Badge>}
                       </div>
+                    </td>
+                    <td className="py-3 pr-3">
+                      <Badge variant={item.approval_status === "approved" ? "outline" : item.approval_status === "frozen" ? "destructive" : "secondary"}>
+                        {item.approval_status || "frozen"}
+                      </Badge>
                     </td>
                     <td className="py-3 pr-3">{item.suite_count ?? 0}</td>
                     <td className="py-3 pr-3 text-muted-foreground">{formatDate(item.created_at)}</td>
@@ -400,6 +431,23 @@ export default function AdminPage() {
                         <Button variant="outline" size="sm" onClick={() => openUser(item.id)} disabled={busyUserId === item.id}>View</Button>
                         <Button variant="outline" size="sm" onClick={() => updateUser(item.id, { is_active: !item.is_active })} disabled={busyUserId === item.id}>
                           {item.is_active ? "Disable" : "Enable"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={item.approval_status === "approved" ? "outline" : "default"}
+                          disabled={busyUserId === item.id}
+                          onClick={async () => {
+                            setBusyUserId(item.id);
+                            try {
+                              const next = item.approval_status === "approved" ? "frozen" : "approved";
+                              await api.admin.updateUser(item.id, { approval_status: next });
+                              setUsers((prev) => prev.map((x) => (x.id === item.id ? { ...x, approval_status: next } : x)));
+                            } finally {
+                              setBusyUserId(null);
+                            }
+                          }}
+                        >
+                          {item.approval_status === "approved" ? "Freeze" : "Approve"}
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => changePassword(item.id)} disabled={busyUserId === item.id} className="gap-1">
                           <KeyRound size={13} /> Password
