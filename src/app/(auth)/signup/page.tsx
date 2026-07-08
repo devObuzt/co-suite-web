@@ -56,6 +56,7 @@ export default function SignupPage() {
   const ArrowNext = isRtl ? ArrowLeft : ArrowRight;
   const [step, setStep] = useState<SignupStep>("account");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [selectedType, setSelectedType] = useState<AccountType>("business");
@@ -72,7 +73,7 @@ export default function SignupPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await api.auth.signup({ email, password, full_name: name });
+      const res = await api.auth.signup({ email, password, full_name: name, phone: phone.trim() || undefined });
       localStorage.setItem("co_suite_account_type", accountType);
       setAuth(res.access_token, res.user);
       router.push("/suite/new");
@@ -108,6 +109,16 @@ export default function SignupPage() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t("auth.namePlaceholder")}
                 required
+                className="bg-background"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">{t("auth.phone")}</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 className="bg-background"
               />
             </div>
