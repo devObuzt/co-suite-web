@@ -105,6 +105,16 @@ const LANG_TO_DIALECT: Record<string, string> = {
   "ru": "Russian", "fr": "French", "es": "Spanish", "tr": "Turkish", "zh": "Chinese",
 };
 
+// Arabs in Israel get exactly this dialect suggestion — no long AI-extracted
+// descriptions in the field.
+const ARAB_48_DIALECT = "عربي - عرب الـ48";
+
+function suggestedDialect(extracted: string, langs: string[], countriesText: string) {
+  const arabicAudience = (langs[0] || "") === "ar" || /arab|عرب|فلسطين|palestin/i.test(extracted);
+  const inIsrael = /israel|إسرائيل|ישראל/i.test(countriesText);
+  return arabicAudience && inIsrael ? ARAB_48_DIALECT : extracted;
+}
+
 const META_INTERESTS: Record<string, string[]> = {
   marketing: ["Meta Ads", "Instagram Business", "Small business", "Entrepreneurship", "Digital marketing"],
   restaurant: ["Restaurants", "Food delivery", "Local food", "Dining out", "Coffee shops"],
@@ -458,20 +468,19 @@ export default function NewSuitePage() {
       .catch(() => undefined);
   }, []);
 
-  useEffect(() => {
-    if (step !== "step-e" || customCountries || !ipCountry) return;
-    setCustomCountries((prev) => prev || ipCountry);
-  }, [step, customCountries, ipCountry]);
-
-  // Israeli visitor with Arabic as the primary language → suggest the
-  // Arab-48 dialect by default (still editable).
-  useEffect(() => {
-    if (audienceDialect) return;
-    const primaryLang = orderedLangs[0] || "";
-    if (primaryLang === "ar" && /israel|إسرائيل|ישראל/i.test(ipCountry)) {
-      setAudienceDialect("Arabic - Arab 48");
+  // Adjust-during-render (no setState-in-effect): prefill the country on the
+  // audience step, and suggest the Arab-48 dialect for Israeli Arabic suites.
+  const ipPrefillKey = `${step}|${ipCountry}|${orderedLangs[0] || ""}`;
+  const [prevIpPrefillKey, setPrevIpPrefillKey] = useState(ipPrefillKey);
+  if (ipPrefillKey !== prevIpPrefillKey) {
+    setPrevIpPrefillKey(ipPrefillKey);
+    if (step === "step-e" && !customCountries && ipCountry) {
+      setCustomCountries(ipCountry);
     }
-  }, [ipCountry, orderedLangs, audienceDialect]);
+    if (!audienceDialect && (orderedLangs[0] || "") === "ar" && /israel|إسرائيل|ישראל/i.test(ipCountry)) {
+      setAudienceDialect(ARAB_48_DIALECT);
+    }
+  }
 
   function detectLocation() {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -734,12 +743,25 @@ export default function NewSuitePage() {
       setSelectedNicheIdx(foundNicheIdx);
       setSelectedResearchNiche(foundNicheIdx >= 0 ? "" : (researchedNiches[0] || ""));
       setOrderedLangs(res.brand?.audience_languages || []);
-      setAudienceDialect(res.brand?.dialect || "");
+      const dialectContextCountries = [
+        ...(res.brand?.audience_location?.countries || []),
+        res.brand?.location || "",
+        ipCountry,
+      ].join(", ");
+      setAudienceDialect(
+        suggestedDialect(res.brand?.dialect || "", res.brand?.audience_languages || [], dialectContextCountries)
+      );
       setAudienceNotes(res.brand?.audience_notes || "");
       const audienceLocation = res.brand?.audience_location;
       setLocationScope("Custom");
-      setCustomCountries((audienceLocation?.countries || []).join(", ") || res.brand?.location || "");
-      setCustomCities((audienceLocation?.cities || []).join(", "));
+      // Country field keeps ONLY the country — any city in the extracted
+      // location string moves to the cities field.
+      const extractedLocation = String(res.brand?.location || "");
+      const locationParts = extractedLocation.split(",").map((part) => part.trim()).filter(Boolean);
+      const extractedCountry = locationParts.length > 1 ? locationParts[locationParts.length - 1] : extractedLocation;
+      const extractedCity = locationParts.length > 1 ? locationParts.slice(0, -1).join(", ") : "";
+      setCustomCountries((audienceLocation?.countries || []).join(", ") || extractedCountry || "");
+      setCustomCities((audienceLocation?.cities || []).join(", ") || extractedCity);
       setSelectedInterests(res.brand?.audience_interests || []);
       setSelectedBehaviors(res.brand?.audience_behaviors || []);
       setSelectedStatuses(res.brand?.audience_social_statuses || []);
@@ -995,7 +1017,7 @@ export default function NewSuitePage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {/* Business name override */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 rounded-2xl border border-border bg-background/60 p-4">
                 <Label className="text-muted-foreground text-xs">{t("suite.new.businessOverride")}</Label>
                 <Input
                   value={businessName}
@@ -1006,10 +1028,8 @@ export default function NewSuitePage() {
                 />
               </div>
 
-              <Separator />
-
               {/* Link rows */}
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-2xl border border-border bg-background/60 p-4">
                 {links.map((link, i) => (
                   <div key={i} className="flex gap-2 items-start">
                     {/* Platform selector */}
@@ -1115,12 +1135,14 @@ export default function NewSuitePage() {
               <CardDescription className="text-muted-foreground">{t("suite.new.stepASubtitle")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Input
-                value={bizName}
-                onChange={(e) => setBizName(e.target.value)}
-                className="bg-background text-foreground text-lg font-medium"
-                dir="auto"
-              />
+              <div className="rounded-2xl border border-border bg-background/60 p-4">
+                <Input
+                  value={bizName}
+                  onChange={(e) => setBizName(e.target.value)}
+                  className="bg-background text-foreground text-lg font-medium"
+                  dir="auto"
+                />
+              </div>
             </CardContent>
           </Card>
           <div className="flex gap-3">
@@ -1145,7 +1167,7 @@ export default function NewSuitePage() {
               <CardDescription className="text-muted-foreground">{t("suite.new.stepBSubtitle")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 rounded-2xl border border-border bg-background/60 p-4">
                 {researchNicheOptions.length > 0 && (
                   <span className="w-full text-xs text-muted-foreground">{t("suite.new.researchSuggestions")}</span>
                 )}
@@ -1224,8 +1246,8 @@ export default function NewSuitePage() {
                 {t("suite.new.stepCSubtitle")}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-2">
+            <CardContent className="space-y-5">
+              <div className="flex flex-wrap gap-2 rounded-2xl border border-border bg-background/60 p-4">
                 {LANGUAGES.filter((l) => !orderedLangs.includes(l.code)).map((l) => (
                   <button
                     key={l.code}
@@ -1258,8 +1280,8 @@ export default function NewSuitePage() {
                 </Button>
               </div>
               {orderedLangs.length > 0 && (
-                <div className="space-y-2 mt-2">
-                  <p className="text-muted-foreground text-xs">{t("suite.new.selectedOrder")}</p>
+                <div className="space-y-2 rounded-2xl border border-border bg-background/60 p-4">
+                  <p className="text-xs font-semibold text-foreground">{t("suite.new.selectedOrder")}</p>
                   {orderedLangs.map((code, idx) => {
                     return (
                       <div key={code} className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2.5">
@@ -1293,13 +1315,16 @@ export default function NewSuitePage() {
                   })}
                 </div>
               )}
-              <Input
-                value={audienceDialect}
-                onChange={(e) => setAudienceDialect(e.target.value)}
-                placeholder={t("suite.new.dialectPlaceholder")}
-                className="bg-background text-foreground text-sm"
-                dir="auto"
-              />
+              <div className="space-y-2 rounded-2xl border border-border bg-background/60 p-4">
+                <p className="text-xs font-semibold text-foreground">{t("suite.new.dialectLabel")}</p>
+                <Input
+                  value={audienceDialect}
+                  onChange={(e) => setAudienceDialect(e.target.value)}
+                  placeholder={t("suite.new.dialectPlaceholder")}
+                  className="bg-background text-foreground text-sm"
+                  dir="auto"
+                />
+              </div>
             </CardContent>
           </Card>
           <div className="flex gap-3">
@@ -1330,6 +1355,7 @@ export default function NewSuitePage() {
               <CardDescription className="text-muted-foreground">{t("suite.new.stepDSubtitle")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              <div className="space-y-2 rounded-2xl border border-border bg-background/60 p-4">
               {serviceItems.map((item, i) => (
                 <div key={i} className="flex gap-2 items-center">
                   <Input
@@ -1351,6 +1377,7 @@ export default function NewSuitePage() {
                 onClick={() => setServiceItems((prev) => [...prev, ""])}
                 className="flex items-center gap-1.5 text-[#2f80ff] hover:underline text-sm transition-colors"
               ><Plus size={13} /> {t("suite.new.addService")}</button>
+              </div>
             </CardContent>
           </Card>
           <div className="flex gap-3">
@@ -1581,7 +1608,7 @@ export default function NewSuitePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-2xl border border-border bg-background/60 p-4">
                 <Label className="text-foreground">{t("suite.new.uspLabel")}</Label>
                 {uspPoints.map((point, i) => (
                   <div key={i} className="flex items-center gap-2">
@@ -1619,7 +1646,7 @@ export default function NewSuitePage() {
                   </button>
                 </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-2xl border border-border bg-background/60 p-4">
                 <Label className="text-foreground">{t("suite.new.espLabel")}</Label>
                 {espPoints.map((point, i) => (
                   <div key={i} className="flex gap-2 items-center">
@@ -1690,7 +1717,7 @@ export default function NewSuitePage() {
             <CardContent className="space-y-6">
 
               {/* ── LOGO ── */}
-              <div className="space-y-3">
+              <div className="space-y-3 rounded-2xl border border-border bg-background/60 p-4">
                 <Label className="text-foreground">{t("suite.new.logoLabel")}</Label>
 
                 {/* Logo preview */}
@@ -1802,7 +1829,7 @@ export default function NewSuitePage() {
               </div>
 
               {/* ── COLORS ── */}
-              <div className="space-y-3">
+              <div className="space-y-3 rounded-2xl border border-border bg-background/60 p-4">
                 <Label className="text-foreground">{t("suite.new.colorsLabel")}</Label>
                 <div className="grid grid-cols-3 gap-3">
                   {(["primary", "secondary", "accent"] as const).map((key) => {
@@ -1859,7 +1886,7 @@ export default function NewSuitePage() {
               </div>
 
               {/* ── FONTS ── */}
-              <div className="space-y-3">
+              <div className="space-y-3 rounded-2xl border border-border bg-background/60 p-4">
                 <Label className="text-foreground">{t("suite.new.fontsLabel")}</Label>
 
                 {/* AI-suggested fonts */}
@@ -1948,7 +1975,7 @@ export default function NewSuitePage() {
               <CardDescription className="text-muted-foreground">{t("suite.new.stepHSubtitle")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex flex-col gap-2 sm:flex-row rounded-2xl border border-border bg-background/60 p-4">
                 <Input
                   value={newPersonaName}
                   onChange={(e) => setNewPersonaName(e.target.value)}
