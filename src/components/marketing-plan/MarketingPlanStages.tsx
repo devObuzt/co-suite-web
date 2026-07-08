@@ -1040,7 +1040,7 @@ function CompetitorsStage({
         <Button onClick={onGenerate} disabled={isBusy} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}{text.generate}</Button>
         {competitors.length > 0 && <Button variant="outline" onClick={onMore} disabled={isBusy} className="gap-2">{loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.generateMore}</Button>}
       </div>
-      {warnings.length > 0 && (
+      {warnings.length > 0 && !loading && !loadingMore && (
         <div className="mt-4 space-y-2">
           {warnings.slice(0, 4).map((warning, index) => (
             <p key={`${warning}-${index}`} className="os-text-wrap rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" dir="auto">{warning}</p>
