@@ -42,6 +42,9 @@ const labels = {
     showAll: "عرض الكل",
     collapseAll: "تصغير",
     coverKicker: "الخطة التسويقية",
+    planEmptyTitle: "ما في خطة تسويقية بعد",
+    planEmptyDesc: "بكبسة وحدة بنولّد الخطة قسم قسم: كلمات مفتاحية، منافسين، عرض وطلب، وشخصيات العملاء — كل قسم بظهر أول ما يجهز وبننتقل تلقائيًا للي بعده.",
+    generateFullPlan: "توليد كل الخطة",
     personasGenerating: "بعدنا عم نولّد شخصيات إضافية...",
     coverStatsKeywords: "كلمة مفتاحية",
     coverStatsCompetitors: "منافس",
@@ -124,6 +127,9 @@ const labels = {
     showAll: "Show all",
     collapseAll: "Collapse",
     coverKicker: "Marketing Plan",
+    planEmptyTitle: "No marketing plan yet",
+    planEmptyDesc: "One click generates the plan section by section: keywords, competitors, demand & supply, and customer personas — each section appears as soon as it is ready.",
+    generateFullPlan: "Generate the full plan",
     personasGenerating: "Still generating more personas...",
     coverStatsKeywords: "keywords",
     coverStatsCompetitors: "competitors",
@@ -207,6 +213,9 @@ const labels = {
     showAll: "הצג הכל",
     collapseAll: "כווץ",
     coverKicker: "התכנית השיווקית",
+    planEmptyTitle: "עדיין אין תכנית שיווקית",
+    planEmptyDesc: "בלחיצה אחת נבנה את התכנית שלב אחרי שלב: מילות מפתח, מתחרים, ביקוש והיצע ופרסונות — כל שלב מופיע ברגע שהוא מוכן.",
+    generateFullPlan: "צור את כל התכנית",
     personasGenerating: "עדיין יוצרים פרסונות נוספות...",
     coverStatsKeywords: "מילות מפתח",
     coverStatsCompetitors: "מתחרים",
@@ -391,6 +400,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
   const [error, setError] = useState("");
   const [showIntro, setShowIntro] = useState(false);
   const visualsRequested = useRef(false);
+  const [autoStage, setAutoStage] = useState<StageSlug | null>(null);
 
   const load = useCallback(async () => {
     setError("");
@@ -582,13 +592,52 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     }
   }
 
+  async function generateFullPlan() {
+    setError("");
+    try {
+      setAutoStage("keywords");
+      setBusy("keywords");
+      applyPlanResponse(await api.marketingPlans.generateKeywords(suiteId, { language: lang }));
+      setAutoStage("competitors");
+      setBusy("competitors");
+      applyPlanResponse(await api.marketingPlans.generateCompetitors(suiteId, { language: lang }));
+      setAutoStage("demand-supply");
+      setBusy("demand-supply");
+      applyPlanResponse(await api.marketingPlans.generateDemandSupply(suiteId, { language: lang }));
+      setAutoStage("personas");
+      setBusy(null);
+      await generatePersonasInitial();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setAutoStage(null);
+      setBusy(null);
+    }
+  }
+
+  const stageReady: Record<string, boolean> = {
+    services: true,
+    keywords: (intelligence?.keywords || []).length > 0,
+    competitors: (intelligence?.competitors || []).length > 0,
+    "demand-supply":
+      Boolean(intelligence?.demand_supply) ||
+      (intelligence?.demand_signals || []).length > 0 ||
+      (intelligence?.supply_signals || []).length > 0,
+    personas: (intelligence?.personas || []).length > 0,
+  };
+  const hasAnyPlanData = stageReady.keywords || stageReady.competitors || stageReady["demand-supply"] || stageReady.personas;
+  // Progressive reveal while the full-plan run is in flight: only sections
+  // that are ready (or currently generating) are shown.
+  const revealing = autoStage !== null;
+  const showStage = (slug: StageSlug) => !revealing || stageReady[slug] || autoStage === slug;
+
   const visualByKind = (kind: string) => visuals.find((item) => item.kind === kind)?.url || "";
 
   const allStages = (
     <div className="w-full min-w-0 overflow-x-hidden space-y-4" dir={dir}>
       {visualByKind("services") && <VisualDivider url={visualByKind("services")} />}
       <ServicesStage text={text} suiteId={suiteId} services={services} saving={busy === "save-services"} onSave={saveServices} />
-      <KeywordsStage
+      {showStage("keywords") && <KeywordsStage
         text={text}
         suiteId={suiteId}
         keywords={intelligence?.keywords || []}
@@ -598,8 +647,8 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         onGenerate={() => run("keywords", () => api.marketingPlans.generateKeywords(suiteId, { language: lang }))}
         onMore={() => run("keywords-more", () => api.marketingPlans.generateMoreKeywords(suiteId, { language: lang, existing_values: (intelligence?.keywords || []).map((k) => k.text) }))}
         onSave={saveKeywords}
-      />
-      <CompetitorsStage
+      />}
+      {showStage("competitors") && <CompetitorsStage
         text={text}
         suiteId={suiteId}
         competitors={intelligence?.competitors || []}
@@ -611,8 +660,8 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         onMore={() => run("competitors-more", () => api.marketingPlans.generateMoreCompetitors(suiteId, { language: lang, existing_ids: (intelligence?.competitors || []).map((c) => c.id), existing_values: (intelligence?.competitors || []).map((c) => c.url || c.name) }))}
         onTagsChange={(competitorId, tags) => run("competitors", () => api.marketingPlans.updateCompetitor(suiteId, competitorId, { classification_tags: tags }))}
         onSave={saveCompetitors}
-      />
-      <DemandSupplyStage
+      />}
+      {showStage("demand-supply") && <DemandSupplyStage
         text={text}
         suiteId={suiteId}
         intelligence={intelligence}
@@ -620,9 +669,9 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         loadingMore={busy === "demand-supply-more"}
         onGenerate={() => run("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang }))}
         onMore={() => run("demand-supply-more", () => api.marketingPlans.generateMoreDemandSupply(suiteId, { language: lang }))}
-      />
-      {visualByKind("audience") && <VisualDivider url={visualByKind("audience")} />}
-      <PersonasStage
+      />}
+      {showStage("personas") && visualByKind("audience") && <VisualDivider url={visualByKind("audience")} />}
+      {showStage("personas") && <PersonasStage
         text={text}
         suiteId={suiteId}
         personas={intelligence?.personas || []}
@@ -630,15 +679,29 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         loadingMore={busy === "personas-more"}
         onGenerate={generatePersonasInitial}
         onMore={generateMorePersonas}
-      />
-      <MarketingPdfStage
+      />}
+      {(!revealing || stageReady.personas) && <MarketingPdfStage
         text={text}
         suiteId={suiteId}
         ready={(intelligence?.personas || []).length > 0}
         loading={busy === "pdf"}
         onDownload={downloadPdf}
-      />
+      />}
     </div>
+  );
+
+  const emptyPlanState = (
+    <section className="rounded-3xl border border-border bg-card p-8 text-center sm:p-12" dir={dir}>
+      <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[color:var(--brand-accent)]/12 text-[color:var(--deck-accent,var(--brand-accent))]">
+        <Target size={26} />
+      </span>
+      <h2 className="mt-5 text-2xl font-black text-foreground">{text.planEmptyTitle}</h2>
+      <p className="mx-auto mt-2 max-w-xl text-sm leading-7 text-muted-foreground">{text.planEmptyDesc}</p>
+      <Button onClick={generateFullPlan} className="mt-6 gap-2">
+        <Target size={16} />
+        {text.generateFullPlan}
+      </Button>
+    </section>
   );
 
   if (!suite && !error) {
@@ -702,7 +765,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       {stage === "demand-supply" && <DemandSupplyStage text={text} suiteId={suiteId} intelligence={intelligence} loading={busy === "demand-supply"} loadingMore={busy === "demand-supply-more"} onGenerate={() => run("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang }))} onMore={() => run("demand-supply-more", () => api.marketingPlans.generateMoreDemandSupply(suiteId, { language: lang }))} detail />}
       {stage === "personas" && <PersonasStage text={text} suiteId={suiteId} personas={intelligence?.personas || []} loading={busy === "personas"} loadingMore={busy === "personas-more"} onGenerate={generatePersonasInitial} onMore={generateMorePersonas} detail />}
       {stage === "pdf" && <MarketingPdfStage text={text} suiteId={suiteId} ready={(intelligence?.personas || []).length > 0} loading={busy === "pdf"} onDownload={downloadPdf} detail />}
-      {!stage && allStages}
+      {!stage && (!hasAnyPlanData && !revealing ? emptyPlanState : allStages)}
     </div>
   );
 }
