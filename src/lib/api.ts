@@ -535,6 +535,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ password }),
       }),
+    generateVisuals: (suiteId: string) =>
+      request<{ visuals: PlanVisual[] }>(`/suites/${suiteId}/marketing-plan/visuals/generate`, {
+        method: "POST",
+        body: "{}",
+      }),
     downloadPdf: (suiteId: string) =>
       downloadFile(`/suites/${suiteId}/marketing-plan/pdf`),
   },
@@ -989,6 +994,11 @@ export interface MarketingPlanFunnelStage {
   }>;
 }
 
+export interface PlanVisual {
+  kind: "cover" | "audience" | "services" | string;
+  url: string;
+}
+
 export interface MarketingPlanResponse {
   status: "missing" | "ready" | string;
   suite_id: string;
@@ -996,6 +1006,7 @@ export interface MarketingPlanResponse {
   deck: MarketingPlanDeck | null;
   intelligence?: MarketingIntelligence;
   action_plan?: MarketingActionPlan;
+  visuals?: PlanVisual[];
   generation_status?: GenerationStatus | null;
 }
 

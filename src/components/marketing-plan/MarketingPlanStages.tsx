@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
   ArrowUpRight,
   Check,
+  ChevronDown,
   Copy,
   Camera,
   Download,
@@ -26,7 +27,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { api, Brand, MarketingCompetitor, MarketingIntelligence, MarketingKeyword, MarketingPersona, MarketingPlanResponse, Suite } from "@/lib/api";
+import { api, Brand, MarketingCompetitor, MarketingIntelligence, MarketingKeyword, MarketingPersona, MarketingPlanResponse, PlanVisual, Suite } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
@@ -38,6 +39,12 @@ const labels = {
   ar: {
     title: "الخطة التسويقية",
     desc: "مقسمة لمراحل عملية. كل مرحلة تولد أو تحفظ بياناتها بشكل مستقل.",
+    showAll: "عرض الكل",
+    collapseAll: "تصغير",
+    coverKicker: "الخطة التسويقية",
+    coverStatsKeywords: "كلمة مفتاحية",
+    coverStatsCompetitors: "منافس",
+    coverStatsPersonas: "شخصية",
     servicesTitle: "الخدمات / المنتجات",
     servicesDesc: "هذه المرحلة تلقائية وتعتمد على بيانات السوت. أي تعديل هنا يحدّث السوت نفسه.",
     addService: "إضافة",
@@ -96,7 +103,6 @@ const labels = {
     demandSignals: "الطلب",
     supplySignals: "العرض",
     opportunitySignals: "الفرص",
-    showAll: "عرض الكل",
     collapse: "إخفاء",
     notCompetitor: "غير منافس",
     goodCompetitor: "منافس جيد",
@@ -114,6 +120,12 @@ const labels = {
   },
   en: {
     title: "Marketing Plan",
+    showAll: "Show all",
+    collapseAll: "Collapse",
+    coverKicker: "Marketing Plan",
+    coverStatsKeywords: "keywords",
+    coverStatsCompetitors: "competitors",
+    coverStatsPersonas: "personas",
     desc: "Split into practical stages. Each stage saves or generates independently.",
     servicesTitle: "Services / Products",
     servicesDesc: "This stage is automatic and updates the Suite profile directly.",
@@ -173,7 +185,6 @@ const labels = {
     demandSignals: "Demand",
     supplySignals: "Supply",
     opportunitySignals: "Opportunities",
-    showAll: "Show all",
     collapse: "Collapse",
     notCompetitor: "Not a competitor",
     goodCompetitor: "Good competitor",
@@ -191,6 +202,12 @@ const labels = {
   },
   he: {
     title: "התכנית השיווקית",
+    showAll: "הצג הכל",
+    collapseAll: "כווץ",
+    coverKicker: "התכנית השיווקית",
+    coverStatsKeywords: "מילות מפתח",
+    coverStatsCompetitors: "מתחרים",
+    coverStatsPersonas: "פרסונות",
     desc: "מחולקת לשלבים מעשיים. כל שלב נשמר או נוצר באופן עצמאי.",
     servicesTitle: "שירותים / מוצרים",
     servicesDesc: "שלב אוטומטי שמעדכן ישירות את פרופיל הסוויט.",
@@ -250,7 +267,6 @@ const labels = {
     demandSignals: "ביקוש",
     supplySignals: "היצע",
     opportunitySignals: "הזדמנויות",
-    showAll: "הצג הכל",
     collapse: "כווץ",
     notCompetitor: "לא מתחרה",
     goodCompetitor: "מתחרה טוב",
@@ -367,16 +383,32 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
   const text = useMemo(() => withAdminTextOverrides(baseText, t), [baseText, t]);
   const [suite, setSuite] = useState<Suite | null>(null);
   const [intelligence, setIntelligence] = useState<MarketingIntelligence | null>(null);
+  const [visuals, setVisuals] = useState<PlanVisual[]>([]);
   const [busy, setBusy] = useState<BusyAction>(null);
   const [error, setError] = useState("");
   const [showIntro, setShowIntro] = useState(false);
+  const visualsRequested = useRef(false);
 
   const load = useCallback(async () => {
     setError("");
     const [suiteRes, planRes] = await Promise.all([api.suites.get(suiteId), api.marketingPlans.get(suiteId)]);
     setSuite(suiteRes);
     setIntelligence(planRes.intelligence || null);
+    setVisuals(planRes.visuals || []);
   }, [suiteId]);
+
+  const hasPlanContent = Boolean(
+    intelligence && ((intelligence.keywords || []).length > 0 || (intelligence.competitors || []).length > 0)
+  );
+
+  useEffect(() => {
+    // Generate the field images once — they serve both this page and the PDF.
+    if (!hasPlanContent || visuals.length > 0 || visualsRequested.current) return;
+    visualsRequested.current = true;
+    api.marketingPlans.generateVisuals(suiteId)
+      .then((res) => setVisuals(res.visuals || []))
+      .catch(() => undefined);
+  }, [hasPlanContent, visuals.length, suiteId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -536,8 +568,11 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     }
   }
 
+  const visualByKind = (kind: string) => visuals.find((item) => item.kind === kind)?.url || "";
+
   const allStages = (
     <div className="w-full min-w-0 overflow-x-hidden space-y-4" dir={dir}>
+      {visualByKind("services") && <VisualDivider url={visualByKind("services")} title={text.servicesTitle} />}
       <ServicesStage text={text} suiteId={suiteId} services={services} saving={busy === "save-services"} onSave={saveServices} />
       <KeywordsStage
         text={text}
@@ -572,6 +607,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         onGenerate={() => run("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang }))}
         onMore={() => run("demand-supply-more", () => api.marketingPlans.generateMoreDemandSupply(suiteId, { language: lang }))}
       />
+      {visualByKind("audience") && <VisualDivider url={visualByKind("audience")} title={text.personasTitle} />}
       <PersonasStage
         text={text}
         suiteId={suiteId}
@@ -595,28 +631,52 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     return <div className="rounded-2xl border border-border bg-card p-10 text-center text-muted-foreground"><Loader2 className="mx-auto animate-spin" /></div>;
   }
 
+  const coverImage = visuals.find((item) => item.kind === "cover")?.url || visuals[0]?.url || "";
+  const brandName = String((brand as Record<string, unknown>).name || "") || text.title;
+  const coverStats: Array<{ value: number; label: string }> = [
+    { value: (intelligence?.keywords || []).length, label: text.coverStatsKeywords },
+    { value: (intelligence?.competitors || []).length, label: text.coverStatsCompetitors },
+    { value: (intelligence?.personas || []).length, label: text.coverStatsPersonas },
+  ];
+
   return (
-    <div className="w-full min-w-0 overflow-x-hidden space-y-5" dir={dir}>
-      <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-border bg-card p-4 sm:p-5">
-        <div className="flex min-w-0 items-center justify-between gap-3">
-          <h1 className="os-text-wrap text-2xl font-black text-foreground">{text.title}</h1>
-          <button
-            type="button"
-            aria-label={showIntro ? text.hideIntro : text.showIntro}
-            title={showIntro ? text.hideIntro : text.showIntro}
-            aria-expanded={showIntro}
-            onClick={() => setShowIntro((value) => !value)}
-            className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm shadow-sm transition ${showIntro ? "border-[color:var(--brand-accent)] bg-[color:var(--brand-accent)]/10 text-[color:var(--brand-accent)]" : "border-border bg-background/80 text-muted-foreground hover:bg-muted hover:text-foreground"}`}
-          >
-            <Info size={16} />
-          </button>
-        </div>
-        {showIntro && (
-          <p className="os-text-wrap mt-3 rounded-xl border border-border bg-background/70 p-3 text-sm leading-6 text-muted-foreground">
-            {text.desc}
-          </p>
+    <div className="dark w-full min-w-0 space-y-4 overflow-x-hidden rounded-[2rem] bg-[#131318] p-3 text-foreground sm:p-5" dir={dir}>
+      <section className="relative min-h-[220px] w-full min-w-0 overflow-hidden rounded-3xl border border-border bg-[#17171d] sm:min-h-[280px]">
+        {coverImage ? (
+          <img src={coverImage} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
+        ) : (
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,color-mix(in_oklab,var(--brand-accent)_38%,transparent),transparent_38%),radial-gradient(circle_at_80%_60%,rgba(236,72,153,.2),transparent_35%)]" />
         )}
-      </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-[#131318] via-[#131318]/45 to-transparent" />
+        <div className="relative flex min-h-[220px] flex-col justify-end gap-3 p-5 sm:min-h-[280px] sm:p-8">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm font-bold text-[color:var(--brand-accent)]">{text.coverKicker}</p>
+            <button
+              type="button"
+              aria-label={showIntro ? text.hideIntro : text.showIntro}
+              title={showIntro ? text.hideIntro : text.showIntro}
+              aria-expanded={showIntro}
+              onClick={() => setShowIntro((value) => !value)}
+              className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm shadow-sm transition ${showIntro ? "border-[color:var(--brand-accent)] bg-[color:var(--brand-accent)]/10 text-[color:var(--brand-accent)]" : "border-white/20 bg-black/30 text-white/80 hover:text-white"}`}
+            >
+              <Info size={16} />
+            </button>
+          </div>
+          <h1 className="os-text-wrap text-3xl font-black leading-tight text-white sm:text-5xl" dir="auto">{brandName}</h1>
+          <div className="flex flex-wrap gap-2">
+            {coverStats.filter((stat) => stat.value > 0).map((stat) => (
+              <span key={stat.label} className="rounded-full border border-white/15 bg-black/40 px-3.5 py-1.5 text-sm text-white backdrop-blur">
+                <span className="font-black text-[color:var(--brand-accent)]">{stat.value}</span> {stat.label}
+              </span>
+            ))}
+          </div>
+          {showIntro && (
+            <p className="os-text-wrap rounded-xl border border-white/15 bg-black/50 p-3 text-sm leading-6 text-white/85 backdrop-blur">
+              {text.desc}
+            </p>
+          )}
+        </div>
+      </section>
       {error && <div className="os-text-wrap rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200">{error}</div>}
       {stage === "services" && <ServicesStage text={text} suiteId={suiteId} services={services} saving={busy === "save-services"} onSave={saveServices} detail />}
       {stage === "keywords" && (
@@ -643,17 +703,30 @@ function withAdminTextOverrides(base: typeof labels.en, t: (key: string) => stri
   ) as typeof labels.en;
 }
 
-function StageBox({ title, description, icon, suiteId, slug, children, detail }: { title: string; description: string; icon: ReactNode; suiteId: string; slug: StageSlug; children: ReactNode; detail?: boolean }) {
+function VisualDivider({ url, title }: { url: string; title?: string }) {
+  return (
+    <div className="relative h-36 w-full min-w-0 overflow-hidden rounded-3xl border border-border sm:h-48">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt="" className="h-full w-full object-cover" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+      {title && <p className="absolute bottom-4 start-6 text-2xl font-black text-white" dir="auto">{title}</p>}
+    </div>
+  );
+}
+
+function StageBox({ title, description, icon, suiteId, slug, children, detail, expand }: { title: string; description: string; icon: ReactNode; suiteId: string; slug: StageSlug; children: ReactNode; detail?: boolean; expand?: { show: string; hide: string } }) {
   const tone = stageTones[slug];
   const [showDescription, setShowDescription] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const collapsible = Boolean(expand) && !detail;
   return (
-    <section className={`relative w-full min-w-0 max-w-full overflow-hidden rounded-2xl border bg-card p-4 shadow-sm sm:p-5 ${tone.section}`}>
-      <span className={`absolute inset-x-0 top-0 h-1 ${tone.accent}`} />
+    <section className={`relative w-full min-w-0 max-w-full overflow-hidden rounded-3xl border bg-card p-4 shadow-sm sm:p-6 ${tone.section}`}>
+      <span className={`absolute inset-y-0 start-0 w-1.5 ${tone.accent}`} />
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone.icon}`}>{icon}</span>
+          <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${tone.icon}`}>{icon}</span>
           <div className="min-w-0">
-            <h2 className="os-text-wrap text-xl font-black text-foreground">{title}</h2>
+            <h2 className="os-text-wrap text-2xl font-black text-foreground">{title}</h2>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -679,7 +752,23 @@ function StageBox({ title, description, icon, suiteId, slug, children, detail }:
           {description}
         </p>
       )}
-      <div className="mt-5 min-w-0">{children}</div>
+      <div className={`relative mt-5 min-w-0 ${collapsible && !expanded ? "max-h-[330px] overflow-hidden" : ""}`}>
+        {children}
+        {collapsible && !expanded && (
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-24"
+            style={{ background: "linear-gradient(to top, var(--card), transparent)" }}
+          />
+        )}
+      </div>
+      {collapsible && (
+        <div className="relative mt-3 flex justify-center">
+          <Button type="button" variant="outline" size="sm" onClick={() => setExpanded((value) => !value)} className="gap-1.5">
+            {expanded ? expand!.hide : expand!.show}
+            <ChevronDown size={14} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
+          </Button>
+        </div>
+      )}
     </section>
   );
 }
@@ -808,7 +897,7 @@ function KeywordsStage({
   }
 
   return (
-    <StageBox title={text.keywordsTitle} description={text.keywordsDesc} icon={<FileSearch size={18} />} suiteId={suiteId} slug="keywords" detail={detail}>
+    <StageBox title={text.keywordsTitle} description={text.keywordsDesc} icon={<FileSearch size={18} />} suiteId={suiteId} slug="keywords" detail={detail} expand={{ show: text.showAll, hide: text.collapseAll }}>
       <div className="flex min-w-0 flex-wrap gap-2">
         <Button onClick={onGenerate} disabled={isBusy} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}{text.generate}</Button>
         {keywords.length > 0 && <Button variant="outline" onClick={onMore} disabled={isBusy} className="gap-2">{loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.generateMore}</Button>}
@@ -946,7 +1035,7 @@ function CompetitorsStage({
   }
 
   return (
-    <StageBox title={text.competitorsTitle} description={text.competitorsDesc} icon={<Search size={18} />} suiteId={suiteId} slug="competitors" detail={detail}>
+    <StageBox title={text.competitorsTitle} description={text.competitorsDesc} icon={<Search size={18} />} suiteId={suiteId} slug="competitors" detail={detail} expand={{ show: text.showAll, hide: text.collapseAll }}>
       <div className="flex min-w-0 flex-wrap gap-2">
         <Button onClick={onGenerate} disabled={isBusy} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}{text.generate}</Button>
         {competitors.length > 0 && <Button variant="outline" onClick={onMore} disabled={isBusy} className="gap-2">{loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.generateMore}</Button>}
@@ -1130,7 +1219,7 @@ function DemandSupplyStage({ text, suiteId, intelligence, loading, loadingMore, 
   const keywordMetrics = planner?.keyword_metrics || [];
   const hasData = Boolean(summary?.analyzed_keywords || keywordMetrics.length || planner?.warning || demand.length || supply.length || opportunities.length);
   return (
-    <StageBox title={text.demandTitle} description={text.demandDesc} icon={<Target size={18} />} suiteId={suiteId} slug="demand-supply" detail={detail}>
+    <StageBox title={text.demandTitle} description={text.demandDesc} icon={<Target size={18} />} suiteId={suiteId} slug="demand-supply" detail={detail} expand={{ show: text.showAll, hide: text.collapseAll }}>
       <div className="flex min-w-0 flex-wrap gap-2">
         <Button onClick={onGenerate} disabled={loading || loadingMore} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Target size={15} />}{text.generate}</Button>
         {hasData && onMore && (planner?.remaining_terms ?? 0) > 0 && (
@@ -1228,7 +1317,7 @@ function PersonasStage({
   detail?: boolean;
 }) {
   return (
-    <StageBox title={text.personasTitle} description={text.personasDesc} icon={<UserRound size={18} />} suiteId={suiteId} slug="personas" detail={detail}>
+    <StageBox title={text.personasTitle} description={text.personasDesc} icon={<UserRound size={18} />} suiteId={suiteId} slug="personas" detail={detail} expand={{ show: text.showAll, hide: text.collapseAll }}>
       <div className="flex min-w-0 flex-wrap gap-2">
         <Button onClick={onGenerate} disabled={loading || loadingMore} className="gap-2">
           {loading ? <Loader2 size={15} className="animate-spin" /> : <UserRound size={15} />}
