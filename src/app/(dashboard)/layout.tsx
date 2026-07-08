@@ -11,6 +11,8 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { SuiteNav } from "@/components/suite/SuiteNav";
 import { api, Suite } from "@/lib/api";
+import { FrozenScreen } from "@/components/FrozenScreen";
+import { FunnelChrome } from "@/components/funnel/FunnelChrome";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, _hasHydrated, setUser } = useAuthStore();
@@ -49,6 +51,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   if (!user) return null;
+
+  if (user.approval_status === "frozen" && !user.is_super_admin) {
+    return <FrozenScreen />;
+  }
+  if (user.approval_status === "funnel" && !user.is_super_admin) {
+    return <FunnelChrome>{children}</FunnelChrome>;
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
