@@ -44,22 +44,51 @@ const styles = `
 const TATWEEL = 'ـ';
 const ARABIC_WORD = /[\u0600-\u06FF]+/g;
 
-const stretchArabicWord = (word: string) => {
-  const letters = Array.from(word);
-  if (letters.length <= 3) {
-    return `${letters.slice(0, -1).join('')}${TATWEEL.repeat(10)}${letters.at(-1)}`;
-  }
+const TITLE_PUNCT = /[.,\u060C\u061B\u061F;:!?\u2026'"\u201C\u201D()\[\]{}\-\u2014_\u0640]/g;
+const AR_CHAR = /[\u0600-\u06FF]/;
+const HE_CHAR = /[\u0590-\u05FF]/;
+// Letters that can carry a stretch; a stretch is never placed on the last
+// letter of the word (end-of-word stretches are forbidden).
+const STRETCH_AR = new Set(Array.from('\u062C\u062D\u062E\u0647\u0639\u063A\u0641\u0642\u062B\u0635\u0636\u0634\u0633\u064A\u0628\u062A\u0646\u0645\u0643\u0638\u0637'));
+const STRETCH_HE = new Set(Array.from('\u05E0\u05E6\u05EA'));
+const STRETCH_EN = new Set(Array.from('etlz'));
 
-  const splitAt = Math.max(2, Math.ceil(letters.length * 0.58));
-  return `${letters.slice(0, splitAt).join('')}${TATWEEL.repeat(12)}${letters
-    .slice(splitAt)
-    .join('')}`;
+type TitlePlan = {
+  before: string;
+  core: string;
+  after: string;
+  mode: 'tatweel' | 'repeat' | 'scalex' | 'side';
+  rtl: boolean;
 };
 
-const stretchedTitle = (title: string) => {
-  const words = title.match(ARABIC_WORD) ?? [title];
-  const word = [...words].sort((a, b) => b.length - a.length)[0] ?? title;
-  return stretchArabicWord(word);
+const planBehindTitle = (raw: string): TitlePlan => {
+  // 3D titles carry no punctuation, and Arabic/Hebrew must flow RTL.
+  const clean = String(raw || '').replace(TITLE_PUNCT, ' ').replace(/\s+/g, ' ').trim();
+  const words = clean.split(' ').filter(Boolean);
+  const word = [...words].sort((a, b) => b.length - a.length)[0] ?? clean;
+  const rtl = AR_CHAR.test(word) || HE_CHAR.test(word);
+  const letters = Array.from(word);
+  const set = AR_CHAR.test(word) ? STRETCH_AR : HE_CHAR.test(word) ? STRETCH_HE : STRETCH_EN;
+  const candidates = letters
+    .map((ch, index) => ({ch: ch.toLowerCase(), index}))
+    .filter(({ch, index}) => index < letters.length - 1 && set.has(ch));
+  if (!candidates.length) {
+    // No stretchable letter: the whole word sits beside the head instead.
+    return {before: word, core: '', after: '', mode: 'side', rtl};
+  }
+  const mid = (letters.length - 1) / 2;
+  const pick = candidates.reduce((best, c) =>
+    Math.abs(c.index - mid) < Math.abs(best.index - mid) ? c : best,
+  );
+  const after = letters.slice(pick.index + 1).join('');
+  if (AR_CHAR.test(word)) {
+    return {before: letters.slice(0, pick.index + 1).join(''), core: TATWEEL.repeat(12), after, mode: 'tatweel', rtl};
+  }
+  const before = letters.slice(0, pick.index).join('');
+  if (letters.length % 2 === 0) {
+    return {before, core: letters[pick.index].repeat(8), after, mode: 'repeat', rtl};
+  }
+  return {before, core: letters[pick.index], after, mode: 'scalex', rtl};
 };
 
 const behindTitleLayout = (title: string) => {
@@ -251,16 +280,21 @@ const BehindPersonText = ({scene}: {scene: Scene}) => {
   const frame = useCurrentFrame();
   const {fps, height: canvasHeight} = useVideoConfig();
   const durationInFrames = sourceFrames(scene.sourceEnd - scene.sourceStart, fps);
-  const displayTitle = stretchedTitle(scene.behindText);
-  const titleLayout = behindTitleLayout(displayTitle);
+  const titlePlan = planBehindTitle(scene.behindText);
+  const visualLength =
+    Array.from(titlePlan.before + titlePlan.after).length +
+    (titlePlan.mode === 'tatweel' ? 12 : titlePlan.mode === 'repeat' ? 8 : titlePlan.mode === 'scalex' ? 6 : 0);
+  const titleLayout = behindTitleLayout('x'.repeat(Math.max(1, visualLength)));
   // Pin the title to the subject's head: mirror the subject transform
   // (face-height origin + user zoom/offset) applied to the measured top of
   // the alpha matte, so the title stays just above the head wherever the
   // user places the subject.
   const styleCfg = manifest.style as {
     subjectZoom?: number;
+    subjectOffsetXPct?: number;
     subjectOffsetYPct?: number;
   };
+  const subjectOffsetX = Number(styleCfg.subjectOffsetXPct ?? 0);
   const subjectTopRel = Number(
     (manifest.source as {subjectTopRel?: number | null}).subjectTopRel ?? 0.08,
   );
@@ -272,7 +306,7 @@ const BehindPersonText = ({scene}: {scene: Scene}) => {
     originY + (subjectTopRel * canvasHeight - originY) * 1.055 * userZoom + offsetYPx;
   const titlePaddingTop = Math.max(
     46,
-    Math.min(canvasHeight * 0.45, headTopPx - titleLayout.fontSize * 0.78),
+    Math.min(canvasHeight * 0.45, headTopPx - titleLayout.fontSize * 0.52),
   );
   const introOpacity = interpolate(frame, [0, 14, 70], [0, 0.92, 0.78], {
     extrapolateRight: 'clamp',
@@ -291,9 +325,11 @@ const BehindPersonText = ({scene}: {scene: Scene}) => {
   return (
     <AbsoluteFill
       style={{
-        alignItems: 'center',
+        // A title with no stretchable letter moves beside the head, on the
+        // emptier side of the canvas, instead of vanishing behind it.
+        alignItems: titlePlan.mode === 'side' ? (subjectOffsetX >= 0 ? 'flex-start' : 'flex-end') : 'center',
         justifyContent: 'flex-start',
-        padding: `${titlePaddingTop}px 0 0`,
+        padding: `${titlePaddingTop}px 44px 0`,
         zIndex: 1,
       }}
     >
@@ -317,7 +353,17 @@ const BehindPersonText = ({scene}: {scene: Scene}) => {
           whiteSpace: 'nowrap',
         }}
       >
-        {displayTitle}
+        <span dir={titlePlan.rtl ? 'rtl' : 'ltr'} style={{direction: titlePlan.rtl ? 'rtl' : 'ltr', unicodeBidi: 'isolate'}}>
+          {titlePlan.mode === 'scalex' ? (
+            <>
+              {titlePlan.before}
+              <span style={{display: 'inline-block', margin: '0 0.5em', transform: 'scaleX(5.5)'}}>{titlePlan.core}</span>
+              {titlePlan.after}
+            </>
+          ) : (
+            `${titlePlan.before}${titlePlan.core}${titlePlan.after}`
+          )}
+        </span>
       </div>
     </AbsoluteFill>
   );
