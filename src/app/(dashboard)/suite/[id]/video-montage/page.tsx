@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   BadgeCheck,
@@ -9,7 +9,6 @@ import {
   Clapperboard,
   Clock3,
   Download,
-  Film,
   Layers3,
   Link2,
   Loader2,
@@ -19,13 +18,11 @@ import {
   Scissors,
   Sparkles,
   Upload,
-  UserRound,
+  XCircle,
   WandSparkles,
 } from "lucide-react";
 import { api, API_BASE, ApiError, GenerationStatus } from "@/lib/api";
 import { SuitePageShell } from "@/components/suite/SuitePageShell";
-
-type VideoMode = "talking_head" | "product_scenes";
 
 type MontageOption = {
   id: string;
@@ -34,11 +31,20 @@ type MontageOption = {
   icon: React.ReactNode;
 };
 
+type NotesAnalysisItem = {
+  request?: string;
+  detail?: string;
+};
+
 type VideoMontageResult = {
   rendered?: boolean;
   output_url?: string;
   package_url?: string;
   source_warning?: string;
+  notes_analysis?: {
+    honored?: NotesAnalysisItem[];
+    unsupported?: NotesAnalysisItem[];
+  };
   video_montage?: {
     source_url?: string;
     render?: {
@@ -59,26 +65,6 @@ type VideoMontageResult = {
   };
 };
 
-const modes: Array<{
-  id: VideoMode;
-  title: string;
-  desc: string;
-  icon: React.ReactNode;
-}> = [
-  {
-    id: "talking_head",
-    title: "شخص يتحدث للكاميرا",
-    desc: "فيديو شرح، شهادة عميل، أو ريل مباشر يحتاج قص، كابتشن، وتحسين الإيقاع.",
-    icon: <UserRound size={22} />,
-  },
-  {
-    id: "product_scenes",
-    title: "منتجات / مشاهد متعددة",
-    desc: "مقاطع منتجات، لقطات مكان، صور، أو مواد متفرقة تتحول لقصة قصيرة.",
-    icon: <Film size={22} />,
-  },
-];
-
 const options: MontageOption[] = [
   { id: "captions", label: "كابتشن وترجمة", desc: "نصوص واضحة فوق الفيديو حسب لغة الجمهور.", icon: <Captions size={18} /> },
   { id: "dead_spaces", label: "حذف الفراغات", desc: "قص السكتات والمقاطع الضعيفة لتحسين الإيقاع.", icon: <Scissors size={18} /> },
@@ -86,14 +72,6 @@ const options: MontageOption[] = [
   { id: "titles", label: "عناوين 3D", desc: "افتتاحيات وعناوين قصيرة تجذب الانتباه.", icon: <Layers3 size={18} /> },
   { id: "music", label: "موسيقى ومؤثرات", desc: "إضافة موسيقى خفيفة ومؤثرات انتقال مناسبة.", icon: <Music2 size={18} /> },
   { id: "voice_cleanup", label: "تنظيف الصوت", desc: "تحسين الكلام وتقليل الضجيج قدر الإمكان.", icon: <Mic2 size={18} /> },
-];
-
-const pipeline = [
-  "استلام الفيديوهات",
-  "تحضير المصدر",
-  "مونتاج أولي",
-  "تغليف النتيجة",
-  "رابط مراجعة وتحميل",
 ];
 
 function absoluteApiUrl(path?: string | null): string | null {
@@ -107,9 +85,48 @@ function extractVideoMontageResult(status: GenerationStatus | null): VideoMontag
   return status.result as VideoMontageResult;
 }
 
+type JobDisplayState = "queued" | "running" | "completed" | "failed";
+
+function jobDisplayState(job: GenerationStatus): JobDisplayState {
+  if (job.status === "completed") return "completed";
+  if (job.status === "failed" || job.status === "cancelled" || job.status === "timeout") return "failed";
+  if (job.status === "running") return "running";
+  return "queued";
+}
+
+const jobChips: Record<JobDisplayState, { label: string; className: string }> = {
+  queued: { label: "بالطابور", className: "bg-[#f8d84a]/18 text-[#9a6b00]" },
+  running: { label: "قيد الرندر", className: "bg-[#2f80ff]/12 text-[#2f80ff]" },
+  completed: { label: "جاهز", className: "bg-[#18b89d]/12 text-[#087966]" },
+  failed: { label: "فشل", className: "bg-red-500/12 text-red-600" },
+};
+
+function jobSourceLabel(job: GenerationStatus): { label: string; href: string | null } {
+  const fileName = job.input?.source_file_name;
+  if (fileName) return { label: fileName, href: null };
+  const result = extractVideoMontageResult(job);
+  const url = job.input?.source_url || result?.video_montage?.source_url || "";
+  if (!url) return { label: "بدون مصدر", href: null };
+  try {
+    const parsed = new URL(url);
+    const tail = parsed.pathname.split("/").filter(Boolean).pop() || parsed.hostname;
+    return { label: decodeURIComponent(tail).slice(0, 60) || parsed.hostname, href: url };
+  } catch {
+    return { label: url.slice(0, 60), href: url };
+  }
+}
+
+function formatJobTime(iso?: string): string {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString("ar", { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    return iso;
+  }
+}
+
 export default function VideoMontagePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [mode, setMode] = useState<VideoMode>("talking_head");
   const [selectedOptions, setSelectedOptions] = useState<string[]>(options.map((option) => option.id));
   const [notes, setNotes] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
@@ -122,12 +139,12 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   const [stageFailedUrl, setStageFailedUrl] = useState("");
   const [captionOverrides, setCaptionOverrides] = useState<string[]>([]);
   const [titleOverrides, setTitleOverrides] = useState<string[]>([]);
-  const [status, setStatus] = useState<GenerationStatus | null>(null);
-  const [loadingStatus, setLoadingStatus] = useState(true);
+  const [jobs, setJobs] = useState<GenerationStatus[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const activeMode = useMemo(() => modes.find((item) => item.id === mode) || modes[0], [mode]);
   const preview = useMemo(() => {
     if (sourceFile) return { kind: "video" as const, src: URL.createObjectURL(sourceFile) };
     if (stagedUrl) return { kind: "video" as const, src: stagedUrl };
@@ -182,40 +199,38 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceUrl, sourceFile, stagedUrl, staging, stageFailedUrl]);
-  const isActive = Boolean(status?.is_active);
-  const result = extractVideoMontageResult(status);
-  const outputUrl = absoluteApiUrl(result?.output_url || result?.video_montage?.render?.output_url || null);
-  const packageUrl = absoluteApiUrl(result?.package_url || result?.video_montage?.package_url || null);
-  const renderReason = result?.video_montage?.render?.reason || result?.source_warning || result?.video_montage?.source_warning;
-  const renderedScenes = result?.video_montage?.render?.scenes || [];
-  const effectiveSourceUrl = sourceUrl.trim() || result?.video_montage?.source_url || "";
 
-  useEffect(() => {
-    let cancelled = false;
-    api.videoMontage.latest(id)
-      .then((next) => {
-        if (!cancelled) setStatus(next);
-      })
-      .catch(() => {
-        if (!cancelled) setStatus(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingStatus(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+  const anyActive = jobs.some((job) => job.is_active);
+  const latestScenesJob = useMemo(
+    () => jobs.find((job) => (extractVideoMontageResult(job)?.video_montage?.render?.scenes || []).length > 0) || null,
+    [jobs],
+  );
+  const renderedScenes = extractVideoMontageResult(latestScenesJob)?.video_montage?.render?.scenes || [];
+  const latestSourceUrl = extractVideoMontageResult(latestScenesJob)?.video_montage?.source_url || "";
+  const effectiveSourceUrl = sourceUrl.trim() || latestSourceUrl;
+
+  const refreshJobs = useCallback(async () => {
+    try {
+      const res = await api.videoMontage.list(id, 10);
+      setJobs(res.jobs || []);
+    } catch {
+      // Keep the previous list on transient polling errors.
+    } finally {
+      setLoadingJobs(false);
+    }
   }, [id]);
 
   useEffect(() => {
-    if (!status?.job_id || !status.is_active) return;
+    void refreshJobs();
+  }, [refreshJobs]);
+
+  useEffect(() => {
+    if (!anyActive) return;
     const interval = window.setInterval(() => {
-      api.videoMontage.get(id, status.job_id!)
-        .then(setStatus)
-        .catch((err) => setError(err instanceof Error ? err.message : "تعذر تحديث حالة المونتاج."));
-    }, 2500);
+      void refreshJobs();
+    }, 5000);
     return () => window.clearInterval(interval);
-  }, [id, status?.is_active, status?.job_id]);
+  }, [anyActive, refreshJobs]);
 
   useEffect(() => {
     if (!renderedScenes.length) return;
@@ -231,6 +246,20 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     ));
   }
 
+  function resetForm() {
+    setSourceFile(null);
+    setSourceUrl("");
+    setStagedUrl("");
+    setStageFailedUrl("");
+    setNotes("");
+    setCaptionOverrides([]);
+    setTitleOverrides([]);
+    setZoom(1);
+    setOffsetX(0);
+    setOffsetY(0);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   async function startMontage() {
     setError(null);
     if (!sourceFile && !effectiveSourceUrl) {
@@ -240,7 +269,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     setSubmitting(true);
     try {
       const next = await api.videoMontage.create(id, {
-        mode,
+        mode: "talking_head",
         sourceUrl: sourceFile ? "" : stagedUrl || effectiveSourceUrl,
         options: selectedOptions,
         notes,
@@ -251,7 +280,11 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
         offsetX,
         offsetY,
       });
-      setStatus(next);
+      // Show the fresh job immediately, then let the list poll take over —
+      // and clear the form so the next video can queue right away.
+      setJobs((current) => [next, ...current.filter((job) => job.job_id !== next.job_id)].slice(0, 10));
+      resetForm();
+      void refreshJobs();
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
       else setError(err instanceof Error ? err.message : "تعذر تشغيل المونتاج.");
@@ -271,13 +304,13 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
               <div className="min-w-0 space-y-3">
                 <div className="inline-flex items-center gap-2 rounded-full border border-[#18b89d]/25 bg-[#18b89d]/10 px-3 py-1 text-xs font-bold text-[#087966]">
                   <BadgeCheck size={14} />
-                  رندر V1 فعّال
+                  شخص يتحدث للكاميرا
                 </div>
                 <h1 className="os-text-wrap text-3xl font-black leading-tight text-foreground sm:text-4xl">
                   مونتاج فيديوهات جاهز للمراجعة
                 </h1>
                 <p className="os-text-wrap max-w-2xl text-sm leading-7 text-muted-foreground">
-                  ارفع ملف فيديو أو ضع رابط مباشر، واختر ستايل المونتاج. النسخة الحالية تصدر MP4 أولي للمراجعة، ومعها حزمة بيانات للمرحلة القادمة من Remotion.
+                  ارفع ملف فيديو أو ضع رابط مباشر، واختر ستايل المونتاج. فيك تضيف أكثر من فيديو للطابور — كل واحد بيترندر بدوره وبتتابع حالته تحت.
                 </p>
               </div>
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#2f80ff]/12 text-[#2f80ff]">
@@ -285,30 +318,6 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          {modes.map((item) => {
-            const active = item.id === mode;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setMode(item.id)}
-                className={`min-h-36 rounded-3xl border p-5 text-right shadow-sm transition sm:min-h-44 ${
-                  active
-                    ? "border-[#2f80ff] bg-gradient-to-br from-[#2f80ff]/14 via-[#18b89d]/10 to-background ring-1 ring-[#2f80ff]/20"
-                    : "border-border bg-card hover:border-[#2f80ff]/40"
-                }`}
-              >
-                <span className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl ${active ? "bg-[#2f80ff] text-white" : "bg-muted text-muted-foreground"}`}>
-                  {item.icon}
-                </span>
-                <span className="block text-2xl font-black leading-tight text-foreground">{item.title}</span>
-                <span className="os-text-wrap mt-3 block text-sm leading-6 text-muted-foreground">{item.desc}</span>
-              </button>
-            );
-          })}
         </div>
 
         {error && (
@@ -322,12 +331,13 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">الملفات والمصدر</p>
-                <h2 className="mt-1 text-2xl font-black text-foreground">{activeMode.title}</h2>
+                <h2 className="mt-1 text-2xl font-black text-foreground">فيديو المتحدث</h2>
               </div>
               <Upload className="text-[#2f80ff]" size={24} />
             </div>
             <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-[#2f80ff]/35 bg-[#2f80ff]/5 p-5 text-center transition hover:border-[#2f80ff]">
               <input
+                ref={fileInputRef}
                 type="file"
                 accept="video/*"
                 className="sr-only"
@@ -360,7 +370,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                   setStageFailedUrl("");
                 }}
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                placeholder={result?.video_montage?.source_url || "https://example.com/video.mp4"}
+                placeholder={latestSourceUrl || "https://example.com/video.mp4"}
                 dir="ltr"
               />
             </div>
@@ -470,6 +480,9 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
               className="mt-2 min-h-28 w-full resize-y rounded-2xl border border-border bg-background p-3 text-sm leading-6 outline-none placeholder:text-muted-foreground focus:border-[#2f80ff]"
               placeholder="مثال: فيديو سريع، كابتشن عربي، افتح بعنوان قوي، لا تستخدم موسيقى صاخبة..."
             />
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              ملاحظاتك بتنحلل تلقائيًا: يلي منقدر نطبّقه بينفّذ فعليًا، ويلي مش مدعوم بينذكر بوضوح بنتيجة كل Job.
+            </p>
           </article>
 
           <article className="rounded-3xl border border-border bg-card p-5 shadow-sm">
@@ -512,40 +525,24 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
         <article className="rounded-3xl border border-border bg-card p-5 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">مسار التنفيذ</p>
-              <h2 className="mt-1 text-2xl font-black text-foreground">حالة الرندر</h2>
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">طابور الرندر</p>
+              <h2 className="mt-1 text-2xl font-black text-foreground">آخر الفيديوهات</h2>
             </div>
             <div className="inline-flex w-fit items-center gap-2 rounded-full bg-[#f8d84a]/18 px-3 py-1 text-xs font-bold text-[#9a6b00]">
               <Clock3 size={14} />
-              {loadingStatus ? "نفحص آخر Job" : status?.message || "جاهز للتشغيل"}
+              {loadingJobs ? "نفحص الطابور" : anyActive ? "في فيديوهات قيد الشغل" : "جاهز للتشغيل"}
             </div>
           </div>
-          <div className="mt-5 grid gap-3 md:grid-cols-5">
-            {pipeline.map((step, index) => {
-              const progress = status?.progress || 0;
-              const done = progress >= [10, 25, 60, 88, 100][index];
-              return (
-                <div key={step} className={`rounded-2xl border p-4 ${done ? "border-[#18b89d]/35 bg-[#18b89d]/8" : "border-border bg-background"}`}>
-                  <span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-black ${done ? "bg-[#18b89d] text-white" : "bg-[#2f80ff]/10 text-[#2f80ff]"}`}>
-                    {done ? <CheckCircle2 size={15} /> : index + 1}
-                  </span>
-                  <p className="os-text-wrap mt-3 text-sm font-bold leading-6 text-foreground">{step}</p>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-5 h-2 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-[#2f80ff] transition-all" style={{ width: `${Math.max(0, Math.min(100, status?.progress || 0))}%` }} />
-          </div>
+
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
               onClick={startMontage}
-              disabled={submitting || isActive}
+              disabled={submitting}
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-foreground px-5 text-sm font-black text-background transition disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting || isActive ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
-              {isActive ? "جاري المونتاج..." : "تشغيل المونتاج"}
+              {submitting ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
+              {submitting ? "عم نضيف للطابور..." : "تشغيل المونتاج"}
             </button>
             <Link
               href={`/suite/${id}/create`}
@@ -556,11 +553,129 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
             </Link>
           </div>
 
-          {renderReason && (
-            <p className="os-text-wrap mt-4 rounded-2xl border border-[#f8d84a]/35 bg-[#f8d84a]/12 p-3 text-sm leading-6 text-[#8a6200]">
-              {renderReason}
-            </p>
-          )}
+          <div className="mt-5 grid gap-3">
+            {jobs.length === 0 && !loadingJobs && (
+              <p className="rounded-2xl border border-border bg-background p-4 text-sm leading-6 text-muted-foreground">
+                ما في أي مونتاج بعد — ارفع أول فيديو وشغّل المونتاج.
+              </p>
+            )}
+            {jobs.map((job, jobIndex) => {
+              const state = jobDisplayState(job);
+              const chip = jobChips[state];
+              const result = extractVideoMontageResult(job);
+              const output = absoluteApiUrl(result?.output_url || result?.video_montage?.render?.output_url || null);
+              const failReason = state === "failed"
+                ? (job.safe_error || result?.video_montage?.render?.reason || result?.source_warning || result?.video_montage?.source_warning || "فشل الرندر.")
+                : null;
+              const honored = result?.notes_analysis?.honored || [];
+              const unsupported = result?.notes_analysis?.unsupported || [];
+              const source = jobSourceLabel(job);
+              const isFirstCompleted = state === "completed" && !!output
+                && jobs.findIndex((item) => jobDisplayState(item) === "completed" && !!absoluteApiUrl(extractVideoMontageResult(item)?.output_url || null)) === jobIndex;
+              return (
+                <div key={job.job_id || jobIndex} className="rounded-2xl border border-border bg-background p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-black ${chip.className}`}>
+                        {state === "running" && <Loader2 size={12} className="animate-spin" />}
+                        {state === "completed" && <CheckCircle2 size={12} />}
+                        {state === "failed" && <XCircle size={12} />}
+                        {state === "queued" && <Clock3 size={12} />}
+                        {chip.label}
+                      </span>
+                      {source.href ? (
+                        <a href={source.href} target="_blank" rel="noreferrer" className="min-w-0 truncate text-sm font-bold text-[#2f80ff]" dir="ltr">
+                          {source.label}
+                        </a>
+                      ) : (
+                        <span className="min-w-0 truncate text-sm font-bold text-foreground" dir="ltr">{source.label}</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground" dir="ltr">{formatJobTime(job.created_at)}</span>
+                  </div>
+
+                  {job.is_active && (
+                    <div className="mt-3">
+                      <div className="h-2 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-[#2f80ff] transition-all"
+                          style={{ width: `${Math.max(4, Math.min(100, job.progress || 0))}%` }}
+                        />
+                      </div>
+                      {job.message && (
+                        <p className="os-text-wrap mt-2 text-xs leading-5 text-muted-foreground">{job.message}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {failReason && (
+                    <p className="os-text-wrap mt-3 rounded-xl border border-red-500/25 bg-red-500/8 p-3 text-xs leading-6 text-red-600">
+                      {failReason}
+                    </p>
+                  )}
+
+                  {(honored.length > 0 || unsupported.length > 0) && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {honored.map((item, index) => (
+                        <span
+                          key={`honored-${index}`}
+                          title={item.detail || ""}
+                          className="inline-flex items-center gap-1 rounded-full bg-[#18b89d]/12 px-3 py-1 text-xs font-bold text-[#087966]"
+                        >
+                          <CheckCircle2 size={12} />
+                          طلبك: {item.request} ✓
+                        </span>
+                      ))}
+                      {unsupported.map((item, index) => (
+                        <span
+                          key={`unsupported-${index}`}
+                          title={item.detail || ""}
+                          className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground"
+                        >
+                          <XCircle size={12} />
+                          غير مدعوم: {item.request} ✗
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {output && (
+                    <div className="mt-3">
+                      {isFirstCompleted && (
+                        <video
+                          className="aspect-[9/16] max-h-[520px] w-full rounded-2xl bg-black object-contain"
+                          src={output}
+                          controls
+                          playsInline
+                        />
+                      )}
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <a
+                          href={output}
+                          download
+                          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#18b89d] px-4 text-xs font-black text-white"
+                        >
+                          <Download size={15} />
+                          تحميل MP4
+                        </a>
+                        <a href={output} target="_blank" rel="noreferrer" className="text-xs font-bold text-[#2f80ff]">
+                          فتح الفيديو
+                        </a>
+                        {(() => {
+                          const pkg = absoluteApiUrl(result?.package_url || result?.video_montage?.package_url || null);
+                          return pkg ? (
+                            <a href={pkg} target="_blank" rel="noreferrer" className="text-xs font-bold text-muted-foreground">
+                              ملف بيانات الرندر
+                            </a>
+                          ) : null;
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
           {renderedScenes.length > 0 && (
             <div className="mt-5 rounded-3xl border border-[#2f80ff]/25 bg-[#2f80ff]/5 p-4">
@@ -568,7 +683,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                 <div>
                   <h3 className="text-xl font-black text-foreground">تعديل يدوي للنصوص</h3>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    عدّل الكابشن أو عنوان 3D لكل مشهد، ثم اضغط تشغيل المونتاج لإعادة الرندر بنفس المصدر.
+                    عدّل الكابشن أو عنوان 3D لكل مشهد من آخر رندر، ثم اضغط تشغيل المونتاج لإعادة الرندر بنفس المصدر.
                   </p>
                 </div>
                 <button
@@ -619,27 +734,6 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                 ))}
               </div>
             </div>
-          )}
-
-          {outputUrl && (
-            <div className="mt-5 rounded-3xl border border-[#18b89d]/30 bg-[#18b89d]/8 p-4">
-              <h3 className="text-xl font-black text-foreground">الفيديو الناتج</h3>
-              <video className="mt-3 aspect-[9/16] max-h-[620px] w-full rounded-2xl bg-black object-contain" src={outputUrl} controls playsInline />
-              <a
-                href={outputUrl}
-                download
-                className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#18b89d] px-4 text-sm font-black text-white"
-              >
-                <Download size={17} />
-                تحميل MP4
-              </a>
-            </div>
-          )}
-
-          {packageUrl && (
-            <a href={packageUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-sm font-bold text-[#2f80ff]">
-              فتح ملف بيانات الرندر
-            </a>
           )}
         </article>
       </section>

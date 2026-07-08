@@ -366,6 +366,8 @@ export const api = {
   videoMontage: {
     latest: (suiteId: string) =>
       request<GenerationStatus>(`/suites/${suiteId}/video-montage/jobs/latest`),
+    list: (suiteId: string, limit = 10) =>
+      request<{ jobs: GenerationStatus[] }>(`/suites/${suiteId}/video-montage/jobs?limit=${limit}`),
     stageSource: (suiteId: string, sourceUrl: string) =>
       request<{ staged_url: string }>(`/suites/${suiteId}/video-montage/stage-source`, {
         method: "POST",
@@ -1617,6 +1619,13 @@ export interface GenerationStatus {
   finished_at?: string;
   stages?: Array<{ id: string; label?: string; status?: string; progress?: number }>;
   partial?: Record<string, unknown> | null;
+  // Trimmed job input, only returned by list endpoints (e.g. video montage jobs).
+  input?: {
+    source_url?: string | null;
+    source_file_name?: string | null;
+    notes?: string | null;
+    options?: string[];
+  } | null;
   result?: {
     post_ids?: string[];
     count?: number;

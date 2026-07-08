@@ -24,6 +24,14 @@ const sourceAudioPath =
   'sourcePublicPath' in manifest.audio
     ? manifest.audio.sourcePublicPath
     : manifest.source.publicPath;
+// Honest option flags: the manifest only carries what the user enabled, and
+// the component must not render features whose flags are off.
+const manifestFlags = manifest as {showCaptions?: boolean; showTitles?: boolean};
+const SHOW_CAPTIONS = manifestFlags.showCaptions !== false;
+const SHOW_TITLES = manifestFlags.showTitles !== false;
+// Opaque (no background-removal) sources render as a full-frame subject.
+const SUBJECT_HAS_ALPHA = manifest.source.hasAlpha !== false;
+const CAPTION_SCALE = Number((manifest.style as {captionScale?: number}).captionScale ?? 1);
 
 const styles = `
 @font-face {
@@ -330,7 +338,9 @@ const BehindPersonText = ({scene}: {scene: Scene}) => {
         alignItems: titlePlan.mode === 'side' ? (subjectOffsetX >= 0 ? 'flex-start' : 'flex-end') : 'center',
         justifyContent: 'flex-start',
         padding: `${titlePaddingTop}px 44px 0`,
-        zIndex: 1,
+        // Behind an opaque full-frame subject the title would be invisible,
+        // so it moves above the video layer instead.
+        zIndex: SUBJECT_HAS_ALPHA ? 1 : 3,
       }}
     >
       <div
@@ -471,7 +481,7 @@ const Captions = ({scene}: {scene: Scene}) => {
           boxShadow: `0 18px 58px #0009, 0 0 26px ${scene.palette[1]}55`,
           color: '#fff',
           fontFamily: manifest.style.arabicFontFamily,
-          fontSize: activeChunk ? 56 : scene.caption.length > 95 ? 42 : 52,
+          fontSize: Math.round((activeChunk ? 56 : scene.caption.length > 95 ? 42 : 52) * CAPTION_SCALE),
           fontWeight: 800,
           lineHeight: 1.14,
           maxWidth: 930,
@@ -609,7 +619,7 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
   return (
     <AbsoluteFill>
       <SceneBackground scene={scene} durationInFrames={durationInFrames} />
-      <BehindPersonText scene={scene} />
+      {SHOW_TITLES ? <BehindPersonText scene={scene} /> : null}
       {frameSrc ? (
         <Img
           src={frameSrc}
@@ -617,6 +627,7 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
         />
       ) : (
         <OffthreadVideo
+          muted
           src={publicAsset(manifest.source.publicPath)}
           startFrom={startFrom}
           endAt={endAt}
@@ -624,7 +635,7 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
         />
       )}
       <Audio src={publicAsset(sourceAudioPath)} startFrom={startFrom} endAt={endAt} />
-      <Captions scene={scene} />
+      {SHOW_CAPTIONS ? <Captions scene={scene} /> : null}
       <AbsoluteFill style={{pointerEvents: 'none', zIndex: 3}}>
         <div
           style={{
@@ -701,6 +712,7 @@ export const AiMontage = () => {
         >
           <AbsoluteFill style={{mixBlendMode: 'screen', opacity: 0.82, zIndex: 12}}>
             <OffthreadVideo
+              muted={(effect.volume ?? 0.25) <= 0}
               src={publicAsset(effect.publicPath)}
               style={{
                 height: '100%',
