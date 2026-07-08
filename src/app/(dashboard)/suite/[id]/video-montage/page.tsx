@@ -9,6 +9,7 @@ import {
   Clapperboard,
   Clock3,
   Download,
+  ImagePlus,
   Layers3,
   Link2,
   Loader2,
@@ -17,11 +18,12 @@ import {
   Play,
   Scissors,
   Sparkles,
+  Trash2,
   Upload,
   XCircle,
   WandSparkles,
 } from "lucide-react";
-import { api, API_BASE, ApiError, GenerationStatus } from "@/lib/api";
+import { api, API_BASE, ApiError, BackgroundAssetItem, GenerationStatus } from "@/lib/api";
 import { SuitePageShell } from "@/components/suite/SuitePageShell";
 
 type MontageOption = {
@@ -144,6 +146,50 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [backgrounds, setBackgrounds] = useState<BackgroundAssetItem[]>([]);
+  const [backgroundsMode, setBackgroundsMode] = useState<"blend" | "user_only">("blend");
+  const [uploadingBackgrounds, setUploadingBackgrounds] = useState(false);
+  const [backgroundsNotice, setBackgroundsNotice] = useState<string | null>(null);
+  const backgroundsInputRef = useRef<HTMLInputElement | null>(null);
+
+  const refreshBackgrounds = useCallback(async () => {
+    try {
+      const res = await api.media.listBackgrounds(id);
+      setBackgrounds(res.assets || []);
+    } catch {
+      // Non-blocking: the montage form still works without the strip.
+    }
+  }, [id]);
+
+  useEffect(() => {
+    void refreshBackgrounds();
+  }, [refreshBackgrounds]);
+
+  async function uploadBackgroundFiles(fileList: FileList | null) {
+    const files = Array.from(fileList || []).slice(0, 10);
+    if (!files.length || uploadingBackgrounds) return;
+    setUploadingBackgrounds(true);
+    setBackgroundsNotice(null);
+    try {
+      const res = await api.media.uploadBackgrounds(id, files);
+      setBackgrounds((current) => [...(res.assets || []), ...current]);
+      if (res.warnings?.length) setBackgroundsNotice(res.warnings.join(" • "));
+    } catch (err) {
+      setBackgroundsNotice(err instanceof Error ? err.message : "تعذر رفع الخلفيات.");
+    } finally {
+      setUploadingBackgrounds(false);
+      if (backgroundsInputRef.current) backgroundsInputRef.current.value = "";
+    }
+  }
+
+  async function deleteBackground(assetId: string) {
+    try {
+      await api.media.deleteBackground(id, assetId);
+      setBackgrounds((current) => current.filter((asset) => asset.id !== assetId));
+    } catch (err) {
+      setBackgroundsNotice(err instanceof Error ? err.message : "تعذر حذف الخلفية.");
+    }
+  }
 
   const preview = useMemo(() => {
     if (sourceFile) return { kind: "video" as const, src: URL.createObjectURL(sourceFile) };
@@ -279,6 +325,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
         zoom,
         offsetX,
         offsetY,
+        backgroundsMode,
       });
       // Show the fresh job immediately, then let the list poll take over —
       // and clear the form so the next video can queue right away.
@@ -467,6 +514,87 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
               ) : (
                 <p className="mt-3 text-center text-xs text-muted-foreground">
                   ارفع فيديو أو حط رابط حتى تشوف معاينة الزوم مباشرة.
+                </p>
+              )}
+            </div>
+            <div className="mt-4 rounded-2xl border border-border bg-background p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-black text-foreground">خلفياتي</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    ارفع صورك وفيديوهاتك لتصير خلفيات لمشاهد المونتاج — بتنحلل تلقائيًا مرة وحدة وبتاخد أولوية بالاختيار.
+                  </p>
+                </div>
+                <label className={`inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 rounded-xl border border-[#2f80ff]/35 bg-[#2f80ff]/8 px-3 text-xs font-black text-[#2f80ff] transition hover:border-[#2f80ff] ${uploadingBackgrounds ? "pointer-events-none opacity-60" : ""}`}>
+                  <input
+                    ref={backgroundsInputRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    multiple
+                    className="sr-only"
+                    onChange={(event) => void uploadBackgroundFiles(event.target.files)}
+                  />
+                  {uploadingBackgrounds ? <Loader2 size={15} className="animate-spin" /> : <ImagePlus size={15} />}
+                  {uploadingBackgrounds ? "عم نرفع ونحلل..." : "رفع خلفيات"}
+                </label>
+              </div>
+              {backgroundsNotice && (
+                <p className="os-text-wrap mt-2 rounded-xl border border-[#f8d84a]/40 bg-[#f8d84a]/10 p-2 text-xs leading-5 text-[#9a6b00]">
+                  {backgroundsNotice}
+                </p>
+              )}
+              {backgrounds.length > 0 && (
+                <div className="mt-3 flex gap-2 overflow-x-auto pb-1" dir="ltr">
+                  {backgrounds.map((asset) => (
+                    <div key={asset.id} className="group relative h-24 w-16 shrink-0 overflow-hidden rounded-xl border border-border bg-black">
+                      {asset.kind === "visual_video" ? (
+                        <video src={asset.storage_url} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={asset.storage_url} alt={asset.title} className="h-full w-full object-cover" />
+                      )}
+                      {asset.kind === "visual_video" && (
+                        <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-[9px] font-bold text-white">فيديو</span>
+                      )}
+                      <button
+                        type="button"
+                        aria-label="حذف الخلفية"
+                        onClick={() => void deleteBackground(asset.id)}
+                        className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-lg bg-black/60 text-white opacity-0 transition group-hover:opacity-100 focus:opacity-100"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBackgroundsMode("blend")}
+                  className={`min-h-10 rounded-xl border px-2 text-xs font-black transition ${
+                    backgroundsMode === "blend"
+                      ? "border-[#18b89d]/45 bg-[#18b89d]/10 text-[#087966]"
+                      : "border-border bg-card text-muted-foreground hover:border-[#18b89d]/35"
+                  }`}
+                >
+                  امزج مع المولّد (افتراضي)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBackgroundsMode("user_only")}
+                  className={`min-h-10 rounded-xl border px-2 text-xs font-black transition ${
+                    backgroundsMode === "user_only"
+                      ? "border-[#18b89d]/45 bg-[#18b89d]/10 text-[#087966]"
+                      : "border-border bg-card text-muted-foreground hover:border-[#18b89d]/35"
+                  }`}
+                >
+                  خلفياتي فقط
+                </button>
+              </div>
+              {backgroundsMode === "user_only" && backgrounds.length === 0 && (
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  ما في خلفيات مرفوعة بعد — إذا شغّلت المونتاج هلق منرجع للمزج الافتراضي.
                 </p>
               )}
             </div>

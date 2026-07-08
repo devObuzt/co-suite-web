@@ -390,12 +390,14 @@ export const api = {
         zoom?: number;
         offsetX?: number;
         offsetY?: number;
+        backgroundsMode?: "blend" | "user_only";
       }
     ) => {
       const form = new FormData();
       form.append("mode", data.mode);
       form.append("source_url", data.sourceUrl || "");
       form.append("options_json", JSON.stringify(data.options || []));
+      form.append("backgrounds_mode", data.backgroundsMode || "blend");
       form.append("zoom", String(data.zoom ?? 1));
       form.append("subject_offset_x", String(data.offsetX ?? 0));
       form.append("subject_offset_y", String(data.offsetY ?? 0));
@@ -421,6 +423,20 @@ export const api = {
       const suffix = query.toString() ? `?${query.toString()}` : "";
       return request<MediaAssetItem[]>(`/suites/${suiteId}/media${suffix}`);
     },
+    listBackgrounds: (suiteId: string) =>
+      request<{ assets: BackgroundAssetItem[] }>(`/suites/${suiteId}/media/backgrounds`),
+    uploadBackgrounds: (suiteId: string, files: File[]) => {
+      const form = new FormData();
+      files.forEach((file) => form.append("files", file));
+      return request<{ assets: BackgroundAssetItem[]; warnings: string[] }>(
+        `/suites/${suiteId}/media/backgrounds`,
+        { method: "POST", body: form }
+      );
+    },
+    deleteBackground: (suiteId: string, assetId: string) =>
+      request<{ ok: boolean; asset_id: string }>(`/suites/${suiteId}/media/backgrounds/${assetId}`, {
+        method: "DELETE",
+      }),
   },
 
   marketingPlans: {
@@ -678,6 +694,18 @@ export interface MediaAssetItem {
   content_type: string;
   duration_seconds: number | null;
   created_at: string | null;
+}
+
+export interface BackgroundAssetItem {
+  id: string;
+  kind: string;
+  title: string;
+  storage_url: string;
+  content_type?: string | null;
+  duration_seconds?: number | null;
+  tags: string[];
+  metadata?: Record<string, unknown>;
+  created_at?: string | null;
 }
 
 export interface MarketingPlanMetric {
@@ -1627,6 +1655,7 @@ export interface GenerationStatus {
     source_file_name?: string | null;
     notes?: string | null;
     options?: string[];
+    backgrounds_mode?: string | null;
   } | null;
   result?: {
     post_ids?: string[];
