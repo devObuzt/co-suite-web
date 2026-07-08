@@ -144,6 +144,8 @@ export const api = {
     create: (data: { name: string; website_url?: string }) =>
       request<Suite>("/suites/", { method: "POST", body: JSON.stringify(data) }),
     get: (id: string) => request<Suite>(`/suites/${id}`),
+    remove: (suiteId: string) =>
+      request<{ ok: boolean; deleted_suite_id: string }>(`/suites/${suiteId}`, { method: "DELETE" }),
     updateBrand: (suiteId: string, brand: Brand) =>
       request<{ ok: boolean }>(`/suites/${suiteId}/brand`, { method: "PATCH", body: JSON.stringify(brand) }),
     marketResearch: (suiteId: string) =>

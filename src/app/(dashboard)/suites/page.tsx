@@ -5,7 +5,7 @@ import { api, Suite } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowRight, Sparkles } from "lucide-react";
+import { Plus, ArrowRight, Loader2, Sparkles, Trash2, X } from "lucide-react";
 
 export default function DashboardPage() {
   const [suites, setSuites] = useState<Suite[]>([]);
@@ -77,7 +77,11 @@ export default function DashboardPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {suites.map((suite) => (
-            <SuiteCard key={suite.id} suite={suite} />
+            <SuiteCard
+              key={suite.id}
+              suite={suite}
+              onDeleted={(deletedId) => setSuites((current) => current.filter((item) => item.id !== deletedId))}
+            />
           ))}
         </div>
       )}
@@ -85,37 +89,103 @@ export default function DashboardPage() {
   );
 }
 
-function SuiteCard({ suite }: { suite: Suite }) {
+function SuiteCard({ suite, onDeleted }: { suite: Suite; onDeleted: (suiteId: string) => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
   const statusColor = suite.status === "active"
     ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
     : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300";
 
+  async function deleteSuite() {
+    setDeleting(true);
+    setError("");
+    try {
+      await api.suites.remove(suite.id);
+      onDeleted(suite.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Delete failed");
+      setDeleting(false);
+    }
+  }
+
   return (
-    <Link href={`/suite/${suite.id}`}>
-      <Card className="h-full cursor-pointer transition-colors hover:ring-primary/50 group">
-        <CardHeader className="pb-2">
-          <div className="flex items-start justify-between">
-            <div
-              className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold text-white"
-              style={{ backgroundColor: suite.brand?.colors?.primary || "#4f46e5" }}
-            >
-              {suite.name[0].toUpperCase()}
+    <div className="relative">
+      <Link href={`/suite/${suite.id}`}>
+        <Card className="h-full cursor-pointer transition-colors hover:ring-primary/50 group">
+          <CardHeader className="pb-2">
+            <div className="flex items-start justify-between">
+              <div
+                className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold text-white"
+                style={{ backgroundColor: suite.brand?.colors?.primary || "#4f46e5" }}
+              >
+                {suite.name[0].toUpperCase()}
+              </div>
+              <Badge className={`text-xs border ${statusColor}`} variant="outline">
+                {suite.status}
+              </Badge>
             </div>
-            <Badge className={`text-xs border ${statusColor}`} variant="outline">
-              {suite.status}
-            </Badge>
+            <CardTitle className="text-base text-foreground">{suite.name}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 line-clamp-2 text-sm text-muted-foreground">
+              {suite.brand?.description || suite.brand?.tagline || "Complete your suite setup to get started."}
+            </p>
+            <div className="flex items-center gap-1 text-sm text-primary transition-all group-hover:gap-2">
+              Open suite <ArrowRight size={14} />
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+      <button
+        type="button"
+        aria-label={`Delete ${suite.name}`}
+        title="Delete suite"
+        onClick={(e) => {
+          e.preventDefault();
+          setConfirming(true);
+        }}
+        className="absolute bottom-3 end-3 rounded-md p-1.5 text-muted-foreground/60 transition-colors hover:bg-red-500/10 hover:text-red-500"
+      >
+        <Trash2 size={15} />
+      </button>
+
+      {confirming && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => !deleting && setConfirming(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-background p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-lg font-bold text-foreground" dir="auto">حذف السوت &quot;{suite.name}&quot;؟</h3>
+              <button
+                type="button"
+                onClick={() => !deleting && setConfirming(false)}
+                className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground" dir="auto">
+              رح ينحذف السوت نهائيًا مع كل بياناته: البراند، الخطة التسويقية، المحتوى، الصور، والاشتراكات المرتبطة. المستخدمون المربوطون بالسوت ما بينحذفوا. هذا الإجراء لا يمكن التراجع عنه.
+            </p>
+            {error && <p className="mt-3 rounded-lg border border-red-300 bg-red-50 p-2 text-xs text-red-700" dir="auto">{error}</p>}
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setConfirming(false)} disabled={deleting}>
+                إلغاء
+              </Button>
+              <Button onClick={deleteSuite} disabled={deleting} className="gap-2 bg-red-600 text-white hover:bg-red-700">
+                {deleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                احذف نهائيًا
+              </Button>
+            </div>
           </div>
-          <CardTitle className="text-base text-foreground">{suite.name}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="mb-4 line-clamp-2 text-sm text-muted-foreground">
-            {suite.brand?.description || suite.brand?.tagline || "Complete your suite setup to get started."}
-          </p>
-          <div className="flex items-center gap-1 text-sm text-primary transition-all group-hover:gap-2">
-            Open suite <ArrowRight size={14} />
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+        </div>
+      )}
+    </div>
   );
 }
