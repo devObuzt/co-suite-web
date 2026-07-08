@@ -809,6 +809,10 @@ export interface MarketingCompetitor {
   confidence?: string;
   research_lead?: boolean;
   classification_tags?: string[];
+  relevance?: string;
+  rating?: number;
+  reviews?: number;
+  address?: string;
 }
 
 export interface MarketingKeyword {

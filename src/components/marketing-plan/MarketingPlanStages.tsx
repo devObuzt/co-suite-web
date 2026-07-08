@@ -22,6 +22,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Star,
   Target,
   Trash2,
   UserRound,
@@ -112,6 +113,11 @@ const labels = {
     goodCompetitor: "منافس جيد",
     localCompetitor: "منافس محلي",
     globalCompetitor: "منافس عالمي",
+    nearbyBadge: "قريب منك",
+    confirmedBadge: "منافس مؤكد",
+    leadBadge: "نقطة بحث",
+    reviewsWord: "تقييم",
+    tagsLabel: "تصنيفك",
     age: "العمر",
     gender: "الجندر",
     profession: "المهنة",
@@ -198,6 +204,11 @@ const labels = {
     goodCompetitor: "Good competitor",
     localCompetitor: "Local competitor",
     globalCompetitor: "Global competitor",
+    nearbyBadge: "Near you",
+    confirmedBadge: "Confirmed competitor",
+    leadBadge: "Research lead",
+    reviewsWord: "reviews",
+    tagsLabel: "Your rating",
     age: "Age",
     gender: "Gender",
     profession: "Profession",
@@ -284,6 +295,11 @@ const labels = {
     goodCompetitor: "מתחרה טוב",
     localCompetitor: "מתחרה מקומי",
     globalCompetitor: "מתחרה גלובלי",
+    nearbyBadge: "קרוב אליך",
+    confirmedBadge: "מתחרה מאומת",
+    leadBadge: "כיוון מחקר",
+    reviewsWord: "ביקורות",
+    tagsLabel: "הסיווג שלך",
     age: "גיל",
     gender: "מגדר",
     profession: "מקצוע",
@@ -387,6 +403,86 @@ function SourceGlyph({ source }: { source?: string }) {
 
 function SourceIcon({ competitor }: { competitor: MarketingCompetitor }) {
   return <SourceGlyph source={`${competitor.result_type || competitor.platform}`} />;
+}
+
+const competitorPlatformStyles: Record<string, { bar: string; avatar: string; chip: string }> = {
+  instagram: {
+    bar: "bg-gradient-to-r from-fuchsia-500 via-pink-500 to-amber-400",
+    avatar: "bg-gradient-to-br from-fuchsia-500 via-pink-500 to-amber-400",
+    chip: "border-pink-300/60 bg-pink-50 text-pink-700 dark:border-pink-500/30 dark:bg-pink-500/10 dark:text-pink-200",
+  },
+  facebook: {
+    bar: "bg-[#1877F2]",
+    avatar: "bg-[#1877F2]",
+    chip: "border-blue-300/60 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200",
+  },
+  tiktok: {
+    bar: "bg-gradient-to-r from-cyan-400 via-slate-700 to-rose-500",
+    avatar: "bg-slate-900",
+    chip: "border-slate-400/60 bg-slate-100 text-slate-800 dark:border-slate-500/40 dark:bg-slate-500/10 dark:text-slate-200",
+  },
+  maps: {
+    bar: "bg-emerald-500",
+    avatar: "bg-emerald-500",
+    chip: "border-emerald-300/60 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
+  },
+  google_organic: {
+    bar: "bg-sky-500",
+    avatar: "bg-sky-500",
+    chip: "border-sky-300/60 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200",
+  },
+  google_sponsored: {
+    bar: "bg-amber-500",
+    avatar: "bg-amber-500",
+    chip: "border-amber-300/60 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200",
+  },
+  other: {
+    bar: "bg-slate-400",
+    avatar: "bg-slate-500",
+    chip: "border-border bg-muted text-muted-foreground",
+  },
+};
+
+function competitorPlatformStyle(competitor: MarketingCompetitor) {
+  const key = competitorGroupKey(competitor);
+  return competitorPlatformStyles[key === "sponsored" ? "google_sponsored" : key] || competitorPlatformStyles.other;
+}
+
+function competitorHost(url?: string) {
+  if (!url) return "";
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+// Platform hosts whose favicon carries no brand identity — fall back to the initial avatar.
+const genericAvatarHosts = /(^|\.)(google\.[a-z.]+|instagram\.com|facebook\.com|tiktok\.com)$/i;
+
+function CompetitorAvatar({ competitor }: { competitor: MarketingCompetitor }) {
+  const [failed, setFailed] = useState(false);
+  const style = competitorPlatformStyle(competitor);
+  const host = competitorHost(competitor.url);
+  const initial = (competitor.title || competitor.name || "?").trim().charAt(0).toUpperCase() || "?";
+  if (!host || failed || genericAvatarHosts.test(host)) {
+    return (
+      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-lg font-bold text-white shadow-sm ${style.avatar}`}>
+        {initial}
+      </span>
+    );
+  }
+  return (
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+      <img
+        src={`https://www.google.com/s2/favicons?domain=${host}&sz=64`}
+        alt=""
+        loading="lazy"
+        className="h-7 w-7"
+        onError={() => setFailed(true)}
+      />
+    </span>
+  );
 }
 
 export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage?: StageSlug }) {
@@ -1240,16 +1336,42 @@ function CompetitorCard({
     }
     onTagsChange(competitor.id, next);
   }
+  const style = competitorPlatformStyle(competitor);
+  const host = competitorHost(competitor.url);
+  const sourceLabel = competitorSourceLabels[competitorGroupKey(competitor)] || competitor.result_type || competitor.platform;
+  const snippet = competitor.snippet || competitor.reason || competitor.evidence;
+  const relevance = competitor.research_lead ? "" : `${competitor.relevance || ""}`.toLowerCase();
   return (
-    <article className="relative min-w-0 overflow-hidden rounded-xl border border-border bg-background p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="mb-2 inline-flex max-w-full items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-            <SourceIcon competitor={competitor} />
-            <span className="min-w-0 truncate">{competitor.result_type || competitor.platform}</span>
+    <article className={`relative flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border bg-background shadow-sm transition-shadow hover:shadow-md ${competitor.research_lead ? "border-dashed border-amber-300 dark:border-amber-500/40" : "border-border"}`}>
+      <span className={`absolute inset-x-0 top-0 h-1 ${style.bar}`} aria-hidden />
+      <div className="flex items-start gap-3 p-4 pb-0 pt-5">
+        <CompetitorAvatar competitor={competitor} />
+        <div className="min-w-0 flex-1">
+          <h3 className="os-text-wrap font-bold leading-snug text-foreground" dir="auto">{competitor.title || competitor.name}</h3>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${style.chip}`}>
+              <SourceIcon competitor={competitor} />
+              <span className="min-w-0 truncate">{sourceLabel}</span>
+            </span>
+            {competitor.research_lead && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-amber-400/70 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                <FileSearch size={11} />
+                {text.leadBadge}
+              </span>
+            )}
+            {relevance === "nearby" && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                <MapPinned size={11} />
+                {text.nearbyBadge}
+              </span>
+            )}
+            {relevance === "real" && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                <Check size={11} />
+                {text.confirmedBadge}
+              </span>
+            )}
           </div>
-          <h3 className="os-text-wrap font-bold text-foreground" dir="auto">{competitor.title || competitor.name}</h3>
-          <p className="os-text-wrap mt-2 text-sm leading-6 text-muted-foreground" dir="auto">{competitor.snippet || competitor.reason || competitor.evidence}</p>
         </div>
         <div className="flex shrink-0 flex-col gap-1">
           <button type="button" aria-label={text.moveCompetitorUp} title={text.moveCompetitorUp} disabled={moveUpDisabled} onClick={onMoveUp} className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30">
@@ -1260,17 +1382,48 @@ function CompetitorCard({
           </button>
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="min-w-0 max-w-full truncate rounded-lg border border-border px-2.5 py-1 text-xs text-muted-foreground" dir="ltr">{shortUrl(competitor.url)}</span>
-        {competitor.url && <a href={competitor.url} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-xs font-semibold hover:bg-muted"><ArrowUpRight size={13} />{text.open}</a>}
-        <Button type="button" size="sm" variant="outline" onClick={copyUrl} className="h-8 gap-1 px-2 text-xs"><Copy size={13} />{copied ? text.copied : text.copy}</Button>
-        <Button type="button" size="sm" variant="outline" onClick={() => setPreview(true)} className="h-8 gap-1 px-2 text-xs"><Eye size={13} />{text.preview}</Button>
+      {(competitor.rating || competitor.address) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2.5 text-xs text-muted-foreground">
+          {competitor.rating ? (
+            <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+              <Star size={13} className="fill-amber-400 text-amber-400" />
+              {competitor.rating}
+              {competitor.reviews ? <span className="font-normal text-muted-foreground">({competitor.reviews} {text.reviewsWord})</span> : null}
+            </span>
+          ) : null}
+          {competitor.address ? (
+            <span className="inline-flex min-w-0 items-center gap-1" dir="auto">
+              <MapPinned size={12} className="shrink-0" />
+              <span className="min-w-0 truncate">{competitor.address}</span>
+            </span>
+          ) : null}
+        </div>
+      )}
+      {snippet && <p className="os-text-wrap px-4 pt-2.5 text-sm leading-6 text-muted-foreground" dir="auto">{snippet}</p>}
+      <div className="px-4 py-3">
+        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{text.tagsLabel}</p>
+        <div className="flex flex-wrap gap-1.5">
+          {Object.entries(tagText).map(([tag, label]) => (
+            <button key={tag} type="button" onClick={() => toggleTag(tag)} className={`os-text-wrap rounded-full border px-2.5 py-1 text-xs font-semibold ${tags.includes(tag) ? "border-[color:var(--brand-accent)] bg-[color:var(--brand-accent)]/10 text-[color:var(--brand-accent)]" : "border-border text-muted-foreground hover:text-foreground"}`}>{label}</button>
+          ))}
+        </div>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {Object.entries(tagText).map(([tag, label]) => (
-          <button key={tag} type="button" onClick={() => toggleTag(tag)} className={`os-text-wrap rounded-full border px-2.5 py-1 text-xs font-semibold ${tags.includes(tag) ? "border-[color:var(--brand-accent)] bg-[color:var(--brand-accent)]/10 text-[color:var(--brand-accent)]" : "border-border text-muted-foreground hover:text-foreground"}`}>{label}</button>
-        ))}
-      </div>
+      <footer className="mt-auto flex items-center gap-1.5 border-t border-border/60 bg-muted/30 px-3 py-2">
+        {competitor.url ? (
+          <a href={competitor.url} target="_blank" rel="noreferrer" title={competitor.url} className="inline-flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg bg-foreground px-3 text-xs font-semibold text-background transition-opacity hover:opacity-90">
+            <ArrowUpRight size={13} className="shrink-0" />
+            <span className="min-w-0 truncate" dir="ltr">{host || text.open}</span>
+          </a>
+        ) : (
+          <span className="inline-flex h-8 min-w-0 flex-1 items-center justify-center rounded-lg border border-dashed border-border px-3 text-xs text-muted-foreground" dir="ltr">{shortUrl(competitor.url)}</span>
+        )}
+        <button type="button" aria-label={text.copy} title={copied ? text.copied : text.copy} onClick={copyUrl} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-foreground">
+          {copied ? <Check size={13} /> : <Copy size={13} />}
+        </button>
+        <button type="button" aria-label={text.preview} title={text.preview} onClick={() => setPreview(true)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-foreground">
+          <Eye size={13} />
+        </button>
+      </footer>
       {preview && (
         <div className="absolute inset-x-3 top-3 z-10 min-w-0 rounded-xl border border-border bg-card p-3 shadow-lg sm:inset-x-4 sm:top-4">
           <div className="flex items-start justify-between gap-3">
