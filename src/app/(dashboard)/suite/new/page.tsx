@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, Brand, BrandLogo, BrandPersona, MarketingStrategy, ResearchDebug } from "@/lib/api";
 import { useT, useLanguage } from "@/lib/i18n/LanguageContext";
@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   Loader2, Plus, X, CheckCircle2, ChevronRight, ChevronLeft,
-  AtSign, AlertCircle, Info,
+  AtSign, AlertCircle, Info, MapPin,
 } from "lucide-react";
 
 type Step = "name" | "links" | "extracting"
@@ -433,6 +433,98 @@ export default function NewSuitePage() {
   const [customCountries, setCustomCountries] = useState("");
   const [customCities, setCustomCities] = useState("");
   const [audienceNotes, setAudienceNotes] = useState("");
+  type AudiencePhase = "location" | "interests" | "behaviors" | "statuses" | "notes";
+  const AUDIENCE_PHASES: AudiencePhase[] = ["location", "interests", "behaviors", "statuses", "notes"];
+  const [audiencePhase, setAudiencePhase] = useState<AudiencePhase>("location");
+  const [cityMode, setCityMode] = useState<"manual" | "radius">("manual");
+  const [radiusKm, setRadiusKm] = useState(5);
+  const [geo, setGeo] = useState<{ lat: number; lng: number; city?: string; country?: string } | null>(null);
+  const [geoBusy, setGeoBusy] = useState(false);
+  const [geoError, setGeoError] = useState("");
+  const ipCountryRequested = useRef(false);
+
+  // Prefill the country from the visitor's IP the first time the audience step opens.
+  useEffect(() => {
+    if (step !== "step-e" || customCountries || ipCountryRequested.current) return;
+    ipCountryRequested.current = true;
+    fetch("https://ipapi.co/json/")
+      .then((res) => res.json())
+      .then((data) => {
+        const country = String(data?.country_name || "").trim();
+        if (country) setCustomCountries((prev) => prev || country);
+      })
+      .catch(() => undefined);
+  }, [step, customCountries]);
+
+  function detectLocation() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeoError(t("suite.new.geoDenied"));
+      return;
+    }
+    setGeoBusy(true);
+    setGeoError("");
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        let city = "";
+        let country = "";
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=${lang}`
+          );
+          const data = await res.json();
+          const address = data?.address || {};
+          city = String(address.city || address.town || address.village || "").trim();
+          country = String(address.country || "").trim();
+        } catch {
+          /* keep coordinates even without a reverse-geocoded name */
+        }
+        setGeo({ lat: latitude, lng: longitude, city, country });
+        if (country) setCustomCountries((prev) => prev || country);
+        if (city) setCustomCities((prev) => prev || city);
+        setGeoBusy(false);
+      },
+      () => {
+        setGeoError(t("suite.new.geoDenied"));
+        setGeoBusy(false);
+      },
+      { enableHighAccuracy: false, timeout: 15000 }
+    );
+  }
+
+  async function saveAudienceStep() {
+    const countries = locationScope === "Custom"
+      ? customCountries.split(",").map((c) => c.trim()).filter(Boolean)
+      : locationScope === "Worldwide" ? [] : [locationScope];
+    const cities = customCities.split(",").map((c) => c.trim()).filter(Boolean);
+    const locationText = locationScope === "Worldwide"
+      ? "Worldwide"
+      : [...countries, ...cities].join(", ") || locationScope;
+    const interestsText = selectedInterests.length > 0
+      ? `, ${t("suite.new.targetAudienceInterestsLabel")}: ${selectedInterests.join(", ")}`
+      : "";
+    const behaviorText = selectedBehaviors.length > 0 ? `. ${t("suite.new.targetAudienceBehaviorsLabel")}: ${selectedBehaviors.join(", ")}` : "";
+    const statusText = selectedStatuses.length > 0 ? `. ${t("suite.new.targetAudienceStatusesLabel")}: ${selectedStatuses.join(", ")}` : "";
+    const notesText = audienceNotes.trim() ? `. ${t("suite.new.targetAudienceNotesLabel")}: ${audienceNotes.trim()}` : "";
+    const targetAudience = `${locationText}${interestsText}${behaviorText}${statusText}${notesText}`;
+    const radius = cityMode === "radius" && geo
+      ? { lat: geo.lat, lng: geo.lng, km: radiusKm, city: geo.city || "", country: geo.country || "" }
+      : undefined;
+    await saveStep("e", {
+      audience_location: {
+        scope: locationScope === "Worldwide" ? "world" : "custom",
+        countries,
+        cities,
+        ...(radius ? { radius } : {}),
+      },
+      audience_interests: selectedInterests,
+      audience_behaviors: selectedBehaviors,
+      audience_social_statuses: selectedStatuses,
+      audience_notes: audienceNotes,
+      target_audience: targetAudience,
+    });
+    setStep("step-f");
+  }
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [selectedBehaviors, setSelectedBehaviors] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
@@ -1247,290 +1339,181 @@ export default function NewSuitePage() {
         </div>
       )}
 
-      {/* ── Step E: Audience ── */}
+      {/* ── Step E: Audience — split into focused sub-screens ── */}
       {step === "step-e" && (
         <div className="space-y-4">
           <Card className="border-border bg-card text-card-foreground">
             <CardHeader>
-              <CardTitle>{t("suite.new.stepETitle")}</CardTitle>
-              <CardDescription className="text-muted-foreground">{t("suite.new.stepESubtitle")}</CardDescription>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle>{t("suite.new.stepETitle")}</CardTitle>
+                <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
+                  {AUDIENCE_PHASES.indexOf(audiencePhase) + 1}/{AUDIENCE_PHASES.length}
+                </span>
+              </div>
+              <CardDescription className="text-muted-foreground">
+                {audiencePhase === "location"
+                  ? t("suite.new.location")
+                  : audiencePhase === "interests"
+                    ? t("suite.new.interests")
+                    : audiencePhase === "behaviors"
+                      ? t("suite.new.behaviors")
+                      : audiencePhase === "statuses"
+                        ? t("suite.new.socialStatus")
+                        : t("suite.new.audienceNotes")}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              <div className="space-y-2">
-                <Label className="text-foreground">{t("suite.new.location")}</Label>
-                <div className="flex flex-wrap gap-2">
-                  {LOCATION_SCOPES.map(({ value, label }) => (
-                    <button
-                      key={value}
-                      onClick={() => setLocationScope(value)}
-                      className={`max-w-full px-3 py-1.5 rounded-full text-sm border transition-colors text-start leading-snug ${
-                        locationScope === value
-                          ? "bg-foreground border-foreground text-background"
-                          : "border-border text-muted-foreground hover:border-zinc-500"
-                      }`}
-                      dir="auto"
-                    >{label}</button>
-                  ))}
-                </div>
-                {locationScope === "Custom" && (
-                  <div className="space-y-2 mt-2">
-                    <Input
-                      value={customCountries}
-                      onChange={(e) => setCustomCountries(e.target.value)}
-                      placeholder={t("suite.new.customCountriesPlaceholder")}
-                      className="bg-background text-foreground text-sm"
-                      dir="auto"
-                    />
-                    <Input
-                      value={customCities}
-                      onChange={(e) => setCustomCities(e.target.value)}
-                      placeholder={t("suite.new.customCitiesPlaceholder")}
-                      className="bg-background text-foreground text-sm"
-                      dir="auto"
-                    />
+              {audiencePhase === "location" && (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-foreground">{t("suite.new.location")}</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {LOCATION_SCOPES.map(({ value, label }) => (
+                        <button
+                          key={value}
+                          onClick={() => setLocationScope(value)}
+                          className={`max-w-full px-3 py-1.5 rounded-full text-sm border transition-colors text-start leading-snug ${
+                            locationScope === value
+                              ? "bg-foreground border-foreground text-background"
+                              : "border-border text-muted-foreground hover:border-zinc-500"
+                          }`}
+                          dir="auto"
+                        >{label}</button>
+                      ))}
+                    </div>
+                    {locationScope === "Custom" && (
+                      <Input
+                        value={customCountries}
+                        onChange={(e) => setCustomCountries(e.target.value)}
+                        placeholder={t("suite.new.customCountriesPlaceholder")}
+                        className="bg-background text-foreground text-sm"
+                        dir="auto"
+                      />
+                    )}
                   </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Label className="text-foreground">{t("suite.new.interests")}</Label>
-                  {audienceInterestSuggestions.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedInterests((prev) => Array.from(new Set([...prev, ...audienceInterestSuggestions])))}
-                      className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15"
-                    >
-                      {t("suite.new.addAllSuggestions")}
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {/* Suggested interests */}
-                  {audienceInterestSuggestions.map((interest) => (
-                    <button
-                      key={interest}
-                      onClick={() => setSelectedInterests((prev) =>
-                        prev.includes(interest) ? prev.filter((i) => i !== interest) : [...prev, interest]
-                      )}
-                      className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                        selectedInterests.includes(interest)
-                          ? "bg-foreground border-foreground text-background"
-                          : "border-border text-muted-foreground hover:border-zinc-500"
-                      } max-w-full text-start leading-snug`}
-                      dir="auto"
-                    >{interest}</button>
-                  ))}
-                  {/* Custom interests added by user */}
-                  {selectedInterests
-                    .filter((i) => !audienceInterestSuggestions.includes(i))
-                    .map((interest) => (
+                  <div className="space-y-2">
+                    <Label className="text-foreground">{t("suite.new.customCitiesPlaceholder")}</Label>
+                    <div className="flex flex-wrap gap-2">
                       <button
-                        key={interest}
-                        onClick={() => setSelectedInterests((prev) => prev.filter((i) => i !== interest))}
-                        className="px-3 py-1.5 rounded-full text-sm border bg-foreground border-foreground text-background flex items-center gap-1"
-                        dir="auto"
-                      >{interest} <X size={11} /></button>
-                    ))
-                  }
-                </div>
-                {/* Add custom interest */}
-                <div className="mt-1 flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    placeholder={t("suite.new.customInterestPlaceholder")}
-                    className="min-h-11 flex-1 bg-background text-sm text-foreground"
-                    dir="auto"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && e.currentTarget.value.trim()) {
-                        const val = e.currentTarget.value.trim();
-                        setSelectedInterests((prev) => prev.includes(val) ? prev : [...prev, val]);
-                        e.currentTarget.value = "";
-                        e.preventDefault();
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border px-3 text-sm font-medium text-[#2f80ff] hover:bg-muted sm:w-auto"
-                    onClick={(e) => {
-                      const input = (e.currentTarget.previousSibling as HTMLInputElement);
-                      const val = input?.value?.trim();
-                      if (val) {
-                        setSelectedInterests((prev) => prev.includes(val) ? prev : [...prev, val]);
-                        input.value = "";
-                      }
-                    }}
-                  ><Plus size={13} /> {t("suite.new.add")}</button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Label className="text-foreground">{t("suite.new.behaviors")}</Label>
-                  {audienceBehaviorSuggestions.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedBehaviors((prev) => Array.from(new Set([...prev, ...audienceBehaviorSuggestions])))}
-                      className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15"
-                    >
-                      {t("suite.new.addAllSuggestions")}
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {audienceBehaviorSuggestions.map((item) => (
-                    <button
-                      key={item}
-                      onClick={() => setSelectedBehaviors((prev) => prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item])}
-                      className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                        selectedBehaviors.includes(item) ? "bg-foreground border-foreground text-background" : "border-border text-muted-foreground hover:border-zinc-500"
-                      } max-w-full text-start leading-snug`}
-                      dir="auto"
-                    >{item}</button>
-                  ))}
-                  {selectedBehaviors
-                    .filter((item) => !audienceBehaviorSuggestions.includes(item))
-                    .map((item) => (
+                        type="button"
+                        onClick={() => setCityMode("manual")}
+                        className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${cityMode === "manual" ? "bg-foreground border-foreground text-background" : "border-border text-muted-foreground hover:border-zinc-500"}`}
+                      >{t("suite.new.cityManual")}</button>
                       <button
-                        key={item}
-                        onClick={() => setSelectedBehaviors((prev) => prev.filter((i) => i !== item))}
-                        className="flex max-w-full items-center gap-1 rounded-full border border-foreground bg-foreground px-3 py-1.5 text-start text-sm leading-snug text-background"
+                        type="button"
+                        onClick={() => setCityMode("radius")}
+                        className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${cityMode === "radius" ? "bg-foreground border-foreground text-background" : "border-border text-muted-foreground hover:border-zinc-500"}`}
+                      >{t("suite.new.cityRadius")}</button>
+                    </div>
+                    {cityMode === "manual" ? (
+                      <Input
+                        value={customCities}
+                        onChange={(e) => setCustomCities(e.target.value)}
+                        placeholder={t("suite.new.customCitiesPlaceholder")}
+                        className="bg-background text-foreground text-sm"
                         dir="auto"
-                      >{item} <X size={11} /></button>
-                    ))
-                  }
-                </div>
-                <div className="mt-1 flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    placeholder={t("suite.new.customBehaviorPlaceholder")}
-                    className="min-h-11 flex-1 bg-background text-sm text-foreground"
-                    dir="auto"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && e.currentTarget.value.trim()) {
-                        const val = e.currentTarget.value.trim();
-                        setSelectedBehaviors((prev) => prev.includes(val) ? prev : [...prev, val]);
-                        e.currentTarget.value = "";
-                        e.preventDefault();
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border px-3 text-sm font-medium text-[#2f80ff] hover:bg-muted sm:w-auto"
-                    onClick={(e) => {
-                      const input = (e.currentTarget.previousSibling as HTMLInputElement);
-                      const val = input?.value?.trim();
-                      if (val) {
-                        setSelectedBehaviors((prev) => prev.includes(val) ? prev : [...prev, val]);
-                        input.value = "";
-                      }
-                    }}
-                  ><Plus size={13} /> {t("suite.new.add")}</button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Label className="text-foreground">{t("suite.new.socialStatus")}</Label>
-                  {audienceStatusSuggestions.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedStatuses((prev) => Array.from(new Set([...prev, ...audienceStatusSuggestions])))}
-                      className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15"
-                    >
-                      {t("suite.new.addAllSuggestions")}
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {audienceStatusSuggestions.map((item) => (
-                    <button
-                      key={item}
-                      onClick={() => setSelectedStatuses((prev) => prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item])}
-                      className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                        selectedStatuses.includes(item) ? "bg-foreground border-foreground text-background" : "border-border text-muted-foreground hover:border-zinc-500"
-                      } max-w-full text-start leading-snug`}
-                      dir="auto"
-                    >{item}</button>
-                  ))}
-                  {selectedStatuses
-                    .filter((item) => !audienceStatusSuggestions.includes(item))
-                    .map((item) => (
-                      <button
-                        key={item}
-                        onClick={() => setSelectedStatuses((prev) => prev.filter((i) => i !== item))}
-                        className="flex max-w-full items-center gap-1 rounded-full border border-foreground bg-foreground px-3 py-1.5 text-start text-sm leading-snug text-background"
-                        dir="auto"
-                      >{item} <X size={11} /></button>
-                    ))
-                  }
-                </div>
-                <div className="mt-1 flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    placeholder={t("suite.new.customStatusPlaceholder")}
-                    className="min-h-11 flex-1 bg-background text-sm text-foreground"
-                    dir="auto"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && e.currentTarget.value.trim()) {
-                        const val = e.currentTarget.value.trim();
-                        setSelectedStatuses((prev) => prev.includes(val) ? prev : [...prev, val]);
-                        e.currentTarget.value = "";
-                        e.preventDefault();
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border px-3 text-sm font-medium text-[#2f80ff] hover:bg-muted sm:w-auto"
-                    onClick={(e) => {
-                      const input = (e.currentTarget.previousSibling as HTMLInputElement);
-                      const val = input?.value?.trim();
-                      if (val) {
-                        setSelectedStatuses((prev) => prev.includes(val) ? prev : [...prev, val]);
-                        input.value = "";
-                      }
-                    }}
-                  ><Plus size={13} /> {t("suite.new.add")}</button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-foreground">{t("suite.new.audienceNotes")}</Label>
-                <textarea
-                  value={audienceNotes}
-                  onChange={(e) => setAudienceNotes(e.target.value)}
-                  placeholder={audienceNotesPlaceholder}
-                  className="min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-[#2f80ff]"
-                  dir="auto"
+                      />
+                    ) : (
+                      <div className="space-y-3 rounded-xl border border-border bg-background/60 p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-semibold text-muted-foreground">{t("suite.new.radiusLabel")}</span>
+                          {[1, 3, 5, 10, 25].map((km) => (
+                            <button
+                              key={km}
+                              type="button"
+                              onClick={() => setRadiusKm(km)}
+                              className={`rounded-full border px-3 py-1 text-sm transition-colors ${radiusKm === km ? "bg-foreground border-foreground text-background" : "border-border text-muted-foreground hover:border-zinc-500"}`}
+                            >{km} km</button>
+                          ))}
+                        </div>
+                        <Button type="button" variant="outline" onClick={detectLocation} disabled={geoBusy} className="gap-2">
+                          {geoBusy ? <Loader2 size={15} className="animate-spin" /> : <MapPin size={15} />}
+                          {geoBusy ? t("suite.new.locating") : t("suite.new.useMyLocation")}
+                        </Button>
+                        <p className="text-xs leading-5 text-muted-foreground">{t("suite.new.geoConsentHint")}</p>
+                        {geoError && <p className="text-xs text-red-500" dir="auto">{geoError}</p>}
+                        {geo && (
+                          <div className="rounded-lg border border-emerald-400/40 bg-emerald-500/10 p-3 text-sm" dir="auto">
+                            <p className="font-semibold text-foreground">{t("suite.new.geoDetected")}</p>
+                            <p className="mt-1 text-muted-foreground">
+                              {[geo.city, geo.country].filter(Boolean).join("، ")} · {radiusKm} km
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {geo.lat.toFixed(4)}, {geo.lng.toFixed(4)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+              {audiencePhase === "interests" && (
+                <AudienceChipsSection
+                  title={t("suite.new.interests")}
+                  addAllLabel={t("suite.new.addAllSuggestions")}
+                  addLabel={t("suite.new.add")}
+                  placeholder={t("suite.new.customInterestPlaceholder")}
+                  suggestions={audienceInterestSuggestions}
+                  selected={selectedInterests}
+                  setSelected={setSelectedInterests}
                 />
-              </div>
+              )}
+              {audiencePhase === "behaviors" && (
+                <AudienceChipsSection
+                  title={t("suite.new.behaviors")}
+                  addAllLabel={t("suite.new.addAllSuggestions")}
+                  addLabel={t("suite.new.add")}
+                  placeholder={t("suite.new.customBehaviorPlaceholder")}
+                  suggestions={audienceBehaviorSuggestions}
+                  selected={selectedBehaviors}
+                  setSelected={setSelectedBehaviors}
+                />
+              )}
+              {audiencePhase === "statuses" && (
+                <AudienceChipsSection
+                  title={t("suite.new.socialStatus")}
+                  addAllLabel={t("suite.new.addAllSuggestions")}
+                  addLabel={t("suite.new.add")}
+                  placeholder={t("suite.new.customStatusPlaceholder")}
+                  suggestions={audienceStatusSuggestions}
+                  selected={selectedStatuses}
+                  setSelected={setSelectedStatuses}
+                />
+              )}
+              {audiencePhase === "notes" && (
+                <div className="space-y-2">
+                  <Label className="text-foreground">{t("suite.new.audienceNotes")}</Label>
+                  <textarea
+                    value={audienceNotes}
+                    onChange={(e) => setAudienceNotes(e.target.value)}
+                    placeholder={audienceNotesPlaceholder}
+                    className="min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-[#2f80ff]"
+                    dir="auto"
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
-            <Button onClick={async () => {
-              const countries = locationScope === "Custom"
-                ? customCountries.split(",").map((c) => c.trim()).filter(Boolean)
-                : locationScope === "Worldwide" ? [] : [locationScope];
-              const cities = customCities.split(",").map((c) => c.trim()).filter(Boolean);
-              // Auto-build target_audience text from structured data
-              const locationText = locationScope === "Worldwide"
-                ? "Worldwide"
-                : [...countries, ...cities].join(", ") || locationScope;
-              const interestsText = selectedInterests.length > 0
-                ? `, ${t("suite.new.targetAudienceInterestsLabel")}: ${selectedInterests.join(", ")}`
-                : "";
-              const behaviorText = selectedBehaviors.length > 0 ? `. ${t("suite.new.targetAudienceBehaviorsLabel")}: ${selectedBehaviors.join(", ")}` : "";
-              const statusText = selectedStatuses.length > 0 ? `. ${t("suite.new.targetAudienceStatusesLabel")}: ${selectedStatuses.join(", ")}` : "";
-              const notesText = audienceNotes.trim() ? `. ${t("suite.new.targetAudienceNotesLabel")}: ${audienceNotes.trim()}` : "";
-              const targetAudience = `${locationText}${interestsText}${behaviorText}${statusText}${notesText}`;
-              await saveStep("e", {
-                audience_location: { scope: locationScope === "Worldwide" ? "world" : "custom", countries, cities },
-                audience_interests: selectedInterests,
-                audience_behaviors: selectedBehaviors,
-                audience_social_statuses: selectedStatuses,
-                audience_notes: audienceNotes,
-                target_audience: targetAudience,
-              });
-              setStep("step-f");
-            }} className="w-full justify-center gap-2 bg-foreground text-background hover:bg-foreground/90 sm:w-auto">
-              <ForwardIcon size={15} /> {t("suite.new.confirmAudience")}
-            </Button>
+            {audiencePhase !== "notes" ? (
+              <Button
+                onClick={() => setAudiencePhase(AUDIENCE_PHASES[AUDIENCE_PHASES.indexOf(audiencePhase) + 1])}
+                className="w-full justify-center gap-2 bg-foreground text-background hover:bg-foreground/90 sm:w-auto"
+              >
+                <ForwardIcon size={15} /> {t("suite.new.audienceNext")}
+              </Button>
+            ) : (
+              <Button onClick={saveAudienceStep} className="w-full justify-center gap-2 bg-foreground text-background hover:bg-foreground/90 sm:w-auto">
+                <ForwardIcon size={15} /> {t("suite.new.confirmAudience")}
+              </Button>
+            )}
+            {audiencePhase !== "location" && (
+              <button
+                onClick={() => setAudiencePhase(AUDIENCE_PHASES[AUDIENCE_PHASES.indexOf(audiencePhase) - 1])}
+                className="min-h-10 text-sm text-muted-foreground hover:text-foreground sm:px-2"
+              >{t("suite.new.audienceBack")}</button>
+            )}
             <button onClick={() => setStep("step-f")} className="min-h-10 text-sm text-muted-foreground hover:text-foreground sm:px-2">{t("suite.new.skip")}</button>
           </div>
         </div>
@@ -2095,6 +2078,92 @@ export default function NewSuitePage() {
           <p className="text-muted-foreground text-sm mt-1">{t("suite.new.doneDesc")}</p>
         </div>
       )}
+      </div>
+    </div>
+  );
+}
+
+function AudienceChipsSection({
+  title,
+  addAllLabel,
+  addLabel,
+  placeholder,
+  suggestions,
+  selected,
+  setSelected,
+}: {
+  title: string;
+  addAllLabel: string;
+  addLabel: string;
+  placeholder: string;
+  suggestions: string[];
+  selected: string[];
+  setSelected: React.Dispatch<React.SetStateAction<string[]>>;
+}) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-3">
+        <p className="text-sm font-bold text-foreground" dir="auto">{title}</p>
+        {suggestions.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setSelected((prev) => Array.from(new Set([...prev, ...suggestions])))}
+            className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15"
+          >
+            {addAllLabel}
+          </button>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2 p-4">
+        {suggestions.map((item) => (
+          <button
+            key={item}
+            onClick={() => setSelected((prev) => (prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]))}
+            className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+              selected.includes(item)
+                ? "bg-foreground border-foreground text-background"
+                : "border-border text-muted-foreground hover:border-zinc-500"
+            } max-w-full text-start leading-snug`}
+            dir="auto"
+          >{item}</button>
+        ))}
+        {selected
+          .filter((item) => !suggestions.includes(item))
+          .map((item) => (
+            <button
+              key={item}
+              onClick={() => setSelected((prev) => prev.filter((i) => i !== item))}
+              className="flex max-w-full items-center gap-1 rounded-full border border-foreground bg-foreground px-3 py-1.5 text-start text-sm leading-snug text-background"
+              dir="auto"
+            >{item} <X size={11} /></button>
+          ))}
+      </div>
+      <div className="flex flex-col gap-2 border-t border-border bg-muted/20 p-3 sm:flex-row">
+        <Input
+          placeholder={placeholder}
+          className="min-h-11 flex-1 bg-background text-sm text-foreground"
+          dir="auto"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && e.currentTarget.value.trim()) {
+              const val = e.currentTarget.value.trim();
+              setSelected((prev) => (prev.includes(val) ? prev : [...prev, val]));
+              e.currentTarget.value = "";
+              e.preventDefault();
+            }
+          }}
+        />
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border px-3 text-sm font-medium text-[#2f80ff] hover:bg-muted sm:w-auto"
+          onClick={(e) => {
+            const input = (e.currentTarget.previousSibling as HTMLInputElement);
+            const val = input?.value?.trim();
+            if (val) {
+              setSelected((prev) => (prev.includes(val) ? prev : [...prev, val]));
+              input.value = "";
+            }
+          }}
+        ><Plus size={13} /> {addLabel}</button>
       </div>
     </div>
   );

@@ -519,6 +519,7 @@ function brandFromForm(form: ProfileForm, current: Brand): Brand {
     audience_language_names: form.audienceLanguages.map((code) => LANGUAGES.find((lang) => lang.code === code)?.label || code),
     dialect: form.dialect.trim(),
     audience_location: {
+      ...(current.audience_location || {}),
       scope: form.audienceCountries.trim() || form.audienceCities.trim() ? "custom" : current.audience_location?.scope || "world",
       countries: fromLines(form.audienceCountries),
       cities: fromLines(form.audienceCities),
