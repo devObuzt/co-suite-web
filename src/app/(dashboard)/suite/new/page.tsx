@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   Loader2, Plus, X, CheckCircle2, ChevronRight, ChevronLeft,
-  AtSign, AlertCircle, Info, MapPin,
+  AtSign, AlertCircle, Building2, Info, MapPin,
 } from "lucide-react";
 
 type Step = "name" | "links" | "extracting"
@@ -442,19 +442,36 @@ export default function NewSuitePage() {
   const [geoBusy, setGeoBusy] = useState(false);
   const [geoError, setGeoError] = useState("");
   const ipCountryRequested = useRef(false);
+  const [ipCountry, setIpCountry] = useState("");
 
-  // Prefill the country from the visitor's IP the first time the audience step opens.
+  // Fetch the visitor's IP country once — used for the audience prefill and
+  // the default dialect suggestion.
   useEffect(() => {
-    if (step !== "step-e" || customCountries || ipCountryRequested.current) return;
+    if (ipCountryRequested.current) return;
     ipCountryRequested.current = true;
     fetch("https://ipapi.co/json/")
       .then((res) => res.json())
       .then((data) => {
         const country = String(data?.country_name || "").trim();
-        if (country) setCustomCountries((prev) => prev || country);
+        if (country) setIpCountry(country);
       })
       .catch(() => undefined);
-  }, [step, customCountries]);
+  }, []);
+
+  useEffect(() => {
+    if (step !== "step-e" || customCountries || !ipCountry) return;
+    setCustomCountries((prev) => prev || ipCountry);
+  }, [step, customCountries, ipCountry]);
+
+  // Israeli visitor with Arabic as the primary language → suggest the
+  // Arab-48 dialect by default (still editable).
+  useEffect(() => {
+    if (audienceDialect) return;
+    const primaryLang = orderedLangs[0] || "";
+    if (primaryLang === "ar" && /israel|إسرائيل|ישראל/i.test(ipCountry)) {
+      setAudienceDialect("Arabic - Arab 48");
+    }
+  }, [ipCountry, orderedLangs, audienceDialect]);
 
   function detectLocation() {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -1401,60 +1418,84 @@ export default function NewSuitePage() {
                       />
                     )}
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-foreground">{t("suite.new.customCitiesPlaceholder")}</Label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
+                  <div className="space-y-3">
+                    <Label className="text-foreground">{t("suite.new.targetAreaTitle")}</Label>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <TargetAreaCard
+                        selected={cityMode === "manual"}
+                        icon={<Building2 size={18} />}
+                        title={t("suite.new.cityManual")}
+                        description={t("suite.new.cityManualDesc")}
                         onClick={() => setCityMode("manual")}
-                        className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${cityMode === "manual" ? "bg-foreground border-foreground text-background" : "border-border text-muted-foreground hover:border-zinc-500"}`}
-                      >{t("suite.new.cityManual")}</button>
-                      <button
-                        type="button"
-                        onClick={() => setCityMode("radius")}
-                        className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${cityMode === "radius" ? "bg-foreground border-foreground text-background" : "border-border text-muted-foreground hover:border-zinc-500"}`}
-                      >{t("suite.new.cityRadius")}</button>
-                    </div>
-                    {cityMode === "manual" ? (
-                      <Input
-                        value={customCities}
-                        onChange={(e) => setCustomCities(e.target.value)}
-                        placeholder={t("suite.new.customCitiesPlaceholder")}
-                        className="bg-background text-foreground text-sm"
-                        dir="auto"
                       />
-                    ) : (
-                      <div className="space-y-3 rounded-xl border border-border bg-background/60 p-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-semibold text-muted-foreground">{t("suite.new.radiusLabel")}</span>
-                          {[1, 3, 5, 10, 25].map((km) => (
-                            <button
-                              key={km}
-                              type="button"
-                              onClick={() => setRadiusKm(km)}
-                              className={`rounded-full border px-3 py-1 text-sm transition-colors ${radiusKm === km ? "bg-foreground border-foreground text-background" : "border-border text-muted-foreground hover:border-zinc-500"}`}
-                            >{km} km</button>
-                          ))}
+                      <TargetAreaCard
+                        selected={cityMode === "radius"}
+                        icon={<MapPin size={18} />}
+                        title={t("suite.new.cityRadius")}
+                        description={t("suite.new.cityRadiusDesc")}
+                        onClick={() => setCityMode("radius")}
+                      />
+                    </div>
+                    <div className="rounded-2xl border border-border bg-background/60 p-4">
+                      {cityMode === "manual" ? (
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">{t("suite.new.customCitiesPlaceholder")}</Label>
+                          <Input
+                            value={customCities}
+                            onChange={(e) => setCustomCities(e.target.value)}
+                            placeholder={t("suite.new.customCitiesPlaceholder")}
+                            className="bg-background text-foreground text-sm"
+                            dir="auto"
+                          />
                         </div>
-                        <Button type="button" variant="outline" onClick={detectLocation} disabled={geoBusy} className="gap-2">
-                          {geoBusy ? <Loader2 size={15} className="animate-spin" /> : <MapPin size={15} />}
-                          {geoBusy ? t("suite.new.locating") : t("suite.new.useMyLocation")}
-                        </Button>
-                        <p className="text-xs leading-5 text-muted-foreground">{t("suite.new.geoConsentHint")}</p>
-                        {geoError && <p className="text-xs text-red-500" dir="auto">{geoError}</p>}
-                        {geo && (
-                          <div className="rounded-lg border border-emerald-400/40 bg-emerald-500/10 p-3 text-sm" dir="auto">
-                            <p className="font-semibold text-foreground">{t("suite.new.geoDetected")}</p>
-                            <p className="mt-1 text-muted-foreground">
-                              {[geo.city, geo.country].filter(Boolean).join("، ")} · {radiusKm} km
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {geo.lat.toFixed(4)}, {geo.lng.toFixed(4)}
-                            </p>
+                      ) : (
+                        <div className="space-y-4">
+                          <Button type="button" onClick={detectLocation} disabled={geoBusy} className="w-full justify-center gap-2 bg-foreground text-background hover:bg-foreground/90 sm:w-auto">
+                            {geoBusy ? <Loader2 size={15} className="animate-spin" /> : <MapPin size={15} />}
+                            {geoBusy ? t("suite.new.locating") : t("suite.new.useMyLocation")}
+                          </Button>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold text-foreground">{t("suite.new.radiusLabel")}</span>
+                            <Input
+                              type="number"
+                              inputMode="numeric"
+                              min={1}
+                              max={100}
+                              value={radiusKm}
+                              onChange={(e) => {
+                                const value = parseInt(e.target.value, 10);
+                                setRadiusKm(Number.isFinite(value) ? Math.min(100, Math.max(1, value)) : 1);
+                              }}
+                              className="w-24 bg-background text-center text-sm"
+                              dir="ltr"
+                            />
+                            <span className="text-sm text-muted-foreground">km</span>
+                            <span className="mx-1 hidden h-5 w-px bg-border sm:block" />
+                            {[1, 3, 5, 10, 25].map((km) => (
+                              <button
+                                key={km}
+                                type="button"
+                                onClick={() => setRadiusKm(km)}
+                                className={`rounded-full border px-3 py-1 text-sm transition-colors ${radiusKm === km ? "bg-foreground border-foreground text-background" : "border-border text-muted-foreground hover:border-zinc-500"}`}
+                              >{km}</button>
+                            ))}
                           </div>
-                        )}
-                      </div>
-                    )}
+                          <p className="text-xs leading-5 text-muted-foreground">{t("suite.new.geoConsentHint")}</p>
+                          {geoError && <p className="text-xs text-red-500" dir="auto">{geoError}</p>}
+                          {geo && (
+                            <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 p-3 text-sm" dir="auto">
+                              <p className="font-semibold text-foreground">{t("suite.new.geoDetected")}</p>
+                              <p className="mt-1 text-muted-foreground">
+                                {[geo.city, geo.country].filter(Boolean).join("، ")} · {radiusKm} km
+                              </p>
+                              <p className="text-xs text-muted-foreground" dir="ltr">
+                                {geo.lat.toFixed(4)}, {geo.lng.toFixed(4)}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
@@ -2090,6 +2131,41 @@ export default function NewSuitePage() {
       )}
       </div>
     </div>
+  );
+}
+
+function TargetAreaCard({
+  selected,
+  icon,
+  title,
+  description,
+  onClick,
+}: {
+  selected: boolean;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-2xl border p-4 text-start transition ${
+        selected
+          ? "border-foreground bg-foreground/5 ring-1 ring-foreground"
+          : "border-border hover:border-zinc-500"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${selected ? "bg-foreground text-background" : "bg-muted text-foreground"}`}>
+          {icon}
+        </span>
+        {selected && <CheckCircle2 size={17} className="shrink-0 text-foreground" />}
+      </div>
+      <p className="mt-2 text-sm font-bold text-foreground" dir="auto">{title}</p>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground" dir="auto">{description}</p>
+    </button>
   );
 }
 
