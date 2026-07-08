@@ -572,7 +572,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
 
   const allStages = (
     <div className="w-full min-w-0 overflow-x-hidden space-y-4" dir={dir}>
-      {visualByKind("services") && <VisualDivider url={visualByKind("services")} title={text.servicesTitle} />}
+      {visualByKind("services") && <VisualDivider url={visualByKind("services")} />}
       <ServicesStage text={text} suiteId={suiteId} services={services} saving={busy === "save-services"} onSave={saveServices} />
       <KeywordsStage
         text={text}
@@ -607,7 +607,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         onGenerate={() => run("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang }))}
         onMore={() => run("demand-supply-more", () => api.marketingPlans.generateMoreDemandSupply(suiteId, { language: lang }))}
       />
-      {visualByKind("audience") && <VisualDivider url={visualByKind("audience")} title={text.personasTitle} />}
+      {visualByKind("audience") && <VisualDivider url={visualByKind("audience")} />}
       <PersonasStage
         text={text}
         suiteId={suiteId}
@@ -640,7 +640,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
   ];
 
   return (
-    <div className="dark w-full min-w-0 space-y-4 overflow-x-hidden rounded-[2rem] bg-[#131318] p-3 text-foreground sm:p-5" dir={dir}>
+    <div className="dark w-full min-w-0 space-y-4 overflow-x-hidden rounded-[2rem] bg-[#131318] p-3 text-foreground sm:p-5" dir={dir} style={{ "--deck-accent": "color-mix(in oklab, var(--brand-accent) 55%, white)" } as React.CSSProperties}>
       <section className="relative min-h-[220px] w-full min-w-0 overflow-hidden rounded-3xl border border-border bg-[#17171d] sm:min-h-[280px]">
         {coverImage ? (
           <img src={coverImage} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
@@ -650,7 +650,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         <div className="absolute inset-0 bg-gradient-to-t from-[#131318] via-[#131318]/45 to-transparent" />
         <div className="relative flex min-h-[220px] flex-col justify-end gap-3 p-5 sm:min-h-[280px] sm:p-8">
           <div className="flex items-start justify-between gap-3">
-            <p className="text-sm font-bold text-[color:var(--brand-accent)]">{text.coverKicker}</p>
+            <p className="text-sm font-bold text-[color:var(--deck-accent)]">{text.coverKicker}</p>
             <button
               type="button"
               aria-label={showIntro ? text.hideIntro : text.showIntro}
@@ -666,7 +666,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
           <div className="flex flex-wrap gap-2">
             {coverStats.filter((stat) => stat.value > 0).map((stat) => (
               <span key={stat.label} className="rounded-full border border-white/15 bg-black/40 px-3.5 py-1.5 text-sm text-white backdrop-blur">
-                <span className="font-black text-[color:var(--brand-accent)]">{stat.value}</span> {stat.label}
+                <span className="font-black text-[color:var(--deck-accent)]">{stat.value}</span> {stat.label}
               </span>
             ))}
           </div>
@@ -705,10 +705,10 @@ function withAdminTextOverrides(base: typeof labels.en, t: (key: string) => stri
 
 function VisualDivider({ url, title }: { url: string; title?: string }) {
   return (
-    <div className="relative h-36 w-full min-w-0 overflow-hidden rounded-3xl border border-border sm:h-48">
+    <div className="relative h-28 w-full min-w-0 overflow-hidden rounded-3xl border border-border sm:h-40">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={url} alt="" className="h-full w-full object-cover" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#131318]/80 via-transparent to-[#131318]/30" />
       {title && <p className="absolute bottom-4 start-6 text-2xl font-black text-white" dir="auto">{title}</p>}
     </div>
   );
