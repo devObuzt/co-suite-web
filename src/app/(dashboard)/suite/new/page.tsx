@@ -2070,10 +2070,10 @@ export default function NewSuitePage() {
                 </div>
               )}
               <Button
-                onClick={() => { setStep("done"); setTimeout(() => router.push(`/suite/${suiteId}`), 800); }}
+                onClick={() => { setStep("done"); setTimeout(() => router.push(`/suite/${suiteId}/marketing-plan`), 800); }}
                 className="bg-foreground text-background hover:bg-foreground/90 gap-2 w-full"
               >
-                <CheckCircle2 size={14} /> {t("suite.new.goToDashboard")}
+                <CheckCircle2 size={14} /> {t("suite.new.goToMarketingPlan")}
               </Button>
             </CardContent>
           </Card>
