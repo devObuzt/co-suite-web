@@ -478,12 +478,12 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data || {}),
       }),
-    generatePersonas: (suiteId: string, data?: { language?: string; existing_ids?: string[]; existing_values?: string[] }) =>
+    generatePersonas: (suiteId: string, data?: { language?: string; existing_ids?: string[]; existing_values?: string[]; count?: number }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/personas/generate`, {
         method: "POST",
         body: JSON.stringify(data || {}),
       }),
-    generateMorePersonas: (suiteId: string, data?: { language?: string; existing_ids?: string[]; existing_values?: string[] }) =>
+    generateMorePersonas: (suiteId: string, data?: { language?: string; existing_ids?: string[]; existing_values?: string[]; count?: number }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/personas/generate`, {
         method: "POST",
         body: JSON.stringify(data || {}),

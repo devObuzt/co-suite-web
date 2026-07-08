@@ -42,6 +42,7 @@ const labels = {
     showAll: "عرض الكل",
     collapseAll: "تصغير",
     coverKicker: "الخطة التسويقية",
+    personasGenerating: "بعدنا عم نولّد شخصيات إضافية...",
     coverStatsKeywords: "كلمة مفتاحية",
     coverStatsCompetitors: "منافس",
     coverStatsPersonas: "شخصية",
@@ -123,6 +124,7 @@ const labels = {
     showAll: "Show all",
     collapseAll: "Collapse",
     coverKicker: "Marketing Plan",
+    personasGenerating: "Still generating more personas...",
     coverStatsKeywords: "keywords",
     coverStatsCompetitors: "competitors",
     coverStatsPersonas: "personas",
@@ -205,6 +207,7 @@ const labels = {
     showAll: "הצג הכל",
     collapseAll: "כווץ",
     coverKicker: "התכנית השיווקית",
+    personasGenerating: "עדיין יוצרים פרסונות נוספות...",
     coverStatsKeywords: "מילות מפתח",
     coverStatsCompetitors: "מתחרים",
     coverStatsPersonas: "פרסונות",
@@ -502,19 +505,29 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
   }
 
   async function generatePersonasInitial() {
+    // Generate in small batches so the first personas show up within seconds,
+    // while the stage keeps a "still generating" indicator for the rest.
+    const TARGET = 10;
+    const BATCH = 2;
     setBusy("personas");
     setError("");
     try {
-      const firstBatch = await api.marketingPlans.generatePersonas(suiteId, { language: lang });
-      applyPlanResponse(firstBatch);
-      const firstPersonas = firstBatch.intelligence?.personas || [];
-      if (firstPersonas.length === 0) return;
-      setBusy("personas-more");
-      const secondBatch = await api.marketingPlans.generateMorePersonas(suiteId, {
-        language: lang,
-        existing_values: firstPersonas.map((persona) => persona.name || persona.id).filter(Boolean),
-      });
-      applyPlanResponse(secondBatch);
+      let existingValues: string[] = [];
+      for (let generated = 0; generated < TARGET; generated += BATCH) {
+        const res = generated === 0
+          ? await api.marketingPlans.generatePersonas(suiteId, { language: lang, count: BATCH })
+          : await api.marketingPlans.generateMorePersonas(suiteId, {
+              language: lang,
+              count: BATCH,
+              existing_values: existingValues,
+            });
+        applyPlanResponse(res);
+        const personas = res.intelligence?.personas || [];
+        if (personas.length === 0) return;
+        existingValues = personas.map((persona) => persona.name || persona.id).filter(Boolean) as string[];
+        if (personas.length >= TARGET) return;
+        setBusy("personas-more");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
     } finally {
@@ -527,6 +540,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     await run("personas-more", () =>
       api.marketingPlans.generateMorePersonas(suiteId, {
         language: lang,
+        count: 2,
         existing_values: existing.map((persona) => persona.name || persona.id).filter(Boolean),
       })
     );
@@ -1331,7 +1345,13 @@ function PersonasStage({
         )}
       </div>
       {personas.length === 0 ? (
-        <p className="mt-4 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noPersonas}</p>
+        loading ? (
+          <div className="mt-4 flex items-center gap-3 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+            <Loader2 size={16} className="animate-spin" /> {text.personasGenerating}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noPersonas}</p>
+        )
       ) : (
         <div className="os-scroll-x mt-4 flex snap-x gap-3 pb-2">
           {personas.map((persona) => (
