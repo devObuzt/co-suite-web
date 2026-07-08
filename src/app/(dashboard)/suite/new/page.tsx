@@ -584,11 +584,21 @@ export default function NewSuitePage() {
           : derivedInterestKey.includes("marketing") || derivedInterestKey.includes("שיווק") || derivedInterestKey.includes("تسويق")
             ? "marketing"
             : "default";
-  const audienceInterestSuggestions = Array.from(new Set([
-    ...(suggestions.interests[selectedNicheLabel] || suggestions.interests["default"] || []),
-    ...(brand?.content_themes || []),
+  // Suite-specific interests first (extraction + services + niche-mapped Meta
+  // interests). The generic static list only appears when nothing specific exists.
+  const suiteSpecificInterests = [
+    ...((brand?.audience_interests || []).filter(Boolean)),
+    ...((brand?.content_themes || []).filter(Boolean)),
     ...(brand?.services || []).slice(0, 5),
-    ...(META_INTERESTS[metaInterestKey] || META_INTERESTS.default),
+    ...(metaInterestKey !== "default" ? (META_INTERESTS[metaInterestKey] || []) : []),
+  ].filter(Boolean);
+  const nicheStaticInterests = suggestions.interests[selectedNicheLabel] || [];
+  const audienceInterestSuggestions = Array.from(new Set([
+    ...suiteSpecificInterests,
+    ...nicheStaticInterests,
+    ...(suiteSpecificInterests.length === 0 && nicheStaticInterests.length === 0
+      ? [...(suggestions.interests["default"] || []), ...META_INTERESTS.default]
+      : []),
   ].filter(Boolean)));
   const fallbackBehaviorSuggestions = [
     ...localizedAudienceBehaviors(lang, metaInterestKey),
