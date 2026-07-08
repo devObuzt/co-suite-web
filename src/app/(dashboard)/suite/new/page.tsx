@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, Brand, BrandLogo, BrandPersona, MarketingStrategy, ResearchDebug } from "@/lib/api";
+import { api, ApiError, Brand, BrandLogo, BrandPersona, MarketingStrategy, ResearchDebug } from "@/lib/api";
+import { useAuthStore } from "@/store/auth";
 import { useT, useLanguage } from "@/lib/i18n/LanguageContext";
 import { LANGUAGES, LangCode } from "@/lib/i18n/translations";
 import { getSuggestions, findNicheIndex, getEnglishNiche } from "@/lib/i18n/suggestions";
@@ -376,6 +377,8 @@ function ResearchDebugPanel({ debug, lang }: { debug: ResearchDebug | null; lang
 export default function NewSuitePage() {
   const router = useRouter();
   const t = useT();
+  const authUser = useAuthStore((s) => s.user);
+  const isFunnelUser = authUser?.approval_status === "funnel";
   const { lang, dir } = useLanguage();
   const isRtl = isRtlLanguage(lang, dir);
   const quickCreateCopy = createWithoutSuiteCopy(lang);
@@ -673,7 +676,9 @@ export default function NewSuitePage() {
     e.preventDefault();
     setError("");
     try {
-      const suite = await api.suites.create({ name: suiteName });
+      const suite = isFunnelUser
+        ? await api.funnel.createSuite({ name: suiteName })
+        : await api.suites.create({ name: suiteName });
       setSuiteId(suite.id);
       setBusinessName(suiteName);
       const accountType = localStorage.getItem("co_suite_account_type");
@@ -686,6 +691,17 @@ export default function NewSuitePage() {
       }
       setStep("links");
     } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 409) {
+        try {
+          const state = await api.funnel.state();
+          if (state.suite_id) {
+            router.push(`/suite/${state.suite_id}/marketing-plan`);
+            return;
+          }
+        } catch {
+          // fall through to generic error handling below
+        }
+      }
       setError(err instanceof Error ? err.message : "Failed");
     }
   }
