@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   CircleGauge,
+  Clapperboard,
   FileText,
   GalleryHorizontalEnd,
   Link2,
@@ -37,6 +38,7 @@ export function SuiteNav({ suiteId, onNavigate }: { suiteId: string; onNavigate?
     { href: `${base}/profile`, label: t("suite.nav.profile"), icon: UserSquare2 },
     { href: `${base}/create`, label: t("suite.nav.create"), icon: Sparkles },
     { href: `${base}/content`, label: t("suite.nav.content"), icon: GalleryHorizontalEnd },
+    { href: `${base}/media`, label: t("suite.nav.media"), icon: Clapperboard },
     { href: `${base}/analytics`, label: t("suite.nav.analytics"), icon: BarChart3 },
     { href: `${base}/marketing-plan`, label: suiteNavLabel(t("suite.nav.marketingPlan")), icon: FileText },
     { href: `${base}/product-bulk`, label: t("suite.nav.productBulk"), icon: PackageOpen },

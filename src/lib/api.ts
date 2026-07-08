@@ -406,6 +406,19 @@ export const api = {
     },
   },
 
+  media: {
+    tree: (suiteId: string) =>
+      request<MediaTreeResponse>(`/suites/${suiteId}/media/tree`),
+    list: (suiteId: string, params: { library?: string; year?: number; month?: number } = {}) => {
+      const query = new URLSearchParams();
+      if (params.library) query.set("library", params.library);
+      if (params.year != null) query.set("year", String(params.year));
+      if (params.month != null) query.set("month", String(params.month));
+      const suffix = query.toString() ? `?${query.toString()}` : "";
+      return request<MediaAssetItem[]>(`/suites/${suiteId}/media${suffix}`);
+    },
+  },
+
   marketingPlans: {
     get: (suiteId: string) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan`),
@@ -632,6 +645,36 @@ export const api = {
   },
 };
 
+
+export interface MediaTreeMonth {
+  month: string;
+  count: number;
+}
+
+export interface MediaTreeYear {
+  year: number;
+  months: MediaTreeMonth[];
+}
+
+export interface MediaTreeLibrary {
+  key: string;
+  label: string;
+  years: MediaTreeYear[];
+}
+
+export interface MediaTreeResponse {
+  libraries: MediaTreeLibrary[];
+}
+
+export interface MediaAssetItem {
+  id: string;
+  title: string;
+  url: string;
+  thumbnail_url: string | null;
+  content_type: string;
+  duration_seconds: number | null;
+  created_at: string | null;
+}
 
 export interface MarketingPlanMetric {
   label: string;
