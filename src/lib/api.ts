@@ -126,17 +126,34 @@ async function downloadFile(path: string, options: RequestInit = {}): Promise<{ 
 
 export const api = {
   auth: {
-    signup: (data: { email: string; password: string; full_name: string }) =>
-      request<{ access_token: string; user: { id: string; email: string; full_name: string } }>("/auth/signup", {
+    signup: (data: { email: string; password: string; full_name: string; phone?: string }) =>
+      request<{ access_token: string; user: import("@/store/auth").AuthUser }>("/auth/signup", {
         method: "POST",
         body: JSON.stringify(data),
       }),
     login: (data: { email: string; password: string }) =>
-      request<{ access_token: string; user: { id: string; email: string; full_name: string } }>("/auth/login", {
+      request<{ access_token: string; user: import("@/store/auth").AuthUser }>("/auth/login", {
         method: "POST",
         body: JSON.stringify(data),
       }),
-    me: () => request<{ id: string; email: string; full_name: string; is_active?: boolean; is_verified?: boolean; is_super_admin?: boolean }>("/auth/me"),
+    me: () => request<import("@/store/auth").AuthUser>("/auth/me"),
+  },
+
+  funnel: {
+    register: (data: { email: string; password: string; full_name: string; phone: string }) =>
+      request<{ access_token: string; user: import("@/store/auth").AuthUser; lead_id: string }>(
+        "/funnel/register", { method: "POST", body: JSON.stringify(data) }),
+    enroll: (data?: { phone?: string }) => request<{ user: import("@/store/auth").AuthUser; lead_id: string }>(
+      "/funnel/enroll", { method: "POST", body: JSON.stringify(data || {}) }),
+    state: () => request<FunnelState>("/funnel/state"),
+    createSuite: (data: { name: string }) =>
+      request<{ id: string; name: string; slug: string; status: string }>(
+        "/funnel/suite", { method: "POST", body: JSON.stringify(data) }),
+    catalog: () => request<ServiceItem[]>("/funnel/catalog"),
+    recommendations: () =>
+      request<{ recommended_service_ids: string[] }>("/funnel/recommendations", { method: "POST" }),
+    submitRequest: (data: { items: { service_id: string; qty: number }[]; customer_notes?: string }) =>
+      request<ServiceRequestOut>("/funnel/service-request", { method: "POST", body: JSON.stringify(data) }),
   },
 
   suites: {
@@ -598,7 +615,7 @@ export const api = {
     providers: () => request<AdminProvider[]>("/admin/providers"),
     users: (q = "") => request<AdminUser[]>(`/admin/users${q ? `?q=${encodeURIComponent(q)}` : ""}`),
     user: (userId: string) => request<AdminUserDetail>(`/admin/users/${userId}`),
-    updateUser: (userId: string, data: Partial<Pick<AdminUser, "email" | "full_name" | "is_active" | "is_verified" | "is_super_admin">>) =>
+    updateUser: (userId: string, data: Partial<Pick<AdminUser, "email" | "full_name" | "is_active" | "is_verified" | "is_super_admin" | "approval_status">>) =>
       request<AdminUser>(`/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(data) }),
     changePassword: (userId: string, password: string) =>
       request<{ ok: boolean }>(`/admin/users/${userId}/password`, { method: "POST", body: JSON.stringify({ password }) }),
@@ -629,6 +646,20 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
+    listServices: () => request<ServiceItem[]>("/admin/services"),
+    createService: (data: Omit<ServiceItem, "id">) =>
+      request<ServiceItem>("/admin/services", { method: "POST", body: JSON.stringify(data) }),
+    updateService: (id: string, data: Partial<Omit<ServiceItem, "id">>) =>
+      request<ServiceItem>(`/admin/services/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deactivateService: (id: string) =>
+      request<{ ok: boolean }>(`/admin/services/${id}`, { method: "DELETE" }),
+    listLeads: (status?: string) =>
+      request<AdminLead[]>(`/admin/leads${status ? `?status=${status}` : ""}`),
+    leadDetail: (id: string) => request<AdminLeadDetail>(`/admin/leads/${id}`),
+    updateLead: (id: string, data: { status?: string; admin_notes?: string }) =>
+      request<AdminLead>(`/admin/leads/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    updateServiceRequest: (id: string, data: { status: "new" | "seen" | "handled" }) =>
+      request<ServiceRequestOut>(`/admin/service-requests/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   },
 
   appText: {
@@ -1188,9 +1219,69 @@ export interface AdminUser {
   is_active: boolean;
   is_verified: boolean;
   is_super_admin: boolean;
+  approval_status?: string;
   suite_count?: number;
   created_at: string;
   updated_at?: string;
+}
+
+export type BillingCycle = "one_time" | "monthly" | "yearly";
+
+export interface ServiceItem {
+  id: string;
+  name: Record<string, string>;
+  description: Record<string, string>;
+  category: Record<string, string>;
+  billing_cycle: BillingCycle;
+  price_min: number;
+  price_max: number | null;
+  unit: Record<string, string> | null;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export type CycleTotals = Partial<Record<BillingCycle, { min: number; max: number }>>;
+
+export interface FunnelLead {
+  id: string;
+  suite_id: string | null;
+  full_name: string;
+  email: string;
+  phone: string;
+  status: string;
+  progress: Record<string, boolean>;
+}
+
+export interface FunnelState {
+  lead: FunnelLead | null;
+  suite_id: string | null;
+  steps: { suite_created?: boolean; request_submitted?: boolean };
+}
+
+export interface ServiceRequestOut {
+  id: string;
+  lead_id: string;
+  items: (ServiceItem & { qty: number })[];
+  totals: CycleTotals;
+  customer_notes: string | null;
+  status: "new" | "seen" | "handled";
+  created_at: string;
+}
+
+export interface AdminLead extends FunnelLead {
+  user_id: string;
+  source: string;
+  admin_notes: string | null;
+  has_request?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminLeadDetail {
+  lead: AdminLead;
+  user: { id: string; email: string; full_name: string; phone?: string | null } | null;
+  suite: { id: string; name: string; slug: string } | null;
+  requests: ServiceRequestOut[];
 }
 
 export interface AdminProvider {
