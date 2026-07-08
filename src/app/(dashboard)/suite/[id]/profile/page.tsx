@@ -35,6 +35,10 @@ type ProfileForm = {
   esp: string;
   uspPoints: string;
   espPoints: string;
+  colorPrimary: string;
+  colorSecondary: string;
+  colorAccent: string;
+  fonts: string;
   personaName: string;
 };
 
@@ -63,6 +67,10 @@ const emptyForm: ProfileForm = {
   esp: "",
   uspPoints: "",
   espPoints: "",
+  colorPrimary: "",
+  colorSecondary: "",
+  colorAccent: "",
+  fonts: "",
   personaName: "",
 };
 
@@ -363,6 +371,23 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
           </div>
         </ProfileSection>
 
+        <ProfileSection title={t("suite.profile.section.identity")}>
+          <div className="grid gap-3 md:grid-cols-3">
+            <ColorField label={t("suite.profile.field.colorPrimary")} value={form.colorPrimary} onChange={(colorPrimary) => setForm({ ...form, colorPrimary })} />
+            <ColorField label={t("suite.profile.field.colorSecondary")} value={form.colorSecondary} onChange={(colorSecondary) => setForm({ ...form, colorSecondary })} />
+            <ColorField label={t("suite.profile.field.colorAccent")} value={form.colorAccent} onChange={(colorAccent) => setForm({ ...form, colorAccent })} />
+          </div>
+          <div className="mt-3">
+            <TextareaField
+              label={t("suite.profile.field.fonts")}
+              value={form.fonts}
+              onChange={(fonts) => setForm({ ...form, fonts })}
+              rows={3}
+              placeholder={t("suite.profile.field.fontsPlaceholder")}
+            />
+          </div>
+        </ProfileSection>
+
         <ProfileSection title={t("suite.profile.section.assets")}>
           <div className="flex flex-wrap items-center gap-3">
             {brand.logo_url && <LogoPreview url={brand.logo_url} label={t("suite.profile.field.primaryLogo")} isPrimary />}
@@ -491,6 +516,10 @@ function formFromBrand(brand: Brand): ProfileForm {
     esp: brand.esp || "",
     uspPoints: toLines(brand.usp_points),
     espPoints: toLines(brand.esp_points),
+    colorPrimary: brand.colors?.primary || brand.color_palette?.primary || "",
+    colorSecondary: brand.colors?.secondary || brand.color_palette?.secondary || "",
+    colorAccent: brand.colors?.accent || brand.color_palette?.accent || "",
+    fonts: toLines(brand.font_suggestions || (brand as Record<string, unknown>).fonts as string[] | undefined),
   };
 }
 
@@ -538,6 +567,15 @@ function brandFromForm(form: ProfileForm, current: Brand): Brand {
     esp,
     usp_points: fromLines(form.uspPoints),
     esp_points: fromLines(form.espPoints),
+    colors: (form.colorPrimary || form.colorSecondary || form.colorAccent)
+      ? {
+          ...(current.colors || {}),
+          primary: form.colorPrimary.trim() || current.colors?.primary || "",
+          secondary: form.colorSecondary.trim() || current.colors?.secondary || "",
+          accent: form.colorAccent.trim() || current.colors?.accent || "",
+        }
+      : current.colors,
+    font_suggestions: fromLines(form.fonts),
     // content_rules are managed via the dedicated content-rules endpoints; never overwrite here.
     content_rules: current.content_rules,
   };
@@ -877,6 +915,31 @@ function TextField({
         className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
         dir="auto"
       />
+    </label>
+  );
+}
+
+function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const safeColor = /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#000000";
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={safeColor}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-10 w-12 shrink-0 cursor-pointer rounded-md border border-input bg-background p-1"
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="#1976D2"
+          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          dir="ltr"
+        />
+      </div>
     </label>
   );
 }
