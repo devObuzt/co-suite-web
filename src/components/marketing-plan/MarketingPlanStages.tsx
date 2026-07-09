@@ -62,13 +62,15 @@ const labels = {
     emptyServices: "لا توجد خدمات بعد. أضف أول خدمة حتى تعتمد عليها باقي المراحل.",
     keywordsTitle: "الكلمات المفتاحية",
     keywordsDesc: "نولّد كلمات ملائمة بناءً على فئة البزنس والخدمات واللغة.",
-    competitorsTitle: "المنافسون",
+    competitorsTitle: "عينة من المنافسين",
     competitorsDesc: "نبحث حسب المصدر ونفصل النتائج بين Google Organic وMaps والمنصات الاجتماعية.",
     demandTitle: "العرض والطلب",
     demandDesc: "نقرأ الطلب والمنافسة من Google Ads Keyword Planner حسب البلد واللغة والكلمات.",
-    personasTitle: "شخصيات العملاء",
+    personasTitle: "عينة شخصيات محتملة من العملاء",
     personasDesc: "نبني بروفايلات عملاء محتملين ونربط الحاجة بالعرض التسويقي.",
     pdfTitle: "ملف الخطة التسويقية",
+    downloadPlanPdf: "تحميل الخطة التسويقية PDF",
+    goToWorkPlan: "الانتقال إلى خطة العمل",
     pdfDesc: "نجهّز ملف PDF قابل للتحميل من كل الأقسام التي تم توليدها.",
     showIntro: "عرض شرح الخطة",
     hideIntro: "إخفاء شرح الخطة",
@@ -170,13 +172,15 @@ const labels = {
     emptyServices: "No services yet. Add the first service so the next stages have context.",
     keywordsTitle: "Keywords",
     keywordsDesc: "Generate suitable keywords from the business category, services, and language.",
-    competitorsTitle: "Competitors",
+    competitorsTitle: "A Sample of Competitors",
     competitorsDesc: "Search by source and split results across Google Organic, Maps, and social platforms.",
     demandTitle: "Demand and Supply",
     demandDesc: "Read demand and competition from Google Ads Keyword Planner by country, language, and keywords.",
-    personasTitle: "Customer Personas",
+    personasTitle: "Sample Potential Customer Personas",
     personasDesc: "Build potential customer profiles and connect their needs to the marketing offer.",
     pdfTitle: "Marketing Plan PDF",
+    downloadPlanPdf: "Download the marketing plan PDF",
+    goToWorkPlan: "Go to the work plan",
     pdfDesc: "Prepare a downloadable PDF from every generated section.",
     showIntro: "Show plan explanation",
     hideIntro: "Hide plan explanation",
@@ -278,13 +282,15 @@ const labels = {
     emptyServices: "עדיין אין שירותים. הוסף שירות ראשון כדי לתת הקשר לשלבים הבאים.",
     keywordsTitle: "מילות מפתח",
     keywordsDesc: "יצירת מילות מפתח לפי קטגוריית העסק, השירותים והשפה.",
-    competitorsTitle: "מתחרים",
+    competitorsTitle: "מדגם מתחרים",
     competitorsDesc: "חיפוש לפי מקור והפרדה בין Google Organic, Maps ופלטפורמות חברתיות.",
     demandTitle: "ביקוש והיצע",
     demandDesc: "קריאת ביקוש ותחרות מ-Google Ads Keyword Planner לפי מדינה, שפה ומילות מפתח.",
-    personasTitle: "פרסונות לקוחות",
+    personasTitle: "דוגמת פרסונות לקוחות פוטנציאליים",
     personasDesc: "בניית פרופילים של לקוחות פוטנציאליים וחיבור הצורך להצעה השיווקית.",
     pdfTitle: "קובץ PDF לתכנית",
+    downloadPlanPdf: "הורדת תוכנית השיווק PDF",
+    goToWorkPlan: "מעבר לתוכנית העבודה",
     pdfDesc: "הכנת קובץ PDF להורדה מכל החלקים שנוצרו.",
     showIntro: "הצג הסבר על התכנית",
     hideIntro: "הסתר הסבר על התכנית",
@@ -1757,19 +1763,26 @@ function MarketingPdfStage({
   detail?: boolean;
 }) {
   return (
-    <StageBox title={text.pdfTitle} description={text.pdfDesc} icon={<Download size={18} />} suiteId={suiteId} slug="pdf" detail={detail}>
-      <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={onDownload} disabled={!ready || loading} className="gap-2">
-          {loading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-          {text.downloadPdf}
+    <section className={`rounded-3xl border border-border bg-card p-6 sm:p-8 ${detail ? "" : "scroll-mt-24"}`}>
+      <div className="flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+        <Button onClick={onDownload} disabled={!ready || loading} className="h-12 flex-1 gap-2 rounded-2xl text-base font-bold sm:max-w-sm">
+          {loading ? <Loader2 size={17} className="animate-spin" /> : <Download size={17} />}
+          {text.downloadPlanPdf}
         </Button>
-        {!ready && (
-          <p className="os-text-wrap text-sm text-muted-foreground" dir="auto">
-            {text.pdfNeedsPersonas}
-          </p>
-        )}
+        <Link
+          href={`/suite/${suiteId}/work-plans`}
+          className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-[color:var(--brand-accent)]/50 bg-[color:var(--brand-accent)]/10 px-4 text-base font-bold text-[color:var(--deck-accent,var(--brand-accent))] transition-colors hover:bg-[color:var(--brand-accent)]/20 sm:max-w-sm"
+        >
+          <ArrowUpRight size={17} />
+          {text.goToWorkPlan}
+        </Link>
       </div>
-    </StageBox>
+      {!ready && (
+        <p className="os-text-wrap mt-3 text-center text-sm text-muted-foreground" dir="auto">
+          {text.pdfNeedsPersonas}
+        </p>
+      )}
+    </section>
   );
 }
 
