@@ -886,6 +886,15 @@ export interface MarketingDemandSupplyData {
   };
   keyword_metrics?: MarketingDemandSupplyKeyword[];
   suggested_keywords?: MarketingDemandSupplyKeyword[];
+  social?: {
+    provider?: string;
+    level?: string;
+    checked?: number;
+    matched?: number;
+    audience_size?: number;
+    matches?: { query?: string; name?: string; audience_size?: number }[];
+    source?: string;
+  };
   warning?: string;
   checked_terms?: string[];
   remaining_terms?: number;

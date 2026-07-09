@@ -118,6 +118,23 @@ const labels = {
     leadBadge: "نقطة بحث",
     reviewsWord: "تقييم",
     tagsLabel: "تصنيفك",
+    demandIndicator: "متوسط الطلب",
+    competitionIndicator: "المنافسة",
+    byGoogle: "جوجل",
+    bySocial: "سوشيال",
+    levelHigh: "مرتفع",
+    levelMedium: "متوسط",
+    levelLow: "منخفض",
+    levelHighF: "مرتفعة",
+    levelMediumF: "متوسطة",
+    levelLowF: "منخفضة",
+    recAllPlatforms: "مفضّل التواجد على كل المنصات",
+    recFocusSocial: "مفضّل التركيز على السوشيال ميديا",
+    recFocusSearch: "مفضّل التركيز على البحث في جوجل",
+    recBuildAwareness: "الطلب منخفض — ركّز على بناء الوعي والجمهور",
+    recSeoOpportunity: "فرصة قوية SEO / GEO",
+    recSocialGap: "منافسة ضعيفة على السوشيال — فرصة للريادة",
+    recDifferentiate: "منافسة مرتفعة — ميّز عرضك ومحتواك",
     age: "العمر",
     gender: "الجندر",
     profession: "المهنة",
@@ -209,6 +226,23 @@ const labels = {
     leadBadge: "Research lead",
     reviewsWord: "reviews",
     tagsLabel: "Your rating",
+    demandIndicator: "Market demand",
+    competitionIndicator: "Competition",
+    byGoogle: "Google",
+    bySocial: "Social",
+    levelHigh: "High",
+    levelMedium: "Medium",
+    levelLow: "Low",
+    levelHighF: "High",
+    levelMediumF: "Medium",
+    levelLowF: "Low",
+    recAllPlatforms: "Best to be present on all platforms",
+    recFocusSocial: "Best to focus on social media",
+    recFocusSearch: "Best to focus on Google search",
+    recBuildAwareness: "Low demand — focus on awareness and audience building",
+    recSeoOpportunity: "Strong SEO / GEO opportunity",
+    recSocialGap: "Weak social competition — opportunity to lead",
+    recDifferentiate: "High competition — differentiate your offer and content",
     age: "Age",
     gender: "Gender",
     profession: "Profession",
@@ -300,6 +334,23 @@ const labels = {
     leadBadge: "כיוון מחקר",
     reviewsWord: "ביקורות",
     tagsLabel: "הסיווג שלך",
+    demandIndicator: "ביקוש בשוק",
+    competitionIndicator: "תחרות",
+    byGoogle: "גוגל",
+    bySocial: "סושיאל",
+    levelHigh: "גבוה",
+    levelMedium: "בינוני",
+    levelLow: "נמוך",
+    levelHighF: "גבוהה",
+    levelMediumF: "בינונית",
+    levelLowF: "נמוכה",
+    recAllPlatforms: "מומלץ נוכחות בכל הפלטפורמות",
+    recFocusSocial: "מומלץ להתמקד בסושיאל",
+    recFocusSearch: "מומלץ להתמקד בחיפוש בגוגל",
+    recBuildAwareness: "ביקוש נמוך — התמקדו בבניית מודעות וקהל",
+    recSeoOpportunity: "הזדמנות חזקה ב־SEO / GEO",
+    recSocialGap: "תחרות חלשה בסושיאל — הזדמנות להוביל",
+    recDifferentiate: "תחרות גבוהה — בדלו את ההצעה והתוכן",
     age: "גיל",
     gender: "מגדר",
     profession: "מקצוע",
@@ -446,6 +497,80 @@ const competitorPlatformStyles: Record<string, { bar: string; avatar: string; ch
 function competitorPlatformStyle(competitor: MarketingCompetitor) {
   const key = competitorGroupKey(competitor);
   return competitorPlatformStyles[key === "sponsored" ? "google_sponsored" : key] || competitorPlatformStyles.other;
+}
+
+type MarketLevel = "HIGH" | "MEDIUM" | "LOW" | undefined;
+
+function normalizeMarketLevel(value?: string): MarketLevel {
+  const level = `${value || ""}`.toUpperCase();
+  return level === "HIGH" || level === "MEDIUM" || level === "LOW" ? level : undefined;
+}
+
+// good/mid/bad semantics: for demand HIGH is good; for competition LOW is good.
+function marketLevelTone(level: MarketLevel, invert: boolean) {
+  if (!level) return "bg-white/10 text-white/60";
+  const good = invert ? "LOW" : "HIGH";
+  const bad = invert ? "HIGH" : "LOW";
+  if (level === good) return "bg-emerald-500/25 text-emerald-300";
+  if (level === bad) return "bg-rose-500/25 text-rose-300";
+  return "bg-amber-500/25 text-amber-300";
+}
+
+function buildMarketIndicators(intelligence: MarketingIntelligence | null, text: typeof labels.en) {
+  const summary = intelligence?.demand_supply?.summary;
+  const googleDemand = normalizeMarketLevel(summary?.demand_level);
+  const googleCompetition = normalizeMarketLevel(summary?.competition_level);
+  const socialDemand = normalizeMarketLevel(intelligence?.demand_supply?.social?.level);
+  const competitors = intelligence?.competitors || [];
+  const socialCompetitorCount = competitors.filter(
+    (item) => !item.research_lead && /instagram|facebook|tiktok/.test(`${item.result_type || item.platform}`.toLowerCase())
+  ).length;
+  const socialCompetition: MarketLevel = competitors.length === 0
+    ? undefined
+    : socialCompetitorCount >= 5 ? "HIGH" : socialCompetitorCount >= 2 ? "MEDIUM" : "LOW";
+
+  const demandRec = !googleDemand && !socialDemand
+    ? ""
+    : googleDemand === "HIGH" && socialDemand === "HIGH" ? text.recAllPlatforms
+    : socialDemand === "HIGH" ? text.recFocusSocial
+    : googleDemand === "HIGH" ? text.recFocusSearch
+    : googleDemand === "LOW" && socialDemand === "LOW" ? text.recBuildAwareness
+    : text.recAllPlatforms;
+  const competitionRec = !googleCompetition && !socialCompetition
+    ? ""
+    : googleCompetition === "LOW" ? text.recSeoOpportunity
+    : socialCompetition === "LOW" ? text.recSocialGap
+    : googleCompetition === "HIGH" && socialCompetition === "HIGH" ? text.recDifferentiate
+    : "";
+
+  const levelLabel = (level: MarketLevel, feminine: boolean) => {
+    if (!level) return "—";
+    if (level === "HIGH") return feminine ? text.levelHighF : text.levelHigh;
+    if (level === "MEDIUM") return feminine ? text.levelMediumF : text.levelMedium;
+    return feminine ? text.levelLowF : text.levelLow;
+  };
+
+  const cards = [
+    {
+      key: "demand",
+      title: text.demandIndicator,
+      invert: false,
+      feminine: false,
+      google: googleDemand,
+      social: socialDemand,
+      recommendation: demandRec,
+    },
+    {
+      key: "competition",
+      title: text.competitionIndicator,
+      invert: true,
+      feminine: true,
+      google: googleCompetition,
+      social: socialCompetition,
+      recommendation: competitionRec,
+    },
+  ].filter((card) => card.google || card.social);
+  return { cards, levelLabel };
 }
 
 function competitorHost(url?: string) {
@@ -806,11 +931,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
 
   const coverImage = visuals.find((item) => item.kind === "cover")?.url || visuals[0]?.url || "";
   const brandName = String((brand as Record<string, unknown>).name || "") || text.title;
-  const coverStats: Array<{ value: number; label: string }> = [
-    { value: (intelligence?.keywords || []).length, label: text.coverStatsKeywords },
-    { value: (intelligence?.competitors || []).length, label: text.coverStatsCompetitors },
-    { value: (intelligence?.personas || []).length, label: text.coverStatsPersonas },
-  ];
+  const marketIndicators = buildMarketIndicators(intelligence, text);
 
   return (
     <div className="dark w-full min-w-0 space-y-4 overflow-x-hidden rounded-[2rem] bg-[#131318] p-3 text-foreground sm:p-5" dir={dir} style={{ "--deck-accent": "color-mix(in oklab, var(--brand-accent) 55%, white)" } as React.CSSProperties}>
@@ -836,13 +957,26 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
             </button>
           </div>
           <h1 className="os-text-wrap text-3xl font-black leading-tight text-white sm:text-5xl" dir="auto">{brandName}</h1>
-          <div className="flex flex-wrap gap-2">
-            {coverStats.filter((stat) => stat.value > 0).map((stat) => (
-              <span key={stat.label} className="rounded-full border border-white/15 bg-black/40 px-3.5 py-1.5 text-sm text-white backdrop-blur">
-                <span className="font-black text-[color:var(--deck-accent)]">{stat.value}</span> {stat.label}
-              </span>
-            ))}
-          </div>
+          {marketIndicators.cards.length > 0 && (
+            <div className="grid max-w-2xl gap-2 sm:grid-cols-2">
+              {marketIndicators.cards.map((card) => (
+                <div key={card.key} className="rounded-2xl border border-white/15 bg-black/45 p-3 backdrop-blur">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-white/60">{card.title}</p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${marketLevelTone(card.google, card.invert)}`}>
+                      {text.byGoogle}: {marketIndicators.levelLabel(card.google, card.feminine)}
+                    </span>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${marketLevelTone(card.social, card.invert)}`}>
+                      {text.bySocial}: {marketIndicators.levelLabel(card.social, card.feminine)}
+                    </span>
+                  </div>
+                  {card.recommendation && (
+                    <p className="os-text-wrap mt-2 text-xs font-semibold leading-5 text-[color:var(--deck-accent)]">✨ {card.recommendation}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           {showIntro && (
             <p className="os-text-wrap rounded-xl border border-white/15 bg-black/50 p-3 text-sm leading-6 text-white/85 backdrop-blur">
               {text.desc}
