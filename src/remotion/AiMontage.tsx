@@ -32,6 +32,7 @@ const SHOW_TITLES = manifestFlags.showTitles !== false;
 // Opaque (no background-removal) sources render as a full-frame subject.
 const SUBJECT_HAS_ALPHA = manifest.source.hasAlpha !== false;
 const CAPTION_SCALE = Number((manifest.style as {captionScale?: number}).captionScale ?? 1);
+const BRAND_COLOR = String((manifest.style as {brandColor?: string}).brandColor ?? '#2f80ff');
 
 const styles = `
 @font-face {
@@ -492,29 +493,44 @@ const Captions = ({scene}: {scene: Scene}) => {
         }}
       >
         {activeChunk
-          ? activeChunk.words.map((word, index) => (
-              <span
-                key={`${activeChunk.start}-${index}`}
-                style={{
-                  display: 'inline-block',
-                  margin: '0 5px',
-                  opacity: interpolate(
-                    seconds,
-                    [word.start - 0.06, word.start + 0.08],
-                    [0, 1],
-                    {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
-                  ),
-                  transform: `translateY(${interpolate(
-                    seconds,
-                    [word.start - 0.06, word.start + 0.12],
-                    [10, 0],
-                    {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
-                  )}px)`,
-                }}
-              >
-                {word.text}
-              </span>
-            ))
+          ? (() => {
+              // Karaoke highlight: the word being spoken sits in a
+              // brand-colored pill; upcoming words stay dimmed.
+              const spokenIndex = activeChunk.words.reduce(
+                (best, word, index) => (seconds >= word.start ? index : best),
+                -1,
+              );
+              return activeChunk.words.map((word, index) => {
+                const isSpoken = index === spokenIndex;
+                return (
+                  <span
+                    key={`${activeChunk.start}-${index}`}
+                    style={{
+                      backgroundColor: isSpoken ? BRAND_COLOR : 'transparent',
+                      borderRadius: 14,
+                      display: 'inline-block',
+                      margin: '0 4px',
+                      opacity: interpolate(
+                        seconds,
+                        [word.start - 0.06, word.start + 0.08],
+                        [0.3, 1],
+                        {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
+                      ),
+                      padding: isSpoken ? '0 14px' : '0 2px',
+                      transform: `translateY(${interpolate(
+                        seconds,
+                        [word.start - 0.06, word.start + 0.12],
+                        [10, 0],
+                        {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
+                      )}px) scale(${isSpoken ? 1.06 : 1})`,
+                      transition: 'none',
+                    }}
+                  >
+                    {word.text}
+                  </span>
+                );
+              });
+            })()
           : scene.caption}
       </div>
     </AbsoluteFill>
