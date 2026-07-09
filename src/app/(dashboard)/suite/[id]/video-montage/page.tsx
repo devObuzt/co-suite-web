@@ -278,11 +278,6 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     return () => window.clearInterval(interval);
   }, [anyActive, refreshJobs]);
 
-  useEffect(() => {
-    if (!renderedScenes.length) return;
-    setCaptionOverrides((current) => current.length ? current : renderedScenes.map((scene) => scene.caption || ""));
-    setTitleOverrides((current) => current.length ? current : renderedScenes.map((scene) => scene.behindText || ""));
-  }, [renderedScenes]);
 
   function toggleOption(optionId: string) {
     setSelectedOptions((current) => (
@@ -391,6 +386,8 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                 onChange={(event) => {
                   setSourceFile(event.target.files?.[0] || null);
                   setStagedUrl("");
+                  setCaptionOverrides([]);
+                  setTitleOverrides([]);
                 }}
               />
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-background text-[#2f80ff] shadow-sm">
@@ -415,6 +412,8 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                   setSourceUrl(event.target.value);
                   setStagedUrl("");
                   setStageFailedUrl("");
+                  setCaptionOverrides([]);
+                  setTitleOverrides([]);
                 }}
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 placeholder={latestSourceUrl || "https://example.com/video.mp4"}
