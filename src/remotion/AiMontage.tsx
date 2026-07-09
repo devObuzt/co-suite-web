@@ -203,6 +203,21 @@ const SceneBackground = ({scene, durationInFrames}: {scene: Scene; durationInFra
           }}
         />
       ) : null}
+      {/* Unified brand stage: a constant floor band on EVERY scene so
+          generated, library, and user backgrounds all share one branded set.
+          Sits above the background media, under the subject (zIndex 2). */}
+      <div
+        style={{
+          background: `linear-gradient(180deg, transparent 0%, ${BRAND_COLOR}2e 40%, #04070de6 100%)`,
+          bottom: 0,
+          height: '28%',
+          left: 0,
+          opacity: 0.5,
+          pointerEvents: 'none',
+          position: 'absolute',
+          right: 0,
+        }}
+      />
       <div
         style={{
           backgroundImage:
