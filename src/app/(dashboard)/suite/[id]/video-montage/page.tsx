@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   BadgeCheck,
   Captions,
+  Check,
   CheckCircle2,
   Clapperboard,
   Clock3,
@@ -20,6 +21,7 @@ import {
   Sparkles,
   Trash2,
   Upload,
+  X,
   XCircle,
   WandSparkles,
 } from "lucide-react";
@@ -43,6 +45,7 @@ type VideoMontageResult = {
   output_url?: string;
   package_url?: string;
   source_warning?: string;
+  backgrounds_warning?: string;
   notes_analysis?: {
     honored?: NotesAnalysisItem[];
     unsupported?: NotesAnalysisItem[];
@@ -148,6 +151,9 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [backgrounds, setBackgrounds] = useState<BackgroundAssetItem[]>([]);
   const [backgroundsMode, setBackgroundsMode] = useState<"blend" | "user_only">("blend");
+  // Uploads are a library: only ids explicitly selected here apply to THIS job.
+  const [selectedBackgroundIds, setSelectedBackgroundIds] = useState<string[]>([]);
+  const [backgroundsPickerOpen, setBackgroundsPickerOpen] = useState(false);
   const [uploadingBackgrounds, setUploadingBackgrounds] = useState(false);
   const [backgroundsNotice, setBackgroundsNotice] = useState<string | null>(null);
   const backgroundsInputRef = useRef<HTMLInputElement | null>(null);
@@ -165,6 +171,22 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     void refreshBackgrounds();
   }, [refreshBackgrounds]);
 
+  const selectedBackgrounds = useMemo(
+    () =>
+      selectedBackgroundIds
+        .map((assetId) => backgrounds.find((asset) => asset.id === assetId))
+        .filter((asset): asset is BackgroundAssetItem => !!asset),
+    [backgrounds, selectedBackgroundIds],
+  );
+
+  function toggleBackgroundSelection(assetId: string) {
+    setSelectedBackgroundIds((current) =>
+      current.includes(assetId)
+        ? current.filter((item) => item !== assetId)
+        : [...current, assetId].slice(0, 20),
+    );
+  }
+
   async function uploadBackgroundFiles(fileList: FileList | null) {
     const files = Array.from(fileList || []).slice(0, 10);
     if (!files.length || uploadingBackgrounds) return;
@@ -172,7 +194,12 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     setBackgroundsNotice(null);
     try {
       const res = await api.media.uploadBackgrounds(id, files);
-      setBackgrounds((current) => [...(res.assets || []), ...current]);
+      const fresh = res.assets || [];
+      setBackgrounds((current) => [...fresh, ...current]);
+      // Freshly uploaded backgrounds are auto-selected for this job.
+      setSelectedBackgroundIds((current) =>
+        [...current, ...fresh.map((asset) => asset.id).filter((assetId) => !current.includes(assetId))].slice(0, 20),
+      );
       if (res.warnings?.length) setBackgroundsNotice(res.warnings.join(" • "));
     } catch (err) {
       setBackgroundsNotice(err instanceof Error ? err.message : "تعذر رفع الخلفيات.");
@@ -186,6 +213,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     try {
       await api.media.deleteBackground(id, assetId);
       setBackgrounds((current) => current.filter((asset) => asset.id !== assetId));
+      setSelectedBackgroundIds((current) => current.filter((item) => item !== assetId));
     } catch (err) {
       setBackgroundsNotice(err instanceof Error ? err.message : "تعذر حذف الخلفية.");
     }
@@ -298,6 +326,10 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     setZoom(1);
     setOffsetX(0);
     setOffsetY(0);
+    // Selection is per-job: the next video starts with a clean slate.
+    setSelectedBackgroundIds([]);
+    setBackgroundsPickerOpen(false);
+    setBackgroundsMode("blend");
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -320,7 +352,10 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
         zoom,
         offsetX,
         offsetY,
-        backgroundsMode,
+        // The mode only matters with a non-empty selection; without one the
+        // render is generated-only anyway, so always send the default.
+        backgroundsMode: selectedBackgroundIds.length > 0 ? backgroundsMode : "blend",
+        backgroundAssetIds: selectedBackgroundIds,
       });
       // Show the fresh job immediately, then let the list poll take over —
       // and clear the form so the next video can queue right away.
@@ -521,31 +556,27 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                 <div>
                   <p className="text-sm font-black text-foreground">خلفياتي</p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    ارفع صورك وفيديوهاتك لتصير خلفيات لمشاهد المونتاج — بتنحلل تلقائيًا مرة وحدة وبتاخد أولوية بالاختيار.
+                    مكتبتك الخاصة من الصور والفيديوهات — بس الخلفيات يلي بتختارها هون بتدخل بهالفيديو تحديدًا.
                   </p>
                 </div>
-                <label className={`inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 rounded-xl border border-[#2f80ff]/35 bg-[#2f80ff]/8 px-3 text-xs font-black text-[#2f80ff] transition hover:border-[#2f80ff] ${uploadingBackgrounds ? "pointer-events-none opacity-60" : ""}`}>
-                  <input
-                    ref={backgroundsInputRef}
-                    type="file"
-                    accept="image/*,video/*"
-                    multiple
-                    className="sr-only"
-                    onChange={(event) => void uploadBackgroundFiles(event.target.files)}
-                  />
-                  {uploadingBackgrounds ? <Loader2 size={15} className="animate-spin" /> : <ImagePlus size={15} />}
-                  {uploadingBackgrounds ? "عم نرفع ونحلل..." : "رفع خلفيات"}
-                </label>
+                <button
+                  type="button"
+                  onClick={() => setBackgroundsPickerOpen((open) => !open)}
+                  className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-[#2f80ff]/35 bg-[#2f80ff]/8 px-3 text-xs font-black text-[#2f80ff] transition hover:border-[#2f80ff]"
+                >
+                  <ImagePlus size={15} />
+                  {backgroundsPickerOpen ? "إغلاق" : "رفع خلفيات"}
+                </button>
               </div>
               {backgroundsNotice && (
                 <p className="os-text-wrap mt-2 rounded-xl border border-[#f8d84a]/40 bg-[#f8d84a]/10 p-2 text-xs leading-5 text-[#9a6b00]">
                   {backgroundsNotice}
                 </p>
               )}
-              {backgrounds.length > 0 && (
+              {selectedBackgrounds.length > 0 ? (
                 <div className="mt-3 flex gap-2 overflow-x-auto pb-1" dir="ltr">
-                  {backgrounds.map((asset) => (
-                    <div key={asset.id} className="group relative h-24 w-16 shrink-0 overflow-hidden rounded-xl border border-border bg-black">
+                  {selectedBackgrounds.map((asset) => (
+                    <div key={asset.id} className="relative h-24 w-16 shrink-0 overflow-hidden rounded-xl border border-[#18b89d]/45 bg-black">
                       {asset.kind === "visual_video" ? (
                         <video src={asset.storage_url} muted playsInline preload="metadata" className="h-full w-full object-cover" />
                       ) : (
@@ -557,21 +588,106 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                       )}
                       <button
                         type="button"
-                        aria-label="حذف الخلفية"
-                        onClick={() => void deleteBackground(asset.id)}
-                        className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-lg bg-black/60 text-white opacity-0 transition group-hover:opacity-100 focus:opacity-100"
+                        aria-label="إلغاء اختيار الخلفية"
+                        onClick={() => toggleBackgroundSelection(asset.id)}
+                        className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-lg bg-black/60 text-white transition hover:bg-black/80"
                       >
-                        <Trash2 size={13} />
+                        <X size={13} />
                       </button>
                     </div>
                   ))}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-xl border border-dashed border-border p-3 text-xs leading-5 text-muted-foreground">
+                  ما في خلفيات مختارة لهالفيديو — الخلفيات رح تكون مولّدة تلقائيًا.
+                </p>
+              )}
+              {backgroundsPickerOpen && (
+                <div className="mt-3 rounded-2xl border border-[#2f80ff]/25 bg-card p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-black text-foreground">اختر من مكتبتك أو ارفع جديد</p>
+                    <div className="flex items-center gap-2">
+                      <label className={`inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-xl border border-[#2f80ff]/35 bg-[#2f80ff]/8 px-3 text-xs font-black text-[#2f80ff] transition hover:border-[#2f80ff] ${uploadingBackgrounds ? "pointer-events-none opacity-60" : ""}`}>
+                        <input
+                          ref={backgroundsInputRef}
+                          type="file"
+                          accept="image/*,video/*"
+                          multiple
+                          className="sr-only"
+                          onChange={(event) => void uploadBackgroundFiles(event.target.files)}
+                        />
+                        {uploadingBackgrounds ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                        {uploadingBackgrounds ? "عم نرفع ونحلل..." : "رفع ملفات جديدة"}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setBackgroundsPickerOpen(false)}
+                        className="inline-flex min-h-9 items-center rounded-xl bg-foreground px-4 text-xs font-black text-background"
+                      >
+                        تم
+                      </button>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                    الملفات الجديدة بتنضاف للمكتبة وبتنختار تلقائيًا لهالفيديو. اضغط على أي خلفية لاختيارها أو إلغائها.
+                  </p>
+                  {backgrounds.length > 0 ? (
+                    <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-5" dir="ltr">
+                      {backgrounds.map((asset) => {
+                        const selected = selectedBackgroundIds.includes(asset.id);
+                        return (
+                          <div key={asset.id} className="group relative">
+                            <button
+                              type="button"
+                              onClick={() => toggleBackgroundSelection(asset.id)}
+                              aria-pressed={selected}
+                              aria-label={selected ? "إلغاء اختيار الخلفية" : "اختيار الخلفية"}
+                              className={`relative block aspect-[2/3] w-full overflow-hidden rounded-xl border-2 bg-black transition ${
+                                selected ? "border-[#18b89d]" : "border-transparent hover:border-[#2f80ff]/45"
+                              }`}
+                            >
+                              {asset.kind === "visual_video" ? (
+                                <video src={asset.storage_url} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                              ) : (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={asset.storage_url} alt={asset.title} className="h-full w-full object-cover" />
+                              )}
+                              {asset.kind === "visual_video" && (
+                                <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-[9px] font-bold text-white">فيديو</span>
+                              )}
+                              <span
+                                className={`absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-lg transition ${
+                                  selected ? "bg-[#18b89d] text-white" : "bg-black/50 text-white/60"
+                                }`}
+                              >
+                                <Check size={13} />
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              aria-label="حذف الخلفية من المكتبة"
+                              onClick={() => void deleteBackground(asset.id)}
+                              className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-lg bg-black/60 text-white opacity-0 transition group-hover:opacity-100 focus:opacity-100"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="mt-3 rounded-xl border border-dashed border-border p-3 text-center text-xs leading-5 text-muted-foreground">
+                      المكتبة فاضية بعد — ارفع أول صورة أو فيديو من زر &quot;رفع ملفات جديدة&quot;.
+                    </p>
+                  )}
                 </div>
               )}
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setBackgroundsMode("blend")}
-                  className={`min-h-10 rounded-xl border px-2 text-xs font-black transition ${
+                  disabled={selectedBackgroundIds.length === 0}
+                  className={`min-h-10 rounded-xl border px-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${
                     backgroundsMode === "blend"
                       ? "border-[#18b89d]/45 bg-[#18b89d]/10 text-[#087966]"
                       : "border-border bg-card text-muted-foreground hover:border-[#18b89d]/35"
@@ -582,7 +698,8 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                 <button
                   type="button"
                   onClick={() => setBackgroundsMode("user_only")}
-                  className={`min-h-10 rounded-xl border px-2 text-xs font-black transition ${
+                  disabled={selectedBackgroundIds.length === 0}
+                  className={`min-h-10 rounded-xl border px-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${
                     backgroundsMode === "user_only"
                       ? "border-[#18b89d]/45 bg-[#18b89d]/10 text-[#087966]"
                       : "border-border bg-card text-muted-foreground hover:border-[#18b89d]/35"
@@ -591,9 +708,9 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                   خلفياتي فقط
                 </button>
               </div>
-              {backgroundsMode === "user_only" && backgrounds.length === 0 && (
+              {selectedBackgroundIds.length === 0 && (
                 <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  ما في خلفيات مرفوعة بعد — إذا شغّلت المونتاج هلق منرجع للمزج الافتراضي.
+                  خيارات المزج بتتفعّل بس تختار خلفيات لهالفيديو.
                 </p>
               )}
             </div>
@@ -738,6 +855,12 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                   {failReason && (
                     <p className="os-text-wrap mt-3 rounded-xl border border-red-500/25 bg-red-500/8 p-3 text-xs leading-6 text-red-600">
                       {failReason}
+                    </p>
+                  )}
+
+                  {result?.backgrounds_warning && (
+                    <p className="os-text-wrap mt-3 rounded-xl border border-[#f8d84a]/40 bg-[#f8d84a]/10 p-3 text-xs leading-6 text-[#9a6b00]">
+                      {result.backgrounds_warning}
                     </p>
                   )}
 

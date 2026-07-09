@@ -408,6 +408,7 @@ export const api = {
         offsetX?: number;
         offsetY?: number;
         backgroundsMode?: "blend" | "user_only";
+        backgroundAssetIds?: string[];
       }
     ) => {
       const form = new FormData();
@@ -415,6 +416,7 @@ export const api = {
       form.append("source_url", data.sourceUrl || "");
       form.append("options_json", JSON.stringify(data.options || []));
       form.append("backgrounds_mode", data.backgroundsMode || "blend");
+      form.append("background_asset_ids_json", JSON.stringify(data.backgroundAssetIds || []));
       form.append("zoom", String(data.zoom ?? 1));
       form.append("subject_offset_x", String(data.offsetX ?? 0));
       form.append("subject_offset_y", String(data.offsetY ?? 0));
@@ -1761,6 +1763,7 @@ export interface GenerationStatus {
     notes?: string | null;
     options?: string[];
     backgrounds_mode?: string | null;
+    background_asset_ids?: string[];
   } | null;
   result?: {
     post_ids?: string[];
