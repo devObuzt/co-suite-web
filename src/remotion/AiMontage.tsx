@@ -710,7 +710,7 @@ export const AiMontage = () => {
           from={Math.max(0, sourceFrames((effect.at ?? 0) - (effect.duration ?? 0.7) / 2, fps))}
           durationInFrames={Math.max(1, sourceFrames(effect.duration ?? 0.7, fps))}
         >
-          <AbsoluteFill style={{mixBlendMode: 'screen', opacity: 0.82, zIndex: 12}}>
+          <AbsoluteFill style={{mixBlendMode: 'screen', opacity: 0.6, zIndex: 12}}>
             <OffthreadVideo
               muted={(effect.volume ?? 0.25) <= 0}
               src={publicAsset(effect.publicPath)}
