@@ -10,14 +10,18 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
+import {TransitionSeries, linearTiming, type TransitionPresentation} from '@remotion/transitions';
+import {slide} from '@remotion/transitions/slide';
+import {fade} from '@remotion/transitions/fade';
+import {flip} from '@remotion/transitions/flip';
+import {zoomInOut} from '@remotion/transitions/zoom-in-out';
 import manifest from './manifest.generated.json';
 
 type Scene = (typeof manifest.scenes)[number];
 type AttentionBeat = {at: number; type: 'zoom' | 'flash' | 'overlay' | 'parallax' | string};
 
 const sourceFrames = (seconds: number, fps: number) => Math.round(seconds * fps);
-const TRANSITION_FRAMES = 12;
-const BRIDGE_FRAMES = 14;
+const TRANSITION_FRAMES = 7;
 const publicAsset = (path: string) =>
   /^https?:\/\//.test(path) ? path : staticFile(path.replace(/^\//, ''));
 const sourceAudioPath =
@@ -395,62 +399,6 @@ const BehindPersonText = ({scene}: {scene: Scene}) => {
   );
 };
 
-const TransitionEffects = ({
-  scene,
-  durationInFrames,
-}: {
-  scene: Scene;
-  durationInFrames: number;
-}) => {
-  const frame = useCurrentFrame();
-  const exit = interpolate(
-    frame,
-    [Math.max(0, durationInFrames - TRANSITION_FRAMES), durationInFrames],
-    [0, 1],
-    {extrapolateLeft: 'clamp'},
-  );
-  const sweepX = interpolate(
-    frame,
-    [Math.max(0, durationInFrames - TRANSITION_FRAMES), durationInFrames],
-    [-640, 1320],
-    {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    },
-  );
-  const sweepOpacity = interpolate(frame, [0, durationInFrames], [0, 0.14], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-  const transitionOpacity = exit;
-
-  return (
-    <AbsoluteFill style={{pointerEvents: 'none', zIndex: 4}}>
-      <div
-        style={{
-          background: scene.palette[1],
-          inset: 0,
-          opacity: transitionOpacity * 0.12,
-          position: 'absolute',
-        }}
-      />
-      <div
-        style={{
-          background: `linear-gradient(90deg, transparent, #ffffffaa, ${scene.palette[1]}aa, transparent)`,
-          filter: `blur(${8 + transitionOpacity * 8}px)`,
-          height: '125%',
-          left: 0,
-          opacity: (sweepOpacity + 0.18) * transitionOpacity,
-          position: 'absolute',
-          top: '-12%',
-          transform: `translateX(${sweepX}px) rotate(12deg)`,
-          width: 96,
-        }}
-      />
-    </AbsoluteFill>
-  );
-};
-
 type CaptionChunk = {
   start: number;
   end: number;
@@ -552,52 +500,6 @@ const Captions = ({scene}: {scene: Scene}) => {
   );
 };
 
-const BoundaryTransition = ({fromScene, toScene}: {fromScene: Scene; toScene: Scene}) => {
-  const frame = useCurrentFrame();
-  const progress = interpolate(frame, [0, BRIDGE_FRAMES], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-  const bandX = interpolate(progress, [0, 1], [-520, 1320]);
-  const veilOpacity = interpolate(progress, [0, 0.46, 1], [0, 0.72, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-  const blur = interpolate(progress, [0, 0.5, 1], [0, 18, 0]);
-
-  return (
-    <AbsoluteFill style={{pointerEvents: 'none', zIndex: 9}}>
-      <div
-        style={{
-          background: `linear-gradient(115deg, ${fromScene.palette[0]}00 0%, ${fromScene.palette[1]}66 34%, ${toScene.palette[1]}99 58%, ${toScene.palette[0]}00 100%)`,
-          filter: `blur(${blur}px)`,
-          inset: '-8%',
-          opacity: veilOpacity,
-          position: 'absolute',
-          transform: `translateX(${bandX - 420}px) skewX(-12deg)`,
-        }}
-      />
-      <div
-        style={{
-          background: `linear-gradient(90deg, transparent, #ffffffe6, ${toScene.palette[1]}dd, transparent)`,
-          boxShadow: `0 0 80px ${toScene.palette[1]}aa`,
-          filter: 'blur(8px)',
-          height: '130%',
-          left: 0,
-          opacity: interpolate(progress, [0, 0.45, 1], [0, 0.82, 0], {
-            extrapolateLeft: 'clamp',
-            extrapolateRight: 'clamp',
-          }),
-          position: 'absolute',
-          top: '-15%',
-          transform: `translateX(${bandX}px) rotate(10deg)`,
-          width: 170,
-        }}
-      />
-    </AbsoluteFill>
-  );
-};
-
 const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: number}) => {
   const {fps} = useVideoConfig();
   const frame = useCurrentFrame();
@@ -690,7 +592,6 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
           }}
         />
       </AbsoluteFill>
-      <TransitionEffects scene={scene} durationInFrames={durationInFrames} />
     </AbsoluteFill>
   );
 };
@@ -704,17 +605,25 @@ export const AiMontage = () => {
   }, []);
   const backgroundMusic = manifest.audio.backgroundMusic;
   const soundEffects = manifest.audio.soundEffects ?? [];
-  const visualTransitions =
-    'visualTransitions' in manifest && Array.isArray(manifest.visualTransitions)
-      ? (manifest.visualTransitions as Array<{
-          publicPath: string;
-          at?: number;
-          duration?: number;
-          volume?: number;
-          assetId?: string;
-          kind?: string;
+  const sceneTransitions =
+    'sceneTransitions' in manifest && Array.isArray(manifest.sceneTransitions)
+      ? (manifest.sceneTransitions as Array<{
+          type: 'slide' | 'flip' | 'zoom' | 'fade';
+          durationInFrames: number;
+          direction?: string | null;
         }>)
       : [];
+
+  const presentationFor = (
+    t: (typeof sceneTransitions)[number],
+  ): TransitionPresentation<Record<string, unknown>> => {
+    if (t.type === 'slide')
+      return slide({direction: t.direction === 'from-right' ? 'from-right' : 'from-left'}) as TransitionPresentation<Record<string, unknown>>;
+    if (t.type === 'flip') return flip() as TransitionPresentation<Record<string, unknown>>;
+    if (t.type === 'zoom')
+      return zoomInOut({}) as unknown as TransitionPresentation<Record<string, unknown>>;
+    return fade() as TransitionPresentation<Record<string, unknown>>;
+  };
 
   return (
     <AbsoluteFill style={{backgroundColor: '#08090d'}}>
@@ -735,47 +644,31 @@ export const AiMontage = () => {
           <Audio src={publicAsset(effect.publicPath)} volume={effect.volume ?? 0.2} />
         </Sequence>
       ))}
-      {visualTransitions.map((effect, index) => (
-        <Sequence
-          key={`visual-transition-${effect.assetId ?? index}`}
-          from={Math.max(0, sourceFrames((effect.at ?? 0) - (effect.duration ?? 0.7) / 2, fps))}
-          durationInFrames={Math.max(1, sourceFrames(effect.duration ?? 0.7, fps))}
-        >
-          <AbsoluteFill style={{mixBlendMode: 'screen', opacity: 0.6, zIndex: 12}}>
-            <OffthreadVideo
-              muted={(effect.volume ?? 0.25) <= 0}
-              src={publicAsset(effect.publicPath)}
-              style={{
-                height: '100%',
-                inset: 0,
-                objectFit: 'cover',
-                position: 'absolute',
-                width: '100%',
-              }}
-              volume={effect.volume ?? 0.25}
-            />
-          </AbsoluteFill>
-        </Sequence>
-      ))}
-      {timedScenes.map(({duration, from, scene}) => {
-        return (
-          <Sequence key={scene.id} from={from} durationInFrames={duration}>
-            <SceneLayer scene={scene} durationInFrames={duration} />
-          </Sequence>
-        );
-      })}
-      {timedScenes.slice(0, -1).map(({from, duration, scene}, index) => {
-        const next = timedScenes[index + 1].scene;
-        return (
-          <Sequence
-            key={`${scene.id}-bridge`}
-            from={from + duration - Math.floor(BRIDGE_FRAMES / 2)}
-            durationInFrames={BRIDGE_FRAMES}
-          >
-            <BoundaryTransition fromScene={scene} toScene={next} />
-          </Sequence>
-        );
-      })}
+      <TransitionSeries>
+        {timedScenes.flatMap(({duration, scene}, index) => {
+          // Compensation rule from spike findings: keep the visual timeline
+          // length equal to sum(scene durations) despite transition overlap.
+          const seqFrames = duration + (index === 0 || index === timedScenes.length - 1
+            ? Math.ceil(TRANSITION_FRAMES / 2)
+            : TRANSITION_FRAMES);
+          const nodes = [
+            <TransitionSeries.Sequence key={scene.id} durationInFrames={seqFrames}>
+              <SceneLayer scene={scene} durationInFrames={duration} />
+            </TransitionSeries.Sequence>,
+          ];
+          const t = sceneTransitions[index];
+          if (index < timedScenes.length - 1 && t) {
+            nodes.push(
+              <TransitionSeries.Transition
+                key={`${scene.id}-t`}
+                presentation={presentationFor(t)}
+                timing={linearTiming({durationInFrames: t.durationInFrames})}
+              />,
+            );
+          }
+          return nodes;
+        })}
+      </TransitionSeries>
     </AbsoluteFill>
   );
 };
