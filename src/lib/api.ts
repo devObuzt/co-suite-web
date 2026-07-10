@@ -409,6 +409,7 @@ export const api = {
         offsetY?: number;
         backgroundsMode?: "blend" | "user_only";
         backgroundAssetIds?: string[];
+        bgRemovalQuality?: string;
       }
     ) => {
       const form = new FormData();
@@ -417,6 +418,7 @@ export const api = {
       form.append("options_json", JSON.stringify(data.options || []));
       form.append("backgrounds_mode", data.backgroundsMode || "blend");
       form.append("background_asset_ids_json", JSON.stringify(data.backgroundAssetIds || []));
+      form.append("bg_removal_quality", data.bgRemovalQuality || "auto");
       form.append("zoom", String(data.zoom ?? 1));
       form.append("subject_offset_x", String(data.offsetX ?? 0));
       form.append("subject_offset_y", String(data.offsetY ?? 0));

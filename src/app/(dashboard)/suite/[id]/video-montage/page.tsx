@@ -142,6 +142,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
   const [stagedUrl, setStagedUrl] = useState("");
   const [staging, setStaging] = useState(false);
   const [stageFailedUrl, setStageFailedUrl] = useState("");
+  const [bgRemovalQuality, setBgRemovalQuality] = useState<"auto" | "ai">("auto");
   const [captionOverrides, setCaptionOverrides] = useState<string[]>([]);
   const [titleOverrides, setTitleOverrides] = useState<string[]>([]);
   const [jobs, setJobs] = useState<GenerationStatus[]>([]);
@@ -356,6 +357,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
         // render is generated-only anyway, so always send the default.
         backgroundsMode: selectedBackgroundIds.length > 0 ? backgroundsMode : "blend",
         backgroundAssetIds: selectedBackgroundIds,
+        bgRemovalQuality,
       });
       // Show the fresh job immediately, then let the list poll take over —
       // and clear the form so the next video can queue right away.
@@ -713,6 +715,28 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                   خيارات المزج بتتفعّل بس تختار خلفيات لهالفيديو.
                 </p>
               )}
+            </div>
+            <div className="mt-4 rounded-2xl border border-border bg-background p-4">
+              <p className="text-sm font-semibold text-foreground">جودة إزالة الخلفية</p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBgRemovalQuality("auto")}
+                  className={`flex-1 rounded-xl border px-3 py-2 text-sm font-bold transition ${bgRemovalQuality === "auto" ? "border-[#2f80ff] bg-[#2f80ff]/10 text-[#2f80ff]" : "border-border text-muted-foreground hover:border-[#2f80ff]/50"}`}
+                >
+                  تلقائي (موفّر)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBgRemovalQuality("ai")}
+                  className={`flex-1 rounded-xl border px-3 py-2 text-sm font-bold transition ${bgRemovalQuality === "ai" ? "border-[#2f80ff] bg-[#2f80ff]/10 text-[#2f80ff]" : "border-border text-muted-foreground hover:border-[#2f80ff]/50"}`}
+                >
+                  احترافية AI ✨
+                </button>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                التلقائي بيستعمل القص المجاني للخلفيات الخضرا. الاحترافية بتعزل الشخصية بالذكاء الاصطناعي — بتشيل أي شي غيرها (معدات، أثاث…) حتى مع الأخضر. مدفوعة حسب مدة الفيديو.
+              </p>
             </div>
             <label className="mt-4 block text-sm font-semibold text-foreground" htmlFor="montage-notes">
               ملاحظات المونتاج
