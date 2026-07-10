@@ -665,7 +665,6 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
           style={subjectStyle}
         />
       )}
-      <Audio src={publicAsset(sourceAudioPath)} startFrom={startFrom} endAt={endAt} />
       {SHOW_CAPTIONS ? <Captions scene={scene} /> : null}
       <AbsoluteFill style={{pointerEvents: 'none', zIndex: 3}}>
         <div
@@ -726,6 +725,7 @@ export const AiMontage = () => {
           volume={backgroundMusic.volume ?? 0.14}
         />
       ) : null}
+      <Audio src={publicAsset(sourceAudioPath)} />
       {soundEffects.map((effect, index) => (
         <Sequence
           key={`sfx-${index}`}
