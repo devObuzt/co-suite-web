@@ -17,6 +17,7 @@
     "@prisma/client": "^6.19.3",
     "@remotion/cli": "^4.0.473",
     "@remotion/media-utils": "^4.0.473",
+    "@remotion/transitions": "^4.0.473",
     "axios": "^1.16.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
