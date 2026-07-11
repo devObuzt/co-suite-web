@@ -14,7 +14,7 @@ import {TransitionSeries, linearTiming, type TransitionPresentation} from '@remo
 import {slide} from '@remotion/transitions/slide';
 import {fade} from '@remotion/transitions/fade';
 import {flip} from '@remotion/transitions/flip';
-import {zoomInOut} from '@remotion/transitions/zoom-in-out';
+import {zoom} from './transitions/zoom';
 import manifest from './manifest.generated.json';
 
 type Scene = (typeof manifest.scenes)[number];
@@ -621,7 +621,7 @@ export const AiMontage = () => {
       return slide({direction: t.direction === 'from-right' ? 'from-right' : 'from-left'}) as TransitionPresentation<Record<string, unknown>>;
     if (t.type === 'flip') return flip() as TransitionPresentation<Record<string, unknown>>;
     if (t.type === 'zoom')
-      return zoomInOut({}) as unknown as TransitionPresentation<Record<string, unknown>>;
+      return zoom() as unknown as TransitionPresentation<Record<string, unknown>>;
     return fade() as TransitionPresentation<Record<string, unknown>>;
   };
 
