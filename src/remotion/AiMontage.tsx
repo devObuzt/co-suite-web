@@ -21,7 +21,7 @@ type Scene = (typeof manifest.scenes)[number];
 type AttentionBeat = {at: number; type: 'zoom' | 'flash' | 'overlay' | 'parallax' | string};
 
 const sourceFrames = (seconds: number, fps: number) => Math.round(seconds * fps);
-const TRANSITION_FRAMES = 7;
+const TRANSITION_FRAMES = 12;
 const publicAsset = (path: string) =>
   /^https?:\/\//.test(path) ? path : staticFile(path.replace(/^\//, ''));
 const sourceAudioPath =
@@ -646,11 +646,20 @@ export const AiMontage = () => {
       ))}
       <TransitionSeries>
         {timedScenes.flatMap(({duration, scene}, index) => {
-          // Compensation rule from spike findings: keep the visual timeline
-          // length equal to sum(scene durations) despite transition overlap.
-          const seqFrames = duration + (index === 0 || index === timedScenes.length - 1
-            ? Math.ceil(TRANSITION_FRAMES / 2)
-            : TRANSITION_FRAMES);
+          // Each boundary's transition frames are split across its two neighbouring
+          // sequences (ceil from the left boundary, floor into the right) so every
+          // boundary's two halves sum to exactly its own durationInFrames and the whole
+          // TransitionSeries length equals sum(D) — i.e. the continuous audio length —
+          // for any transition length, odd or even.
+          const leftT =
+            index > 0 && sceneTransitions[index - 1]
+              ? sceneTransitions[index - 1].durationInFrames
+              : 0;
+          const rightT =
+            index < timedScenes.length - 1 && sceneTransitions[index]
+              ? sceneTransitions[index].durationInFrames
+              : 0;
+          const seqFrames = duration + Math.ceil(leftT / 2) + Math.floor(rightT / 2);
           const nodes = [
             <TransitionSeries.Sequence key={scene.id} durationInFrames={seqFrames}>
               <SceneLayer scene={scene} durationInFrames={duration} />
