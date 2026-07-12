@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SuitePageShell } from "@/components/suite/SuitePageShell";
 import { SocialPlanCalendar } from "@/components/work-plans/SocialPlanCalendar";
+import { SocialIdeasGallery } from "@/components/work-plans/SocialIdeasGallery";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
-type Mode = "social" | "paid";
+type Mode = "ideas" | "social" | "paid";
 
 function paidItemsFor(plan: PaidContentWorkPlan | undefined, stage: string) {
   return plan?.candidates?.[stage] || [];
@@ -23,7 +24,7 @@ function paidRequiredFor(plan: PaidContentWorkPlan | undefined, stage: string) {
 export default function WorkPlansPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { lang, dir } = useLanguage();
-  const [mode, setMode] = useState<Mode>("social");
+  const [mode, setMode] = useState<Mode>("ideas");
   const [response, setResponse] = useState<MarketingPlanResponse | null>(null);
   const [selectedPaidIds, setSelectedPaidIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,12 +108,19 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
 
         <TeachRulesBox suiteId={id} />
 
-        <section className="grid grid-cols-2 gap-3">
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <ModeButton
+            active={mode === "ideas"}
+            title="أفكار السوشيال"
+            description="اعرض أفكار مع طريقة تطبيقها — افحص المناسبات واختر منها."
+            icon={<Sparkles size={22} />}
+            onClick={() => setMode("ideas")}
+          />
           <ModeButton
             active={mode === "social"}
             title="خطة محتوى للسوشيال ميديا"
             description="أفكار ريلز وبوستات موزعة بين جذب، ثقة، ومبيعات."
-            icon={<Sparkles size={22} />}
+            icon={<Layers3 size={22} />}
             onClick={() => setMode("social")}
           />
           <ModeButton
@@ -126,6 +134,8 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
 
         {loading ? (
           <div className="rounded-2xl border border-border bg-card p-6 text-muted-foreground">جار تحميل خطة العمل...</div>
+        ) : mode === "ideas" ? (
+          <SocialIdeasGallery suiteId={id} response={response} onResponse={setResponse} />
         ) : mode === "social" ? (
           <SocialPlanCalendar suiteId={id} response={response} onResponse={setResponse} />
         ) : (

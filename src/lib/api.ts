@@ -544,6 +544,19 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ selected_ids: selectedIds }),
       }),
+    generateSocialIdeas: (suiteId: string, data: { period: string; target_count?: number; language?: string }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/social-ideas/generate`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    updateSocialIdeasSelection: (
+      suiteId: string,
+      data: { selected_ids: string[]; notes?: Record<string, string>; assets?: Record<string, string[]> },
+    ) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/social-ideas/selection`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     updateSocialContentItem: (suiteId: string, itemId: string, data: { title?: string; idea?: string; script?: string; cta?: string }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/social-content-plan/items/${itemId}`, {
         method: "PATCH",
@@ -983,7 +996,38 @@ export interface MarketingActionPlan {
   ad_funnel_items: MarketingActionItem[];
   social_content_plan?: SocialContentWorkPlan;
   paid_content_plan?: PaidContentWorkPlan;
+  social_ideas_plan?: SocialIdeasPlan;
   planning_questions?: string[];
+  warnings?: string[];
+}
+
+export type SocialIdeaObjective = "attraction" | "trust" | "sales";
+
+export interface SocialIdeaAsset {
+  asset_type: string;
+  recommended: boolean;
+}
+
+export interface SocialIdea {
+  id: string;
+  objective_type: SocialIdeaObjective;
+  title: string;
+  short_description: string;
+  occasion_ref?: { title: string; date_or_window: string } | null;
+  client_story: { text: string; example: string; is_illustrative: boolean };
+  apply_assets: SocialIdeaAsset[];
+  user_notes?: string;
+  selected?: boolean;
+}
+
+export interface SocialIdeasPlan {
+  version: string;
+  language?: string;
+  period?: string;
+  target_count?: number;
+  occasions?: Array<{ title: string; date_or_window?: string; type?: string }>;
+  candidates?: SocialIdea[];
+  selected_ids?: string[];
   warnings?: string[];
 }
 
