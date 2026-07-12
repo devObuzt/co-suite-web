@@ -945,7 +945,7 @@ export default function NewSuitePage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-4xl items-start justify-center px-4 py-8" dir={dir}>
+    <div className="mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-4xl items-start justify-center px-4 py-8" dir={dir}>
       <div className="w-full max-w-3xl">
       <div className="mb-6 rounded-3xl border border-border bg-card/70 p-5 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -1005,6 +1005,7 @@ export default function NewSuitePage() {
             </CardContent>
           </Card>
 
+          {!isFunnelUser && (
           <button
             type="button"
             onClick={() => router.push("/create")}
@@ -1018,6 +1019,7 @@ export default function NewSuitePage() {
               {quickCreateCopy.cta} <ForwardIcon size={15} />
             </span>
           </button>
+          )}
         </div>
       )}
 
