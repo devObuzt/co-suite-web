@@ -127,7 +127,9 @@ export function FirstTimeLanguagePicker() {
         {step === "lang" ? (
           <>
             <div className="mb-6 space-y-1.5 text-center">
-              <p className="text-xl font-bold text-foreground">How should we speak with you?</p>
+              <p className="text-xl font-bold text-foreground" dir="ltr">
+                How should we speak with you?
+              </p>
               <p className="text-xl font-bold text-foreground" dir="rtl">
                 איך תרצה שנדבר איתך?
               </p>
