@@ -145,6 +145,20 @@ export const api = {
         "/funnel/register", { method: "POST", body: JSON.stringify(data) }),
     enroll: (data?: { phone?: string }) => request<{ user: import("@/store/auth").AuthUser; lead_id: string }>(
       "/funnel/enroll", { method: "POST", body: JSON.stringify(data || {}) }),
+    otpRequest: (data: { phone: string }) =>
+      request<{ ok: boolean }>("/funnel/otp/request", { method: "POST", body: JSON.stringify(data) }),
+    otpVerify: (data: { phone: string; code: string }) =>
+      request<{
+        access_token: string;
+        user: import("@/store/auth").AuthUser;
+        lead: FunnelLead;
+        resume_step: FunnelResumeStep;
+      }>("/funnel/otp/verify", { method: "POST", body: JSON.stringify(data) }),
+    setProfile: (data: { full_name: string }) =>
+      request<{ user: import("@/store/auth").AuthUser; lead: FunnelLead; resume_step: FunnelResumeStep }>(
+        "/funnel/profile", { method: "POST", body: JSON.stringify(data) }),
+    setProgress: (data: { step: FunnelResumeStep }) =>
+      request<{ resume_step: FunnelResumeStep }>("/funnel/progress", { method: "POST", body: JSON.stringify(data) }),
     state: () => request<FunnelState>("/funnel/state"),
     createSuite: (data: { name: string }) =>
       request<{ id: string; name: string; slug: string; status: string }>(
@@ -1300,20 +1314,23 @@ export interface ServiceItem {
 
 export type CycleTotals = Partial<Record<BillingCycle, { min: number; max: number }>>;
 
+export type FunnelResumeStep = "phone" | "name" | "suite" | "plans" | "services" | "done";
+
 export interface FunnelLead {
   id: string;
   suite_id: string | null;
-  full_name: string;
-  email: string;
+  full_name: string | null;
+  email: string | null;
   phone: string;
   status: string;
-  progress: Record<string, boolean>;
+  progress: Record<string, boolean | string>;
 }
 
 export interface FunnelState {
   lead: FunnelLead | null;
   suite_id: string | null;
   steps: { suite_created?: boolean; request_submitted?: boolean };
+  resume_step?: FunnelResumeStep | null;
 }
 
 export interface ServiceRequestOut {
