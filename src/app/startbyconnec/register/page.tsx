@@ -58,7 +58,12 @@ export default function FunnelRegisterPage() {
     if (err instanceof ApiError && typeof err.detail === "string" && OTP_ERROR_KEYS.has(err.detail)) {
       return t(`sbc.otp.err.${err.detail}`);
     }
-    return err instanceof Error ? err.message : "Request failed";
+    const msg = err instanceof Error ? err.message : "Request failed";
+    // A dead device connection must read as exactly that — not as our fault.
+    if (/load failed|failed to fetch|network\s?error|fetch failed/i.test(msg)) {
+      return t("sbc.otp.err.network");
+    }
+    return msg;
   }
 
   function routeByStep(step: FunnelResumeStep, lead: FunnelLead | null) {
@@ -136,7 +141,8 @@ export default function FunnelRegisterPage() {
     "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[var(--brand-accent)] to-[var(--brand-accent-strong)] px-6 text-base font-bold text-white shadow-lg shadow-[#2f80ff]/25 transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60";
 
   return (
-    <div className="mx-auto max-w-md px-4 py-10">
+    // Content sits lower on the screen so the field is comfortable to reach.
+    <div className="mx-auto flex min-h-[58dvh] max-w-md flex-col justify-center px-4 py-10">
       {screen === "phone" && (
         <form onSubmit={requestCode} className="space-y-5">
           <div className="space-y-2 text-center">

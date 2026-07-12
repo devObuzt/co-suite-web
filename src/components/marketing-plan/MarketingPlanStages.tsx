@@ -48,6 +48,12 @@ const labels = {
     planEmptyTitle: "ما في خطة تسويقية بعد",
     planEmptyDesc: "بكبسة وحدة بنولّد الخطة قسم قسم: كلمات مفتاحية، منافسين، عرض وطلب، وشخصيات العملاء — كل قسم بظهر أول ما يجهز وبننتقل تلقائيًا للي بعده.",
     generateFullPlan: "توليد كل الخطة",
+    preparingPlan: "عم نجهّز خطتك التسويقية…",
+    preparingPlanHint: "الصفحة بتتحدث لحالها أول ما يجهز أول قسم — ما في داعي تعيد التحميل.",
+    generatingNow: "عم نولّد:",
+    stageFailed: "تعذّر توليد",
+    retryStage: "أعد المحاولة",
+    networkError: "انقطع اتصال جهازك بالإنترنت أثناء العملية — هاي مش مشكلة من عنا. تأكد من الاتصال وجرّب مرة ثانية.",
     messageTitle: "الرسالة التسويقية",
     messageDesc: "خلاصة الخطة: الرسالة الأساسية اللي بتحكي فيها علامتك مع جمهورك.",
     generateMessage: "توليد الرسالة التسويقية",
@@ -162,6 +168,12 @@ const labels = {
     planEmptyTitle: "No marketing plan yet",
     planEmptyDesc: "One click generates the plan section by section: keywords, competitors, demand & supply, and customer personas — each section appears as soon as it is ready.",
     generateFullPlan: "Generate the full plan",
+    preparingPlan: "Preparing your marketing plan…",
+    preparingPlanHint: "The page updates by itself as soon as the first section is ready — no need to reload.",
+    generatingNow: "Generating:",
+    stageFailed: "Failed to generate",
+    retryStage: "Try again",
+    networkError: "Your device lost its internet connection during the operation — this is not a problem on our side. Check your connection and try again.",
     messageTitle: "Marketing message",
     messageDesc: "The plan's essence: the core message your brand speaks to its audience.",
     generateMessage: "Generate the marketing message",
@@ -277,6 +289,12 @@ const labels = {
     planEmptyTitle: "עדיין אין תכנית שיווקית",
     planEmptyDesc: "בלחיצה אחת נבנה את התכנית שלב אחרי שלב: מילות מפתח, מתחרים, ביקוש והיצע ופרסונות — כל שלב מופיע ברגע שהוא מוכן.",
     generateFullPlan: "צור את כל התכנית",
+    preparingPlan: "מכינים את התכנית השיווקית שלך…",
+    preparingPlanHint: "העמוד מתעדכן לבד ברגע שהחלק הראשון מוכן — אין צורך לרענן.",
+    generatingNow: "יוצרים:",
+    stageFailed: "יצירה נכשלה",
+    retryStage: "נסו שוב",
+    networkError: "חיבור האינטרנט של המכשיר נותק במהלך הפעולה — זו לא תקלה אצלנו. בדקו את החיבור ונסו שוב.",
     messageTitle: "המסר השיווקי",
     messageDesc: "תמצית התכנית: המסר המרכזי שהמותג שלך מדבר עם הקהל.",
     generateMessage: "צור את המסר השיווקי",
@@ -408,7 +426,7 @@ function competitorScore(competitor: MarketingCompetitor) {
   return countScore + priorityScore;
 }
 
-const competitorSourceOrder = ["google_organic", "maps", "instagram", "facebook", "tiktok", "google_sponsored", "sponsored", "other"];
+const competitorSourceOrder = ["google_organic", "instagram", "maps", "facebook", "tiktok", "google_sponsored", "sponsored", "other"];
 
 const competitorSourceLabels: Record<string, string> = {
   google_organic: "Google Organic",
@@ -650,6 +668,8 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
   const [showIntro, setShowIntro] = useState(false);
   const visualsRequested = useRef(false);
   const [autoStage, setAutoStage] = useState<StageSlug | null>(null);
+  const [visualsSettled, setVisualsSettled] = useState(false);
+  const autoStarted = useRef(false);
 
   const load = useCallback(async () => {
     setError("");
@@ -669,8 +689,11 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     visualsRequested.current = true;
     api.marketingPlans.generateVisuals(suiteId)
       .then((res) => setVisuals(res.visuals || []))
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setVisualsSettled(true));
   }, [hasPlanContent, visuals.length, suiteId]);
+  // Existing visuals count as settled — no extra request, no gate.
+  const visualsReady = visualsSettled || visuals.length > 0;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -710,6 +733,12 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     setIntelligence(res.intelligence || null);
   }
 
+  // A dead device connection must read as exactly that — not as our fault.
+  function friendlyError(e: unknown): string {
+    const msg = e instanceof Error ? e.message : "Request failed";
+    return /load failed|failed to fetch|network\s?error|fetch failed/i.test(msg) ? text.networkError : msg;
+  }
+
   async function saveServices(next: string[]) {
     if (!suite) return;
     setBusy("save-services");
@@ -719,7 +748,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       await api.suites.updateBrand(suiteId, nextBrand);
       setSuite({ ...suite, brand: nextBrand });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Request failed");
+      setError(friendlyError(e));
     } finally {
       setBusy(null);
     }
@@ -732,7 +761,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       const res = await api.marketingPlans.updateKeywords(suiteId, { keywords: next });
       applyPlanResponse(res);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Request failed");
+      setError(friendlyError(e));
     } finally {
       setBusy(null);
     }
@@ -745,9 +774,22 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       const res = await api.marketingPlans.updateCompetitors(suiteId, { competitors: next });
       applyPlanResponse(res);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Request failed");
+      setError(friendlyError(e));
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function resyncPlan() {
+    // A long generation request can die on mobile (Safari "Load failed")
+    // while the server still finishes and persists the section — re-pull
+    // before declaring failure so completed work shows up.
+    try {
+      const fresh = await api.marketingPlans.get(suiteId);
+      setIntelligence(fresh.intelligence || null);
+      return fresh.intelligence || null;
+    } catch {
+      return null;
     }
   }
 
@@ -757,7 +799,8 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     try {
       applyPlanResponse(await fn());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Request failed");
+      await resyncPlan();
+      setError(friendlyError(e));
     } finally {
       setBusy(null);
     }
@@ -788,7 +831,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         setBusy("personas-more");
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Request failed");
+      setError(friendlyError(e));
     } finally {
       setBusy(null);
     }
@@ -835,7 +878,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Request failed");
+      setError(friendlyError(e));
     } finally {
       setBusy(null);
     }
@@ -850,37 +893,62 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       const res = await api.onboarding.generateStrategy({ suite_id: suiteId, user_language: lang });
       setSuite((prev) => (prev ? { ...prev, strategy: res.strategy } : prev));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Request failed");
+      // The request may have died after the server saved the message — resync.
+      try {
+        const fresh = await api.suites.get(suiteId);
+        setSuite(fresh);
+        if (fresh.strategy?.marketing_message) return;
+      } catch {
+        /* fall through to the error below */
+      }
+      setError(friendlyError(e));
     } finally {
       setBusy(null);
     }
   }
 
+  async function runStageSafe(slug: StageSlug, fn: () => Promise<MarketingPlanResponse>): Promise<boolean> {
+    setAutoStage(slug);
+    setBusy(slug);
+    try {
+      applyPlanResponse(await fn());
+      return true;
+    } catch {
+      const fresh = await resyncPlan();
+      // If the request died but the server persisted the section, it's a success.
+      if (slug === "keywords") return (fresh?.keywords || []).length > 0;
+      if (slug === "competitors") return (fresh?.competitors || []).length > 0;
+      if (slug === "demand-supply") return Boolean(fresh?.demand_supply) || (fresh?.demand_signals || []).length > 0;
+      return false;
+    }
+  }
+
   async function generateFullPlan() {
     setError("");
+    const failed: string[] = [];
     try {
-      setAutoStage("keywords");
-      setBusy("keywords");
-      applyPlanResponse(await api.marketingPlans.generateKeywords(suiteId, { language: lang }));
-      setAutoStage("competitors");
-      setBusy("competitors");
-      applyPlanResponse(await api.marketingPlans.generateCompetitors(suiteId, { language: lang }));
-      setAutoStage("demand-supply");
-      setBusy("demand-supply");
-      applyPlanResponse(await api.marketingPlans.generateDemandSupply(suiteId, { language: lang }));
+      // One failing section never blocks the rest of the chain.
+      if (!(await runStageSafe("keywords", () => api.marketingPlans.generateKeywords(suiteId, { language: lang })))) failed.push(text.keywordsTitle);
+      if (!(await runStageSafe("competitors", () => api.marketingPlans.generateCompetitors(suiteId, { language: lang })))) failed.push(text.competitorsTitle);
+      if (!(await runStageSafe("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang })))) failed.push(text.demandTitle);
       setAutoStage("personas");
       setBusy(null);
-      await generatePersonasInitial();
+      try {
+        await generatePersonasInitial();
+      } catch {
+        await resyncPlan();
+      }
       // The marketing message closes the plan: generated last, from everything above.
       if (!marketingMessage) {
         setAutoStage("message");
         await generateMessage();
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Request failed");
     } finally {
       setAutoStage(null);
       setBusy(null);
+    }
+    if (failed.length > 0) {
+      setError(`${text.stageFailed}: ${failed.join(" · ")}`);
     }
   }
 
@@ -896,6 +964,17 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     message: Boolean(marketingMessage),
   };
   const hasAnyPlanData = stageReady.keywords || stageReady.competitors || stageReady["demand-supply"] || stageReady.personas;
+
+  // No plan yet → generation starts by itself, no button press needed.
+  useEffect(() => {
+    if (autoStarted.current || !suite || stage) return;
+    if (!hasAnyPlanData && busy === null && autoStage === null) {
+      autoStarted.current = true;
+      const timer = window.setTimeout(() => void generateFullPlan(), 0);
+      return () => window.clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suite, hasAnyPlanData]);
   // Progressive reveal while the full-plan run is in flight: only sections
   // that are ready (or currently generating) are shown.
   const revealing = autoStage !== null;
@@ -903,11 +982,30 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
 
   const visualByKind = (kind: string) => visuals.find((item) => item.kind === kind)?.url || "";
 
+  // While the auto-run generates a section, its box sits under a translucent
+  // veil with a loader naming exactly what is being generated right now.
+  const stageTitleBySlug: Partial<Record<StageSlug, string>> = {
+    keywords: text.keywordsTitle,
+    competitors: text.competitorsTitle,
+    "demand-supply": text.demandTitle,
+    personas: text.personasTitle,
+    message: text.messageTitle,
+  };
+  const generatingVeil = (slug: StageSlug) =>
+    autoStage === slug && !stageReady[slug] ? (
+      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-3xl bg-background/70 backdrop-blur-[2px]">
+        <Loader2 size={30} className="animate-spin text-[color:var(--deck-accent,var(--brand-accent))]" />
+        <p className="px-4 text-center text-sm font-bold text-foreground" dir="auto">
+          {text.generatingNow} {stageTitleBySlug[slug]}
+        </p>
+      </div>
+    ) : null;
+
   const allStages = (
     <div className="w-full min-w-0 overflow-x-hidden space-y-4" dir={dir}>
       {visualByKind("services") && <VisualDivider url={visualByKind("services")} />}
       <ServicesStage text={text} suiteId={suiteId} services={services} saving={busy === "save-services"} onSave={saveServices} />
-      {showStage("keywords") && <KeywordsStage
+      {showStage("keywords") && <div className="relative">{generatingVeil("keywords")}<KeywordsStage
         text={text}
         suiteId={suiteId}
         keywords={intelligence?.keywords || []}
@@ -917,8 +1015,8 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         onGenerate={() => run("keywords", () => api.marketingPlans.generateKeywords(suiteId, { language: lang }))}
         onMore={() => run("keywords-more", () => api.marketingPlans.generateMoreKeywords(suiteId, { language: lang, existing_values: (intelligence?.keywords || []).map((k) => k.text) }))}
         onSave={saveKeywords}
-      />}
-      {showStage("competitors") && <CompetitorsStage
+      /></div>}
+      {showStage("competitors") && <div className="relative">{generatingVeil("competitors")}<CompetitorsStage
         text={text}
         suiteId={suiteId}
         competitors={intelligence?.competitors || []}
@@ -930,8 +1028,8 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         onMore={() => run("competitors-more", () => api.marketingPlans.generateMoreCompetitors(suiteId, { language: lang, existing_ids: (intelligence?.competitors || []).map((c) => c.id), existing_values: (intelligence?.competitors || []).map((c) => c.url || c.name) }))}
         onTagsChange={(competitorId, tags) => run("competitors", () => api.marketingPlans.updateCompetitor(suiteId, competitorId, { classification_tags: tags }))}
         onSave={saveCompetitors}
-      />}
-      {showStage("demand-supply") && <DemandSupplyStage
+      /></div>}
+      {showStage("demand-supply") && <div className="relative">{generatingVeil("demand-supply")}<DemandSupplyStage
         text={text}
         suiteId={suiteId}
         intelligence={intelligence}
@@ -939,9 +1037,9 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         loadingMore={busy === "demand-supply-more"}
         onGenerate={() => run("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang }))}
         onMore={() => run("demand-supply-more", () => api.marketingPlans.generateMoreDemandSupply(suiteId, { language: lang }))}
-      />}
+      /></div>}
       {showStage("personas") && visualByKind("audience") && <VisualDivider url={visualByKind("audience")} />}
-      {showStage("personas") && <PersonasStage
+      {showStage("personas") && <div className="relative">{generatingVeil("personas")}<PersonasStage
         text={text}
         suiteId={suiteId}
         personas={intelligence?.personas || []}
@@ -949,13 +1047,13 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         loadingMore={busy === "personas-more"}
         onGenerate={generatePersonasInitial}
         onMore={generateMorePersonas}
-      />}
-      {showStage("message") && <MarketingMessageStage
+      /></div>}
+      {showStage("message") && <div className="relative">{generatingVeil("message")}<MarketingMessageStage
         text={text}
         message={marketingMessage}
         loading={busy === "message"}
         onGenerate={generateMessage}
-      />}
+      /></div>}
       {(!revealing || stageReady.personas) && <MarketingPdfStage
         text={text}
         suiteId={suiteId}
@@ -979,6 +1077,27 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       </Button>
     </section>
   );
+
+  // Shown from arrival until the images and the first section are ready —
+  // no half-empty skeleton screen while the auto-run warms up.
+  const initialLoadingState = (
+    <section className="rounded-3xl border border-border bg-card p-10 text-center sm:p-14" dir={dir}>
+      <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[color:var(--brand-accent)]/12">
+        <Loader2 size={30} className="animate-spin text-[color:var(--deck-accent,var(--brand-accent))]" />
+      </span>
+      <h2 className="mt-6 text-2xl font-black text-foreground">{text.preparingPlan}</h2>
+      {autoStage && stageTitleBySlug[autoStage] && (
+        <p className="mt-3 text-sm font-bold text-[color:var(--deck-accent,var(--brand-accent))]" dir="auto">
+          {text.generatingNow} {stageTitleBySlug[autoStage]}
+        </p>
+      )}
+      <p className="mx-auto mt-2 max-w-xl text-sm leading-7 text-muted-foreground">{text.preparingPlanHint}</p>
+    </section>
+  );
+
+  // Reveal gate: during the initial auto-run keep the loader up until the
+  // first section AND its field images are in; existing plans show instantly.
+  const initialGenerating = revealing && (!stageReady.keywords || !visualsReady);
 
   if (!suite && !error) {
     return <div className="rounded-2xl border border-border bg-card p-10 text-center text-muted-foreground"><Loader2 className="mx-auto animate-spin" /></div>;
@@ -1050,7 +1169,13 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       {stage === "demand-supply" && <DemandSupplyStage text={text} suiteId={suiteId} intelligence={intelligence} loading={busy === "demand-supply"} loadingMore={busy === "demand-supply-more"} onGenerate={() => run("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang }))} onMore={() => run("demand-supply-more", () => api.marketingPlans.generateMoreDemandSupply(suiteId, { language: lang }))} detail />}
       {stage === "personas" && <PersonasStage text={text} suiteId={suiteId} personas={intelligence?.personas || []} loading={busy === "personas"} loadingMore={busy === "personas-more"} onGenerate={generatePersonasInitial} onMore={generateMorePersonas} detail />}
       {stage === "pdf" && <MarketingPdfStage text={text} suiteId={suiteId} ready={(intelligence?.personas || []).length > 0} loading={busy === "pdf"} onDownload={downloadPdf} detail />}
-      {!stage && (!hasAnyPlanData && !revealing ? emptyPlanState : allStages)}
+      {!stage && (
+        initialGenerating || (!hasAnyPlanData && !revealing && !error)
+          ? initialLoadingState
+          : !hasAnyPlanData && !revealing
+            ? emptyPlanState
+            : allStages
+      )}
     </div>
   );
 }
@@ -1867,9 +1992,9 @@ function MarketingPdfStage({
         </Button>
         <Link
           href={`/suite/${suiteId}/work-plans`}
-          className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-[color:var(--brand-accent)]/50 bg-[color:var(--brand-accent)]/10 px-4 text-base font-bold text-[color:var(--deck-accent,var(--brand-accent))] transition-colors hover:bg-[color:var(--brand-accent)]/20 sm:max-w-sm"
+          className="inline-flex h-16 flex-1 items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-[var(--brand-accent)] to-[var(--brand-accent-strong)] px-6 text-lg font-black text-white shadow-lg shadow-[#2f80ff]/30 ring-2 ring-[color:var(--brand-accent)]/40 ring-offset-2 ring-offset-transparent transition-transform hover:scale-[1.02] active:scale-[0.98] sm:max-w-sm"
         >
-          <ArrowUpRight size={17} />
+          <ArrowUpRight size={20} />
           {text.goToWorkPlan}
         </Link>
       </div>

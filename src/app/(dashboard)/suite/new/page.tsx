@@ -114,6 +114,19 @@ function suggestedDialect(extracted: string, langs: string[], countriesText: str
   return arabicAudience && inIsrael ? ARAB_48_DIALECT : extracted;
 }
 
+// The custom-country field holds ONLY a clean country name: no parenthetical
+// AI notes, no leading city fragments. Israel-area audiences always get
+// "إسرائيل" (localized) — never "فلسطين" or mixed forms (owner decision).
+function cleanCountryPrefill(raw: string, uiLang: string): string {
+  const stripped = raw.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim().replace(/[،,\s]+$/, "");
+  if (!stripped) return "";
+  if (/إسرائيل|israel|ישראל|فلسطين|palestin/i.test(stripped)) {
+    return uiLang === "ar" ? "إسرائيل" : uiLang === "he" ? "ישראל" : "Israel";
+  }
+  const parts = stripped.split(/[،,/]+/).map((part) => part.trim()).filter(Boolean);
+  return parts.length > 1 ? parts[parts.length - 1] : stripped;
+}
+
 const META_INTERESTS: Record<string, string[]> = {
   marketing: ["Meta Ads", "Instagram Business", "Small business", "Entrepreneurship", "Digital marketing"],
   restaurant: ["Restaurants", "Food delivery", "Local food", "Dining out", "Coffee shops"],
@@ -474,7 +487,7 @@ export default function NewSuitePage() {
   if (ipPrefillKey !== prevIpPrefillKey) {
     setPrevIpPrefillKey(ipPrefillKey);
     if (step === "step-e" && !customCountries && ipCountry) {
-      setCustomCountries(ipCountry);
+      setCustomCountries(cleanCountryPrefill(ipCountry, lang));
     }
     if (!audienceDialect && (orderedLangs[0] || "") === "ar" && /israel|إسرائيل|ישראל/i.test(ipCountry)) {
       setAudienceDialect(ARAB_48_DIALECT);
@@ -505,7 +518,7 @@ export default function NewSuitePage() {
           /* keep coordinates even without a reverse-geocoded name */
         }
         setGeo({ lat: latitude, lng: longitude, city, country });
-        if (country) setCustomCountries((prev) => prev || country);
+        if (country) setCustomCountries((prev) => prev || cleanCountryPrefill(country, lang));
         if (city) setCustomCities((prev) => prev || city);
         setGeoBusy(false);
       },
@@ -770,7 +783,7 @@ export default function NewSuitePage() {
       const locationParts = extractedLocation.split(",").map((part) => part.trim()).filter(Boolean);
       const extractedCountry = locationParts.length > 1 ? locationParts[locationParts.length - 1] : extractedLocation;
       const extractedCity = locationParts.length > 1 ? locationParts.slice(0, -1).join(", ") : "";
-      setCustomCountries((audienceLocation?.countries || []).join(", ") || extractedCountry || "");
+      setCustomCountries(cleanCountryPrefill((audienceLocation?.countries || []).join(", ") || extractedCountry || "", lang));
       setCustomCities((audienceLocation?.cities || []).join(", ") || extractedCity);
       setSelectedInterests(res.brand?.audience_interests || []);
       setSelectedBehaviors(res.brand?.audience_behaviors || []);
@@ -2169,7 +2182,7 @@ function TargetAreaCard({
         <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${selected ? "bg-foreground text-background" : "bg-muted text-foreground"}`}>
           {icon}
         </span>
-        {selected && <CheckCircle2 size={17} className="shrink-0 text-foreground" />}
+        {selected && <CheckCircle2 size={22} className="shrink-0 fill-emerald-500 text-white dark:text-zinc-900" />}
       </div>
       <p className="mt-2 text-sm font-bold text-foreground" dir="auto">{title}</p>
       <p className="mt-1 text-xs leading-5 text-muted-foreground" dir="auto">{description}</p>
