@@ -18,10 +18,12 @@ import {
   Info,
   Loader2,
   MapPinned,
+  MessageCircle,
   Package,
   Pencil,
   Plus,
   Search,
+  Sparkles,
   Star,
   Target,
   Trash2,
@@ -33,7 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
-type StageSlug = "services" | "keywords" | "competitors" | "demand-supply" | "personas" | "pdf";
+type StageSlug = "services" | "keywords" | "competitors" | "demand-supply" | "personas" | "message" | "pdf";
 type BusyAction = StageSlug | "keywords-more" | "competitors-more" | "demand-supply-more" | "personas-more" | "save-services" | "save-keywords" | "save-competitors" | null;
 
 const labels = {
@@ -46,6 +48,11 @@ const labels = {
     planEmptyTitle: "ما في خطة تسويقية بعد",
     planEmptyDesc: "بكبسة وحدة بنولّد الخطة قسم قسم: كلمات مفتاحية، منافسين، عرض وطلب، وشخصيات العملاء — كل قسم بظهر أول ما يجهز وبننتقل تلقائيًا للي بعده.",
     generateFullPlan: "توليد كل الخطة",
+    messageTitle: "الرسالة التسويقية",
+    messageDesc: "خلاصة الخطة: الرسالة الأساسية اللي بتحكي فيها علامتك مع جمهورك.",
+    generateMessage: "توليد الرسالة التسويقية",
+    regenerateMessage: "إعادة توليد الرسالة",
+    messageGenerating: "عم نولّد الرسالة التسويقية...",
     personasGenerating: "بعدنا عم نولّد شخصيات إضافية...",
     coverStatsKeywords: "كلمة مفتاحية",
     coverStatsCompetitors: "منافس",
@@ -155,6 +162,11 @@ const labels = {
     planEmptyTitle: "No marketing plan yet",
     planEmptyDesc: "One click generates the plan section by section: keywords, competitors, demand & supply, and customer personas — each section appears as soon as it is ready.",
     generateFullPlan: "Generate the full plan",
+    messageTitle: "Marketing message",
+    messageDesc: "The plan's essence: the core message your brand speaks to its audience.",
+    generateMessage: "Generate the marketing message",
+    regenerateMessage: "Regenerate the message",
+    messageGenerating: "Generating the marketing message...",
     personasGenerating: "Still generating more personas...",
     coverStatsKeywords: "keywords",
     coverStatsCompetitors: "competitors",
@@ -265,6 +277,11 @@ const labels = {
     planEmptyTitle: "עדיין אין תכנית שיווקית",
     planEmptyDesc: "בלחיצה אחת נבנה את התכנית שלב אחרי שלב: מילות מפתח, מתחרים, ביקוש והיצע ופרסונות — כל שלב מופיע ברגע שהוא מוכן.",
     generateFullPlan: "צור את כל התכנית",
+    messageTitle: "המסר השיווקי",
+    messageDesc: "תמצית התכנית: המסר המרכזי שהמותג שלך מדבר עם הקהל.",
+    generateMessage: "צור את המסר השיווקי",
+    regenerateMessage: "צור מסר מחדש",
+    messageGenerating: "יוצרים את המסר השיווקי...",
     personasGenerating: "עדיין יוצרים פרסונות נוספות...",
     coverStatsKeywords: "מילות מפתח",
     coverStatsCompetitors: "מתחרים",
@@ -429,6 +446,11 @@ const stageTones: Record<StageSlug, { section: string; icon: string; accent: str
     section: "border-rose-200/80 bg-[linear-gradient(135deg,rgba(244,63,94,0.08),rgba(255,255,255,0)_42%)] dark:border-rose-500/20 dark:bg-[linear-gradient(135deg,rgba(244,63,94,0.14),rgba(0,0,0,0)_42%)]",
     icon: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200",
     accent: "bg-rose-500",
+  },
+  message: {
+    section: "border-blue-200/80 bg-[linear-gradient(135deg,rgba(47,128,255,0.08),rgba(255,255,255,0)_42%)] dark:border-blue-500/20 dark:bg-[linear-gradient(135deg,rgba(47,128,255,0.14),rgba(0,0,0,0)_42%)]",
+    icon: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200",
+    accent: "bg-blue-500",
   },
   pdf: {
     section: "border-indigo-200/80 bg-[linear-gradient(135deg,rgba(99,102,241,0.08),rgba(255,255,255,0)_42%)] dark:border-indigo-500/20 dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.14),rgba(0,0,0,0)_42%)]",
@@ -819,6 +841,21 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     }
   }
 
+  const marketingMessage = suite?.strategy?.marketing_message || "";
+
+  async function generateMessage() {
+    setBusy("message");
+    setError("");
+    try {
+      const res = await api.onboarding.generateStrategy({ suite_id: suiteId, user_language: lang });
+      setSuite((prev) => (prev ? { ...prev, strategy: res.strategy } : prev));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function generateFullPlan() {
     setError("");
     try {
@@ -834,6 +871,11 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       setAutoStage("personas");
       setBusy(null);
       await generatePersonasInitial();
+      // The marketing message closes the plan: generated last, from everything above.
+      if (!marketingMessage) {
+        setAutoStage("message");
+        await generateMessage();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
     } finally {
@@ -851,6 +893,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       (intelligence?.demand_signals || []).length > 0 ||
       (intelligence?.supply_signals || []).length > 0,
     personas: (intelligence?.personas || []).length > 0,
+    message: Boolean(marketingMessage),
   };
   const hasAnyPlanData = stageReady.keywords || stageReady.competitors || stageReady["demand-supply"] || stageReady.personas;
   // Progressive reveal while the full-plan run is in flight: only sections
@@ -906,6 +949,12 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         loadingMore={busy === "personas-more"}
         onGenerate={generatePersonasInitial}
         onMore={generateMorePersonas}
+      />}
+      {showStage("message") && <MarketingMessageStage
+        text={text}
+        message={marketingMessage}
+        loading={busy === "message"}
+        onGenerate={generateMessage}
       />}
       {(!revealing || stageReady.personas) && <MarketingPdfStage
         text={text}
@@ -1279,7 +1328,7 @@ function CompetitorsStage({
   onSave: (next: MarketingCompetitor[]) => Promise<void>;
   detail?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [activeSource, setActiveSource] = useState<string | null>(null);
   const [addingSource, setAddingSource] = useState<string | null>(null);
   const [manual, setManual] = useState({ name: "", url: "", snippet: "" });
   const isBusy = loading || loadingMore || saving;
@@ -1308,11 +1357,17 @@ function CompetitorsStage({
       return (indexA === -1 ? 99 : indexA) - (indexB === -1 ? 99 : indexB);
     });
   }, [competitors]);
-  const firstPreviewGroup = grouped.find(([, items]) => items.length > 0) || grouped[0];
-  const visibleGroups = detail || expanded || !firstPreviewGroup ? grouped : [firstPreviewGroup];
-  const nonEmptyGroupCount = grouped.filter(([, items]) => items.length > 0).length;
+  // Tabs: the five primary sources always, extra sources (e.g. "other",
+  // sponsored) only when they actually hold competitors.
+  const tabSources = grouped.filter(
+    ([source, items]) => competitorSourceOrder.slice(0, 5).includes(source) || items.length > 0
+  );
+  const resolvedSource =
+    activeSource && tabSources.some(([source]) => source === activeSource)
+      ? activeSource
+      : tabSources.find(([, items]) => items.length > 0)?.[0] || tabSources[0]?.[0] || null;
+  const activeItems = grouped.find(([source]) => source === resolvedSource)?.[1] || [];
   const visibleCompetitorCount = grouped.reduce((total, [, items]) => total + items.length, 0);
-  const hiddenGroupCount = Math.max(0, nonEmptyGroupCount - visibleGroups.filter(([, items]) => items.length > 0).length);
 
   async function addManualCompetitor(source: string) {
     const name = manual.name.trim();
@@ -1360,79 +1415,79 @@ function CompetitorsStage({
           ))}
         </div>
       )}
-      <div className="mt-4 space-y-5">
-        {visibleCompetitorCount === 0 ? (
+      <div className="mt-4 space-y-4">
+        {visibleCompetitorCount === 0 && !resolvedSource ? (
           <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noCompetitors}</p>
-        ) : visibleGroups.map(([source, items]) => (
-          <section key={source} className="min-w-0">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <h3 className="text-sm font-bold text-foreground">{competitorSourceLabels[source] || source}</h3>
-                <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">{items.length}</span>
-              </div>
-              <Button type="button" variant="outline" size="sm" onClick={() => setAddingSource((current) => current === source ? null : source)} disabled={isBusy} className="h-8 gap-1 px-2 text-xs">
-                <Plus size={13} />
-                {text.addCompetitor}
-              </Button>
+        ) : (
+          <>
+            {/* Source tabs — one horizontal, scrollable bar */}
+            <div className="os-scroll-x -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+              {tabSources.map(([source, items]) => (
+                <button
+                  key={source}
+                  type="button"
+                  onClick={() => setActiveSource(source)}
+                  className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-sm font-semibold transition-colors ${
+                    resolvedSource === source
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border bg-card text-muted-foreground hover:border-zinc-500 hover:text-foreground"
+                  }`}
+                >
+                  <SourceGlyph source={source} />
+                  {competitorSourceLabels[source] || source}
+                  {items.length > 0 && (
+                    <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${
+                      resolvedSource === source ? "bg-background/25 text-background" : "bg-muted text-muted-foreground"
+                    }`}>{items.length}</span>
+                  )}
+                </button>
+              ))}
             </div>
-            {addingSource === source && (
-              <div className="mb-3 grid gap-2 rounded-2xl border border-amber-200/70 bg-amber-50/60 p-3 dark:border-amber-500/20 dark:bg-amber-500/10 sm:grid-cols-[1fr_1fr_auto]">
-                <Input value={manual.name} onChange={(e) => setManual((value) => ({ ...value, name: e.target.value }))} placeholder={text.newCompetitorName} dir="auto" />
-                <Input value={manual.url} onChange={(e) => setManual((value) => ({ ...value, url: e.target.value }))} placeholder={text.newCompetitorUrl} dir="ltr" />
-                <div className="flex gap-2 sm:row-span-2 sm:flex-col">
-                  <Button type="button" onClick={() => addManualCompetitor(source)} disabled={isBusy || !manual.name.trim()} className="h-10 gap-2">
-                    {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+
+            {resolvedSource && (
+              <section key={resolvedSource} className="min-w-0">
+                <div className="mb-2 flex items-center justify-end gap-3">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setAddingSource((current) => current === resolvedSource ? null : resolvedSource)} disabled={isBusy} className="h-8 gap-1 px-2 text-xs">
+                    <Plus size={13} />
                     {text.addCompetitor}
                   </Button>
-                  <Button type="button" variant="ghost" onClick={() => setAddingSource(null)} className="h-10">{text.cancel}</Button>
                 </div>
-                <Input value={manual.snippet} onChange={(e) => setManual((value) => ({ ...value, snippet: e.target.value }))} placeholder={text.newCompetitorDescription} dir="auto" className="sm:col-span-2" />
-              </div>
+                {addingSource === resolvedSource && (
+                  <div className="mb-3 grid gap-2 rounded-2xl border border-amber-200/70 bg-amber-50/60 p-3 dark:border-amber-500/20 dark:bg-amber-500/10 sm:grid-cols-[1fr_1fr_auto]">
+                    <Input value={manual.name} onChange={(e) => setManual((value) => ({ ...value, name: e.target.value }))} placeholder={text.newCompetitorName} dir="auto" />
+                    <Input value={manual.url} onChange={(e) => setManual((value) => ({ ...value, url: e.target.value }))} placeholder={text.newCompetitorUrl} dir="ltr" />
+                    <div className="flex gap-2 sm:row-span-2 sm:flex-col">
+                      <Button type="button" onClick={() => addManualCompetitor(resolvedSource)} disabled={isBusy || !manual.name.trim()} className="h-10 gap-2">
+                        {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+                        {text.addCompetitor}
+                      </Button>
+                      <Button type="button" variant="ghost" onClick={() => setAddingSource(null)} className="h-10">{text.cancel}</Button>
+                    </div>
+                    <Input value={manual.snippet} onChange={(e) => setManual((value) => ({ ...value, snippet: e.target.value }))} placeholder={text.newCompetitorDescription} dir="auto" className="sm:col-span-2" />
+                  </div>
+                )}
+                <div className="os-scroll-x flex snap-x gap-3 pb-2">
+                  {activeItems.length === 0 ? (
+                    <p className="w-[76%] max-w-80 shrink-0 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground sm:w-80">{text.noSourceCompetitors}</p>
+                  ) : activeItems.map((competitor, index) => (
+                    <div key={competitor.id} className="w-[76%] max-w-80 shrink-0 snap-start sm:w-80">
+                      <CompetitorCard
+                        text={text}
+                        competitor={competitor}
+                        onTagsChange={onTagsChange}
+                        onMoveUp={() => moveCompetitor(competitor, -1)}
+                        onMoveDown={() => moveCompetitor(competitor, 1)}
+                        moveUpDisabled={isBusy || index === 0}
+                        moveDownDisabled={isBusy || index === activeItems.length - 1}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
-            <div className="os-scroll-x flex snap-x gap-3 pb-2">
-              {items.length === 0 ? (
-                <p className="w-[76%] max-w-80 shrink-0 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground sm:w-80">{text.noSourceCompetitors}</p>
-              ) : items.map((competitor, index) => (
-                <div key={competitor.id} className="w-[76%] max-w-80 shrink-0 snap-start sm:w-80">
-                  <CompetitorCard
-                    text={text}
-                    competitor={competitor}
-                    onTagsChange={onTagsChange}
-                    onMoveUp={() => moveCompetitor(competitor, -1)}
-                    onMoveDown={() => moveCompetitor(competitor, 1)}
-                    moveUpDisabled={isBusy || index === 0}
-                    moveDownDisabled={isBusy || index === items.length - 1}
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
-        ))}
+          </>
+        )}
       </div>
-      {visibleCompetitorCount > 0 && hiddenGroupCount > 0 && !detail && (
-        <div className="mt-5 flex justify-center">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setExpanded(true)}
-            className="min-h-12 w-full max-w-xl justify-between gap-3 rounded-2xl border-amber-300 bg-amber-50/80 px-4 text-amber-950 shadow-sm hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100"
-          >
-            <span className="font-bold">{text.sourceOverview} +{hiddenGroupCount}</span>
-            <span className="flex items-center gap-1.5">
-              {competitorSourceOrder.slice(0, 5).map((source) => (
-                <span key={source} className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-background/80 text-amber-800 shadow-sm dark:bg-background/30 dark:text-amber-100" title={competitorSourceLabels[source]}>
-                  <SourceGlyph source={source} />
-                </span>
-              ))}
-            </span>
-          </Button>
-        </div>
-      )}
-      {expanded && !detail && hiddenGroupCount === 0 && grouped.length > 1 && (
-        <Button type="button" variant="ghost" size="sm" onClick={() => setExpanded(false)} className="mt-2">
-          {text.collapse}
-        </Button>
-      )}
     </StageBox>
   );
 }
@@ -1744,6 +1799,47 @@ function PersonasStage({
         </div>
       )}
     </StageBox>
+  );
+}
+
+function MarketingMessageStage({
+  text,
+  message,
+  loading,
+  onGenerate,
+}: {
+  text: typeof labels.en;
+  message: string;
+  loading: boolean;
+  onGenerate: () => void;
+}) {
+  const tone = stageTones.message;
+  return (
+    <section className={`rounded-3xl border p-6 sm:p-8 scroll-mt-24 ${tone.section}`}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${tone.icon}`}>
+            <MessageCircle size={20} />
+          </span>
+          <div>
+            <h2 className="text-xl font-black text-foreground">{text.messageTitle}</h2>
+            <p className="text-sm text-muted-foreground">{text.messageDesc}</p>
+          </div>
+        </div>
+        <Button onClick={onGenerate} disabled={loading} variant={message ? "outline" : "default"} className="gap-2">
+          {loading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+          {message ? text.regenerateMessage : text.generateMessage}
+        </Button>
+      </div>
+      {loading && !message && (
+        <p className="mt-4 text-sm text-muted-foreground">{text.messageGenerating}</p>
+      )}
+      {message && (
+        <div className="mt-5 rounded-2xl border border-[color:var(--brand-accent)]/30 bg-[color:var(--brand-accent)]/10 p-5">
+          <p className="os-text-wrap text-base font-semibold leading-8 text-foreground" dir="auto">{message}</p>
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, ApiError, Brand, BrandLogo, BrandPersona, MarketingStrategy, ResearchDebug } from "@/lib/api";
+import { api, ApiError, Brand, BrandLogo, BrandPersona, ResearchDebug } from "@/lib/api";
 import { useAuthStore } from "@/store/auth";
 import { useT, useLanguage } from "@/lib/i18n/LanguageContext";
 import { LANGUAGES, LangCode } from "@/lib/i18n/translations";
@@ -10,16 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   Loader2, Plus, X, CheckCircle2, ChevronRight, ChevronLeft,
-  AtSign, AlertCircle, Building2, Info, MapPin,
+  AtSign, AlertCircle, Building2, Info, MapPin, Users,
 } from "lucide-react";
 
 type Step = "name" | "links" | "extracting"
-  | "step-a" | "step-b" | "step-c" | "step-d" | "step-e" | "step-f" | "step-g" | "step-h"
-  | "strategy" | "preview" | "done";
+  | "step-a" | "step-b" | "step-c" | "step-d" | "step-e" | "step-f" | "step-g" | "step-h";
 
 // ── Platform helpers ──────────────────────────────────────────────────────────
 
@@ -405,11 +403,10 @@ export default function NewSuitePage() {
     { key: "step-d", label: t("suite.new.stepServices") },
     { key: "step-e", label: t("suite.new.stepAudience") },
     { key: "step-f", label: t("suite.new.stepWhyUs") },
-    { key: "step-g", label: t("suite.new.stepBrand") },
+    // Funnel visitors skip brand assets; the marketing message now lives at
+    // the end of the marketing plan instead of a wizard step.
+    ...(isFunnelUser ? [] : [{ key: "step-g" as Step, label: t("suite.new.stepBrand") }]),
     { key: "step-h", label: t("suite.new.stepPersonas") },
-    { key: "strategy", label: t("suite.new.stepStrategy") },
-    { key: "preview", label: t("suite.new.stepPreview") },
-    { key: "done", label: t("suite.new.stepDone") },
   ];
 
   const [step, setStep] = useState<Step>("name");
@@ -424,8 +421,7 @@ export default function NewSuitePage() {
   const [error, setError] = useState("");
   const [extractLog, setExtractLog] = useState("");
   const [researchDebug, setResearchDebug] = useState<ResearchDebug | null>(null);
-  const [strategy, setStrategy] = useState<MarketingStrategy | null>(null);
-  const [strategyError, setStrategyError] = useState("");
+  const [hasPersonas, setHasPersonas] = useState<boolean | null>(null);
 
   // Step A
   const [bizName, setBizName] = useState("");
@@ -583,15 +579,13 @@ export default function NewSuitePage() {
       "step-e": "step-d",
       "step-f": "step-e",
       "step-g": "step-f",
-      "step-h": "step-g",
-      strategy: "step-h",
-      preview: "step-h",
+      "step-h": isFunnelUser ? "step-f" : "step-g",
     };
     const target = previous[step];
     if (target) setStep(target);
   }
 
-  const canGoBack = step !== "name" && step !== "done";
+  const canGoBack = step !== "name";
   const languageLabel = (code: string) => {
     if (code.startsWith("custom:")) return code.slice("custom:".length);
     return LANGUAGES.find((l) => l.code === code)?.label || code;
@@ -827,17 +821,6 @@ export default function NewSuitePage() {
     }
   }
 
-  async function runGenerateStrategy() {
-    setStrategyError("");
-    try {
-      const res = await api.onboarding.generateStrategy({ suite_id: suiteId, user_language: lang });
-      setStrategy(res.strategy);
-      setStep("preview");
-    } catch (err: unknown) {
-      setStrategyError(err instanceof Error ? err.message : "Strategy generation failed. Please try again.");
-    }
-  }
-
   async function saveStep(step: string, data: Partial<Brand>) {
     try {
       await api.onboarding.saveBrandStep({ suite_id: suiteId, step, data });
@@ -998,9 +981,11 @@ export default function NewSuitePage() {
                   />
                 </div>
                 {error && <p className="text-destructive text-sm">{error}</p>}
-                <Button type="submit" className="bg-foreground text-background hover:bg-foreground/90 gap-2">
-                  {t("suite.new.continue")} <ForwardIcon size={16} />
-                </Button>
+                <StepActions sticky={isFunnelUser}>
+                  <Button type="submit" className="bg-foreground text-background hover:bg-foreground/90 gap-2 w-full sm:w-auto">
+                    {t("suite.new.continue")} <ForwardIcon size={16} />
+                  </Button>
+                </StepActions>
               </form>
             </CardContent>
           </Card>
@@ -1110,8 +1095,9 @@ export default function NewSuitePage() {
             </div>
           )}
 
+          <StepActions sticky={isFunnelUser}>
           <div className="flex gap-3">
-            <Button type="submit" className="bg-foreground text-background hover:bg-foreground/90 gap-2">
+            <Button type="submit" className="bg-foreground text-background hover:bg-foreground/90 gap-2 flex-1 sm:flex-none">
               <AtSign size={15} /> {t("suite.new.researchBtn")}
             </Button>
             <Button
@@ -1123,6 +1109,7 @@ export default function NewSuitePage() {
               <BackIcon size={15} /> {t("suite.new.back")}
             </Button>
           </div>
+          </StepActions>
         </form>
       )}
 
@@ -1163,15 +1150,17 @@ export default function NewSuitePage() {
               </div>
             </CardContent>
           </Card>
+          <StepActions sticky={isFunnelUser}>
           <div className="flex gap-3">
             <Button onClick={async () => {
               await saveStep("a", { name: bizName });
               setStep("step-b");
-            }} className="bg-foreground text-background hover:bg-foreground/90 gap-2">
+            }} className="bg-foreground text-background hover:bg-foreground/90 gap-2 flex-1 sm:flex-none">
               <ForwardIcon size={15} /> {t("suite.new.confirmName")}
             </Button>
             <button onClick={() => setStep("step-b")} className="text-muted-foreground text-sm hover:text-foreground">{t("suite.new.skip")}</button>
           </div>
+          </StepActions>
         </div>
       )}
 
@@ -1240,17 +1229,19 @@ export default function NewSuitePage() {
               )}
             </CardContent>
           </Card>
+          <StepActions sticky={isFunnelUser}>
           <div className="flex gap-3">
             <Button onClick={async () => {
               const englishNiche = selectedResearchNiche || (selectedNicheIdx >= 0 ? getEnglishNiche(selectedNicheIdx) : customNiche);
               const localNiche = selectedResearchNiche || (selectedNicheIdx >= 0 ? suggestions.niches[selectedNicheIdx] : customNiche);
               if (englishNiche) await saveStep("b", { niche: localNiche, industry: englishNiche });
               setStep("step-c");
-            }} className="bg-foreground text-background hover:bg-foreground/90 gap-2">
+            }} className="bg-foreground text-background hover:bg-foreground/90 gap-2 flex-1 sm:flex-none">
               <ForwardIcon size={15} /> {t("suite.new.confirmCategory")}
             </Button>
             <button onClick={() => setStep("step-c")} className="text-muted-foreground text-sm hover:text-foreground">{t("suite.new.skip")}</button>
           </div>
+          </StepActions>
         </div>
       )}
 
@@ -1345,6 +1336,7 @@ export default function NewSuitePage() {
               </div>
             </CardContent>
           </Card>
+          <StepActions sticky={isFunnelUser}>
           <div className="flex gap-3">
             <Button onClick={async () => {
               if (orderedLangs.length > 0) {
@@ -1356,11 +1348,12 @@ export default function NewSuitePage() {
                 });
               }
               setStep("step-d");
-            }} className="bg-foreground text-background hover:bg-foreground/90 gap-2">
+            }} className="bg-foreground text-background hover:bg-foreground/90 gap-2 flex-1 sm:flex-none">
               <ForwardIcon size={15} /> {t("suite.new.confirmLanguages")}
             </Button>
             <button onClick={() => setStep("step-d")} className="text-muted-foreground text-sm hover:text-foreground">{t("suite.new.skip")}</button>
           </div>
+          </StepActions>
         </div>
       )}
 
@@ -1398,16 +1391,18 @@ export default function NewSuitePage() {
               </div>
             </CardContent>
           </Card>
+          <StepActions sticky={isFunnelUser}>
           <div className="flex gap-3">
             <Button onClick={async () => {
               const services = serviceItems.filter(Boolean);
               if (services.length > 0) await saveStep("d", { services });
               setStep("step-e");
-            }} className="bg-foreground text-background hover:bg-foreground/90 gap-2">
+            }} className="bg-foreground text-background hover:bg-foreground/90 gap-2 flex-1 sm:flex-none">
               <ForwardIcon size={15} /> {t("suite.new.confirmServices")}
             </Button>
             <button onClick={() => setStep("step-e")} className="text-muted-foreground text-sm hover:text-foreground">{t("suite.new.skip")}</button>
           </div>
+          </StepActions>
         </div>
       )}
 
@@ -1598,6 +1593,7 @@ export default function NewSuitePage() {
               )}
             </CardContent>
           </Card>
+          <StepActions sticky={isFunnelUser}>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
             {audiencePhase !== "notes" ? (
               <Button
@@ -1619,6 +1615,7 @@ export default function NewSuitePage() {
             )}
             <button onClick={() => setStep("step-f")} className="min-h-10 text-sm text-muted-foreground hover:text-foreground sm:px-2">{t("suite.new.skip")}</button>
           </div>
+          </StepActions>
         </div>
       )}
 
@@ -1709,6 +1706,7 @@ export default function NewSuitePage() {
               </div>
             </CardContent>
           </Card>
+          <StepActions sticky={isFunnelUser}>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
             <Button onClick={async () => {
               const filteredUsp = uspPoints.filter(Boolean);
@@ -1720,12 +1718,13 @@ export default function NewSuitePage() {
                 esp: filteredEsp.join(". "),
                 how_they_help: filteredUsp[0] || brand?.how_they_help || "",
               });
-              setStep("step-g");
+              setStep(isFunnelUser ? "step-h" : "step-g");
             }} className="w-full justify-center gap-2 bg-foreground text-background hover:bg-foreground/90 sm:w-auto">
               <ForwardIcon size={15} /> {t("suite.new.confirmWhyUs")}
             </Button>
-            <button onClick={() => setStep("step-g")} className="min-h-10 text-sm text-muted-foreground hover:text-foreground sm:px-2">{t("suite.new.skip")}</button>
+            <button onClick={() => setStep(isFunnelUser ? "step-h" : "step-g")} className="min-h-10 text-sm text-muted-foreground hover:text-foreground sm:px-2">{t("suite.new.skip")}</button>
           </div>
+          </StepActions>
         </div>
       )}
 
@@ -1989,15 +1988,39 @@ export default function NewSuitePage() {
         </div>
       )}
 
-      {/* ── Step H: Brand personas ── */}
-      {step === "step-h" && (
+      {/* ── Step H: People & presenter (question-first) ── */}
+      {step === "step-h" && (() => {
+        const personasAnswer = hasPersonas ?? (personas.length > 0 ? true : null);
+        return (
         <div className="space-y-4">
           <Card className="border-border bg-card text-card-foreground">
             <CardHeader>
-              <CardTitle>{t("suite.new.stepHTitle")}</CardTitle>
-              <CardDescription className="text-muted-foreground">{t("suite.new.stepHSubtitle")}</CardDescription>
+              <CardTitle>{t("suite.new.personasQTitle")}</CardTitle>
+              <CardDescription className="text-muted-foreground">{t("suite.new.personasQSubtitle")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <TargetAreaCard
+                  selected={personasAnswer === true}
+                  icon={<Users size={18} />}
+                  title={t("suite.new.personasYes")}
+                  description={t("suite.new.personasYesDesc")}
+                  onClick={() => setHasPersonas(true)}
+                />
+                <TargetAreaCard
+                  selected={personasAnswer === false}
+                  icon={<X size={18} />}
+                  title={t("suite.new.personasNo")}
+                  description={t("suite.new.personasNoDesc")}
+                  onClick={() => setHasPersonas(false)}
+                />
+              </div>
+              {personasAnswer === true && (
+              <div className="overflow-hidden rounded-2xl border border-border">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-3">
+                  <p className="text-base font-extrabold text-foreground" dir="auto">{t("suite.new.stepHTitle")}</p>
+                </div>
+                <div className="space-y-4 p-4">
               <div className="flex flex-col gap-2 sm:flex-row rounded-2xl border border-border bg-background/60 p-4">
                 <Input
                   value={newPersonaName}
@@ -2081,106 +2104,41 @@ export default function NewSuitePage() {
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-          <Button
-            onClick={async () => {
-              await saveStep("h", { brand_personas: personas });
-              setStep("strategy");
-              await runGenerateStrategy();
-            }}
-            className="w-full justify-center gap-2 bg-foreground text-background hover:bg-foreground/90"
-          >
-            <ForwardIcon size={15} /> {t("suite.new.buildStrategy2")}
-          </Button>
-          <button
-            onClick={async () => {
-              setStep("strategy");
-              await runGenerateStrategy();
-            }}
-            className="text-muted-foreground text-sm hover:text-foreground w-full text-center"
-          >
-            {t("suite.new.skip")}
-          </button>
-        </div>
-      )}
-
-      {/* ── Step 5: Generating Strategy ── */}
-      {step === "strategy" && (
-        <div className="text-center py-16 space-y-4">
-          {strategyError ? (
-            <div className="space-y-4">
-              <div className="text-red-400 text-sm bg-red-950/40 border border-red-900 rounded-lg px-4 py-3">
-                {strategyError}
-              </div>
-              <Button onClick={runGenerateStrategy} className="bg-foreground text-background hover:bg-foreground/90">
-                {t("suite.new.tryAgain")}
-              </Button>
-            </div>
-          ) : (
-            <>
-              <Loader2 size={44} className="text-[#2f80ff] animate-spin mx-auto" />
-              <div>
-                <p className="text-foreground font-medium text-lg">{t("suite.new.generatingStrategy")}</p>
-                <p className="text-muted-foreground text-sm mt-2">{t("suite.new.strategyWork")}</p>
-              </div>
-              <div className="flex flex-col items-center gap-1.5 text-xs text-muted-foreground mt-6">
-                <span>{t("suite.new.strategyBullet1")}</span>
-                <span>{t("suite.new.strategyBullet2")}</span>
-                <span>{t("suite.new.strategyBullet3")}</span>
-                <span>{t("suite.new.strategyBullet4")}</span>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ── Step 6: Strategy Preview ── */}
-      {step === "preview" && strategy && (
-        <div className="space-y-4">
-          <Card className="border-border bg-card text-card-foreground">
-            <CardHeader>
-              <CardTitle>{t("suite.new.strategyReady")}</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                {t("suite.new.strategySaved")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-[#2f80ff]/10 border border-[#2f80ff]/30 rounded-lg p-4">
-                <p className="text-[#2f80ff] text-xs font-medium mb-2 uppercase tracking-wide">{t("suite.new.marketingMessage")}</p>
-                <p className="text-foreground text-sm leading-relaxed" dir="auto">{strategy.marketing_message}</p>
-              </div>
-              {(strategy.marketing_plan?.content_themes ?? []).length > 0 && (
-                <div>
-                  <p className="text-muted-foreground text-xs mb-2">{t("suite.new.contentThemes")}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {strategy.marketing_plan.content_themes.map((theme) => (
-                      <Badge key={theme} variant="outline" className="border-border text-foreground text-xs">{theme}</Badge>
-                    ))}
-                  </div>
                 </div>
+              </div>
               )}
-              <Button
-                onClick={() => { setStep("done"); setTimeout(() => router.push(`/suite/${suiteId}/marketing-plan`), 800); }}
-                className="bg-foreground text-background hover:bg-foreground/90 gap-2 w-full"
-              >
-                <CheckCircle2 size={14} /> {t("suite.new.goToMarketingPlan")}
-              </Button>
             </CardContent>
           </Card>
+          <StepActions sticky={isFunnelUser}>
+            <Button
+              disabled={personasAnswer === null}
+              onClick={async () => {
+                await saveStep("h", { brand_personas: personasAnswer ? personas : [] });
+                router.push(`/suite/${suiteId}/marketing-plan`);
+              }}
+              className="w-full justify-center gap-2 bg-foreground text-background hover:bg-foreground/90"
+            >
+              <CheckCircle2 size={15} /> {t("suite.new.goToMarketingPlan")}
+            </Button>
+          </StepActions>
         </div>
-      )}
-
-      {/* ── Step 7: Done ── */}
-      {step === "done" && (
-        <div className="text-center py-20">
-          <CheckCircle2 size={52} className="text-emerald-400 mx-auto mb-4" />
-          <p className="text-foreground font-medium text-xl">{t("suite.new.doneTitle")}</p>
-          <p className="text-muted-foreground text-sm mt-1">{t("suite.new.doneDesc")}</p>
-        </div>
-      )}
+        );
+      })()}
       </div>
     </div>
+  );
+}
+
+/** Funnel steps keep their confirm button fixed to the bottom of the screen. */
+function StepActions({ sticky, children }: { sticky: boolean; children: React.ReactNode }) {
+  if (!sticky) return <>{children}</>;
+  return (
+    <>
+      <div className="h-20" aria-hidden />
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur">
+        <div className="mx-auto max-w-3xl">{children}</div>
+      </div>
+    </>
   );
 }
 
