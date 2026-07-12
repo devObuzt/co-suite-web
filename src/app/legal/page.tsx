@@ -9,7 +9,7 @@ export const metadata = {
 
 export default function LegalIndexPage() {
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="min-h-dvh bg-background text-foreground">
       <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8">
         <header className="flex items-center justify-between border-b border-border pb-6">
           <Link href="/"><BrandMark /></Link>

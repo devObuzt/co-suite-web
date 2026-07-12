@@ -8,7 +8,7 @@ import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 
 export default function GoogleAdsCallbackPage() {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-background flex items-center justify-center p-4">
       <Suspense fallback={
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">

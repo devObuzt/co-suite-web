@@ -49,12 +49,12 @@ export default function PublicMarketingPlanPage({ params }: { params: Promise<{ 
   }
 
   if (loading) {
-    return <main className="grid min-h-screen place-items-center bg-background text-muted-foreground"><Loader2 className="animate-spin" /></main>;
+    return <main className="grid min-h-dvh place-items-center bg-background text-muted-foreground"><Loader2 className="animate-spin" /></main>;
   }
 
   if (locked) {
     return (
-      <main className="grid min-h-screen place-items-center bg-background p-5">
+      <main className="grid min-h-dvh place-items-center bg-background p-5">
         <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 text-center shadow-sm">
           <Lock className="mx-auto text-muted-foreground" />
           <h1 className="mt-3 text-xl font-bold text-foreground">Protected marketing plan</h1>
@@ -70,7 +70,7 @@ export default function PublicMarketingPlanPage({ params }: { params: Promise<{ 
   }
 
   if (!deck) {
-    return <main className="grid min-h-screen place-items-center bg-background p-5 text-center text-muted-foreground">{error || "Marketing plan not found"}</main>;
+    return <main className="grid min-h-dvh place-items-center bg-background p-5 text-center text-muted-foreground">{error || "Marketing plan not found"}</main>;
   }
 
   return (

@@ -8,7 +8,7 @@ import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
 export default function MetaCallbackPage() {
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-zinc-950 flex items-center justify-center p-4">
       <Suspense fallback={
         <Card className="bg-zinc-900 border-zinc-800 text-white w-full max-w-md">
           <CardContent className="pt-6">

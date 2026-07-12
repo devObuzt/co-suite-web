@@ -11,7 +11,7 @@ export function FrozenScreen() {
   const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
   return (
-    <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
+    <div className="min-h-dvh bg-background text-foreground flex items-center justify-center p-6">
       <div className="max-w-lg w-full rounded-2xl border border-border bg-card p-8 text-center space-y-5">
         <div className="flex justify-center"><BrandMark size="sm" /></div>
         <h1 className="text-2xl font-bold">{t("frozen.title")}</h1>

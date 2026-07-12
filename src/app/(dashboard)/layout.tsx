@@ -44,7 +44,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Show spinner while auth state is loading from localStorage
   if (!_hasHydrated) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-dvh bg-background flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-border border-t-indigo-500 rounded-full animate-spin" />
       </div>
     );
@@ -60,7 +60,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex">
+    <div className="h-dvh bg-background text-foreground flex">
       {/* Sidebar */}
       <aside className="hidden md:flex w-60 border-r border-border bg-card/40 flex-col p-4 shrink-0">
         <div className="mb-8 px-2"><BrandMark size="sm" /></div>

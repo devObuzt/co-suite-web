@@ -43,7 +43,7 @@ export function FunnelChrome({ children }: { children: React.ReactNode }) {
   const nextDisabled = idx === 0 && !suiteId;
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="min-h-dvh bg-background text-foreground flex flex-col">
       <header className="border-b border-border bg-card/60 sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <BrandMark size="sm" />

@@ -134,11 +134,19 @@
     width: 100%;
     max-width: 100%;
     overflow-x: hidden;
+    /* clip is stronger than hidden on iOS: it also blocks touch-pan and
+       programmatic sideways scrolling of the root */
+    overflow-x: clip;
     overscroll-behavior-x: none;
+    -webkit-text-size-adjust: 100%;
   }
   body {
     @apply bg-background text-foreground;
     min-width: 0;
+    /* viewport-fit=cover: keep content out of the notch/rounded corners */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    -webkit-tap-highlight-color: transparent;
   }
   html {
     @apply font-sans;
@@ -160,7 +168,19 @@
   textarea,
   select {
     max-width: 100%;
+    /* form controls default to min-width:auto (their intrinsic content width),
+       which lets a flex-1 input push the row wider than the screen. Allowing
+       them to shrink is what keeps link/field rows from causing sideways scroll */
+    min-width: 0;
     font-size: 16px;
+  }
+
+  /* When the keyboard opens and the browser scrolls the focused field into
+     view, keep it clear of the sticky mobile header */
+  input:focus,
+  textarea:focus,
+  select:focus {
+    scroll-margin-block: 5rem;
   }
 
   img,
@@ -326,6 +346,17 @@
   }
 }
 
+
+/* Unlayered on purpose: wins over Tailwind's layered utilities (text-sm/text-xs)
+   so no form control ever renders below 16px on phones — anything smaller makes
+   iOS Safari zoom the whole layout when the field is focused */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
 
 @media print {
   html,

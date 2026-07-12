@@ -197,7 +197,7 @@ export default function LandingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_12%_10%,rgba(248,216,74,0.18),transparent_28%),radial-gradient(circle_at_88%_20%,rgba(47,128,255,0.13),transparent_30%),linear-gradient(180deg,var(--background),var(--background))] text-foreground dark:bg-[radial-gradient(circle_at_12%_10%,rgba(248,216,74,0.08),transparent_30%),radial-gradient(circle_at_88%_18%,rgba(47,128,255,0.1),transparent_34%),linear-gradient(180deg,var(--background),var(--background))]" dir={dir}>
+    <main className="min-h-dvh bg-[radial-gradient(circle_at_12%_10%,rgba(248,216,74,0.18),transparent_28%),radial-gradient(circle_at_88%_20%,rgba(47,128,255,0.13),transparent_30%),linear-gradient(180deg,var(--background),var(--background))] text-foreground dark:bg-[radial-gradient(circle_at_12%_10%,rgba(248,216,74,0.08),transparent_30%),radial-gradient(circle_at_88%_18%,rgba(47,128,255,0.1),transparent_34%),linear-gradient(180deg,var(--background),var(--background))]" dir={dir}>
       <nav className="sticky top-0 z-30 border-b border-border bg-background/84 px-4 py-4 backdrop-blur-xl sm:px-8">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
           <BrandMark />
@@ -218,7 +218,7 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      <section className="mx-auto grid min-h-[calc(100vh-73px)] max-w-7xl items-center gap-8 px-4 py-6 sm:px-8 sm:py-10 lg:grid-cols-[1.02fr_0.98fr]">
+      <section className="mx-auto grid min-h-[calc(100dvh-73px)] max-w-7xl items-center gap-8 px-4 py-6 sm:px-8 sm:py-10 lg:grid-cols-[1.02fr_0.98fr]">
         <div className="space-y-8">
           <div className="space-y-5">
             <Badge variant="outline" className="border-[#f8d84a]/50 bg-[#f8d84a]/10 text-foreground">
