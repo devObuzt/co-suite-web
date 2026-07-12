@@ -55,10 +55,10 @@ export default function FunnelRegisterPage() {
         </Button>
       ) : null}
       <form onSubmit={submit} className="space-y-3">
-        <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("auth.fullName")} required />
-        <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.email")} required />
-        <input className={inputCls} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("sbc.register.phone")} required minLength={6} />
-        <input className={inputCls} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.password")} required minLength={6} />
+        <input className={inputCls} name="name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("auth.fullName")} required />
+        <input className={inputCls} type="email" name="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.email")} required />
+        <input className={inputCls} type="tel" name="phone" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("sbc.register.phone")} required minLength={6} />
+        <input className={inputCls} type="password" name="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.password")} required minLength={6} />
         {error && <p className="text-sm text-red-500">{error}</p>}
         <Button type="submit" disabled={busy} className="w-full">{t("sbc.register.submit")}</Button>
       </form>

@@ -105,6 +105,8 @@ export default function SignupPage() {
               <Label htmlFor="name">{t("auth.fullName")}</Label>
               <Input
                 id="name"
+                name="name"
+                autoComplete="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t("auth.namePlaceholder")}
@@ -116,7 +118,9 @@ export default function SignupPage() {
               <Label htmlFor="phone">{t("auth.phone")}</Label>
               <Input
                 id="phone"
+                name="phone"
                 type="tel"
+                autoComplete="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="bg-background"
@@ -126,7 +130,9 @@ export default function SignupPage() {
               <Label htmlFor="email">{t("auth.email")}</Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t("auth.emailPlaceholder")}
@@ -138,7 +144,9 @@ export default function SignupPage() {
               <Label htmlFor="password">{t("auth.password")}</Label>
               <Input
                 id="password"
+                name="password"
                 type="password"
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 minLength={8}
