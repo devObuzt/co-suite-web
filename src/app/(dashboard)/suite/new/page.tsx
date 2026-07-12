@@ -1422,17 +1422,20 @@ export default function NewSuitePage() {
                   {AUDIENCE_PHASES.indexOf(audiencePhase) + 1}/{AUDIENCE_PHASES.length}
                 </span>
               </div>
-              <CardDescription className="text-muted-foreground">
-                {audiencePhase === "location"
-                  ? t("suite.new.location")
-                  : audiencePhase === "interests"
-                    ? t("suite.new.interests")
-                    : audiencePhase === "behaviors"
-                      ? t("suite.new.behaviors")
-                      : audiencePhase === "statuses"
-                        ? t("suite.new.socialStatus")
-                        : t("suite.new.audienceNotes")}
-              </CardDescription>
+              <div className="mt-1 flex items-center gap-2.5">
+                <span className="h-6 w-1 shrink-0 rounded-full bg-gradient-to-b from-[var(--brand-accent)] to-[var(--brand-mint)]" />
+                <p className="text-lg font-extrabold tracking-tight text-foreground" dir="auto">
+                  {audiencePhase === "location"
+                    ? t("suite.new.location")
+                    : audiencePhase === "interests"
+                      ? t("suite.new.interests")
+                      : audiencePhase === "behaviors"
+                        ? t("suite.new.behaviors")
+                        : audiencePhase === "statuses"
+                          ? t("suite.new.socialStatus")
+                          : t("suite.new.audienceNotes")}
+                </p>
+              </div>
             </CardHeader>
             <CardContent className="space-y-5">
               {audiencePhase === "location" && (
@@ -1578,15 +1581,19 @@ export default function NewSuitePage() {
                 />
               )}
               {audiencePhase === "notes" && (
-                <div className="space-y-2">
-                  <Label className="text-foreground">{t("suite.new.audienceNotes")}</Label>
-                  <textarea
-                    value={audienceNotes}
-                    onChange={(e) => setAudienceNotes(e.target.value)}
-                    placeholder={audienceNotesPlaceholder}
-                    className="min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-[#2f80ff]"
-                    dir="auto"
-                  />
+                <div className="overflow-hidden rounded-2xl border border-border">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-3">
+                    <p className="text-base font-extrabold text-foreground" dir="auto">{t("suite.new.audienceNotes")}</p>
+                  </div>
+                  <div className="p-4">
+                    <textarea
+                      value={audienceNotes}
+                      onChange={(e) => setAudienceNotes(e.target.value)}
+                      placeholder={audienceNotesPlaceholder}
+                      className="min-h-28 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-[#2f80ff]"
+                      dir="auto"
+                    />
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -1629,12 +1636,11 @@ export default function NewSuitePage() {
               <div className="space-y-2 rounded-2xl border border-border bg-background/60 p-4">
                 <Label className="text-foreground">{t("suite.new.uspLabel")}</Label>
                 {uspPoints.map((point, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <Input
+                  <div key={i} className="flex items-start gap-2">
+                    <AutoGrowTextarea
                       value={point}
                       onChange={(e) => setUspPoints((prev) => prev.map((p, idx) => idx === i ? e.target.value : p))}
-                      className="min-h-11 flex-1 bg-background text-sm text-foreground"
-                      dir="auto"
+                      className="min-h-11 flex-1"
                     />
                     <button onClick={() => setUspPoints((prev) => prev.filter((_, idx) => idx !== i))}
                       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-red-400"><X size={14} /></button>
@@ -1667,12 +1673,11 @@ export default function NewSuitePage() {
               <div className="space-y-2 rounded-2xl border border-border bg-background/60 p-4">
                 <Label className="text-foreground">{t("suite.new.espLabel")}</Label>
                 {espPoints.map((point, i) => (
-                  <div key={i} className="flex gap-2 items-center">
-                    <Input
+                  <div key={i} className="flex items-start gap-2">
+                    <AutoGrowTextarea
                       value={point}
                       onChange={(e) => setEspPoints((prev) => prev.map((p, idx) => idx === i ? e.target.value : p))}
-                      className="min-h-11 flex-1 bg-background text-sm text-foreground"
-                      dir="auto"
+                      className="min-h-11 flex-1"
                     />
                     <button onClick={() => setEspPoints((prev) => prev.filter((_, idx) => idx !== i))}
                       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-red-400"><X size={14} /></button>
@@ -2214,6 +2219,35 @@ function TargetAreaCard({
   );
 }
 
+function AutoGrowTextarea({
+  value,
+  onChange,
+  className = "",
+}: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  className?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el) {
+      el.style.height = "0px";
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      onChange={onChange}
+      className={`resize-none overflow-hidden rounded-lg border border-input bg-background px-3 py-2 text-base leading-relaxed text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm ${className}`}
+      dir="auto"
+    />
+  );
+}
+
 function AudienceChipsSection({
   title,
   addAllLabel,
@@ -2234,7 +2268,7 @@ function AudienceChipsSection({
   return (
     <div className="overflow-hidden rounded-2xl border border-border">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-3">
-        <p className="text-sm font-bold text-foreground" dir="auto">{title}</p>
+        <p className="text-base font-extrabold text-foreground" dir="auto">{title}</p>
         {suggestions.length > 0 && (
           <button
             type="button"
