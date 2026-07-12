@@ -18,7 +18,7 @@ export function SuitePageShell({
   const { dir } = useLanguage();
   const t = useT();
   return (
-    <div className="mx-auto w-full max-w-6xl overflow-x-hidden space-y-5 px-4 py-5 sm:space-y-6 md:p-8" dir={dir}>
+    <div className="mx-auto w-full max-w-6xl overflow-x-clip space-y-5 px-4 py-5 sm:space-y-6 md:p-8" dir={dir}>
       <header className="flex min-w-0 flex-col gap-2">
         {backHref && (
           <Link href={backHref} className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground">

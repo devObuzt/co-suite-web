@@ -9,7 +9,7 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BadgeCheck, ChevronDown, Loader2, Sparkles } from "lucide-react";
+import { BadgeCheck, Loader2, Plus, Sparkles } from "lucide-react";
 
 const OBJECTIVE: Record<SocialIdeaObjective, { label: string; dot: string }> = {
   attraction: { label: "جذب", dot: "#2f80ff" },
@@ -69,7 +69,6 @@ export function SocialIdeasGallery({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
-  const [expanded, setExpanded] = useState<string | null>(null);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -109,7 +108,6 @@ export function SocialIdeasGallery({
       });
       onResponse(res);
       setFilter("all");
-      setExpanded(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذّر توليد الأفكار");
     } finally {
@@ -237,11 +235,9 @@ export function SocialIdeasGallery({
           <IdeaCard
             key={idea.id}
             idea={idea}
-            expanded={expanded === idea.id}
             selected={selected.has(idea.id)}
             chosenAssets={assets[idea.id] ?? []}
             note={notes[idea.id] ?? ""}
-            onToggleExpand={() => setExpanded(expanded === idea.id ? null : idea.id)}
             onToggleSelect={() => toggleSelected(idea.id)}
             onToggleAsset={(t) => toggleAsset(idea.id, t)}
             onNote={(v) => setNotes((prev) => ({ ...prev, [idea.id]: v }))}
@@ -261,21 +257,17 @@ export function SocialIdeasGallery({
 
 function IdeaCard({
   idea,
-  expanded,
   selected,
   chosenAssets,
   note,
-  onToggleExpand,
   onToggleSelect,
   onToggleAsset,
   onNote,
 }: {
   idea: SocialIdea;
-  expanded: boolean;
   selected: boolean;
   chosenAssets: string[];
   note: string;
-  onToggleExpand: () => void;
   onToggleSelect: () => void;
   onToggleAsset: (assetType: string) => void;
   onNote: (value: string) => void;
@@ -288,7 +280,7 @@ function IdeaCard({
       }`}
     >
       <div className="flex items-start gap-2">
-        <button onClick={onToggleExpand} className="min-w-0 flex-1 text-right">
+        <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-1.5">
             <Badge variant="secondary" className="gap-1">
               <span className="size-2 rounded-full" style={{ background: obj.dot }} />
@@ -303,84 +295,80 @@ function IdeaCard({
           <h4 className="font-semibold leading-snug" dir="auto">
             {idea.title}
           </h4>
-          <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground" dir="auto">
+          <p className="mt-0.5 text-sm text-muted-foreground" dir="auto">
             {idea.short_description}
           </p>
+        </div>
+        <button
+          onClick={onToggleSelect}
+          className={`flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+            selected
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-primary/40 text-primary hover:bg-primary/10"
+          }`}
+        >
+          {selected ? <BadgeCheck className="size-4" /> : <Plus className="size-4" />}
+          {selected ? "مضافة" : "أضف الفكرة"}
         </button>
-        <div className="flex flex-col items-center gap-1">
-          <button
-            onClick={onToggleSelect}
-            className={`rounded-lg border px-2 py-1 text-xs transition ${
-              selected ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground"
-            }`}
-          >
-            {selected ? <BadgeCheck className="size-4" /> : "اختر"}
-          </button>
-          <ChevronDown
-            onClick={onToggleExpand}
-            className={`size-4 cursor-pointer text-muted-foreground transition ${expanded ? "rotate-180" : ""}`}
+      </div>
+
+      {/* Always-visible detail: client story, how-to-apply assets, notes */}
+      <div className="mt-3 space-y-3 border-t border-dashed border-border pt-3">
+        {(idea.client_story.text || idea.client_story.example) && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              قصة عميل — مثال توضيحي حالياً
+            </div>
+            {idea.client_story.text && (
+              <p className="mt-1 text-sm" dir="auto">
+                {idea.client_story.text}
+              </p>
+            )}
+            {idea.client_story.example && (
+              <p className="mt-0.5 text-sm text-muted-foreground" dir="auto">
+                {idea.client_story.example}
+              </p>
+            )}
+          </div>
+        )}
+
+        <div>
+          <div className="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+            كيفية التطبيق — المقترح (الوسط) مختار مسبقاً
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {idea.apply_assets.map((a) => {
+              const on = chosenAssets.includes(a.asset_type);
+              return (
+                <button
+                  key={a.asset_type}
+                  onClick={() => onToggleAsset(a.asset_type)}
+                  className={`rounded-full border px-2.5 py-1 text-xs transition ${
+                    on
+                      ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                      : "border-border text-muted-foreground"
+                  }`}
+                >
+                  {on ? "✓ " : "+ "}
+                  {assetLabel(a.asset_type)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">ملاحظاتك</div>
+          <textarea
+            value={note}
+            onChange={(e) => onNote(e.target.value)}
+            placeholder="دوّن ملاحظاتك على الفكرة…"
+            rows={2}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            dir="auto"
           />
         </div>
       </div>
-
-      {expanded && (
-        <div className="mt-3 space-y-3 border-t border-dashed border-border pt-3">
-          {(idea.client_story.text || idea.client_story.example) && (
-            <div>
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                قصة عميل — مثال توضيحي حالياً
-              </div>
-              {idea.client_story.text && (
-                <p className="mt-1 text-sm" dir="auto">
-                  {idea.client_story.text}
-                </p>
-              )}
-              {idea.client_story.example && (
-                <p className="mt-0.5 text-sm text-muted-foreground" dir="auto">
-                  {idea.client_story.example}
-                </p>
-              )}
-            </div>
-          )}
-
-          <div>
-            <div className="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-              كيفية التطبيق — المقترح (الوسط) مختار مسبقاً
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {idea.apply_assets.map((a) => {
-                const on = chosenAssets.includes(a.asset_type);
-                return (
-                  <button
-                    key={a.asset_type}
-                    onClick={() => onToggleAsset(a.asset_type)}
-                    className={`rounded-full border px-2.5 py-1 text-xs transition ${
-                      on
-                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                        : "border-border text-muted-foreground"
-                    }`}
-                  >
-                    {on ? "✓ " : "+ "}
-                    {assetLabel(a.asset_type)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">ملاحظاتك</div>
-            <textarea
-              value={note}
-              onChange={(e) => onNote(e.target.value)}
-              placeholder="دوّن ملاحظاتك على الفكرة…"
-              rows={2}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-              dir="auto"
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
