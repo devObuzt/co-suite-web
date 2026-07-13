@@ -1036,6 +1036,9 @@ export interface SocialIdea {
 
 export interface SocialIdeasPlan {
   version: string;
+  status?: "generating" | "ready" | "failed";
+  error?: string;
+  started_at?: string;
   language?: string;
   period?: string;
   target_count?: number;

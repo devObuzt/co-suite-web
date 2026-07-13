@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   api,
   type MarketingPlanResponse,
@@ -44,6 +44,25 @@ function nextMonth(): string {
   d.setDate(1);
   d.setMonth(d.getMonth() + 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+// A plain select, identical on mobile and desktop — no native month/calendar
+// widget differences between platforms.
+function monthOptions(current: string): Array<{ value: string; label: string }> {
+  const fmt = new Intl.DateTimeFormat("ar", { month: "long", year: "numeric" });
+  const list: Array<{ value: string; label: string }> = [];
+  const d = new Date();
+  d.setDate(1);
+  for (let i = 0; i < 12; i++) {
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    list.push({ value, label: fmt.format(d) });
+    d.setMonth(d.getMonth() + 1);
+  }
+  if (current && !list.some((o) => o.value === current)) {
+    const [y, m] = current.split("-").map(Number);
+    list.unshift({ value: current, label: fmt.format(new Date(y, (m || 1) - 1, 1)) });
+  }
+  return list;
 }
 
 function assetLabel(type: string): string {
@@ -98,6 +117,22 @@ export function SocialIdeasGallery({
     return candidates.filter((c) => c.objective_type === filter);
   }, [candidates, filter]);
 
+  // Generation runs on the server and keeps going even if the visitor
+  // navigates away or closes the app — this component only polls the plan
+  // until the run finishes, and resumes polling on any later visit.
+  const generating = plan?.status === "generating";
+  useEffect(() => {
+    if (!generating) return;
+    const timer = window.setInterval(() => {
+      api.marketingPlans
+        .get(suiteId)
+        .then(onResponse)
+        .catch(() => undefined);
+    }, 5000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generating, suiteId]);
+
   async function generate() {
     setBusy(true);
     setError(null);
@@ -150,7 +185,7 @@ export function SocialIdeasGallery({
     });
   }
 
-  // ── Empty state: generate ──────────────────────────────────────────────
+  // ── Empty state: generate / generating / failed ────────────────────────
   if (candidates.length === 0) {
     return (
       <div dir="rtl" className="space-y-4 text-right">
@@ -159,36 +194,58 @@ export function SocialIdeasGallery({
             <Sparkles className="size-5 text-primary" />
             <h3 className="text-lg font-semibold">أفكار السوشيال</h3>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            بنفحص المناسبات وأبحاث السوق، وبنقترح ضعف العدد أفكار — إنت بتختار.
-          </p>
-          <div className="mt-4 flex flex-wrap items-end gap-3">
-            <label className="text-sm">
-              <span className="mb-1 block text-muted-foreground">الشهر</span>
-              <input
-                type="month"
-                value={period}
-                onChange={(e) => setPeriod(e.target.value)}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="text-sm">
-              <span className="mb-1 block text-muted-foreground">عدد الأفكار (الوتيرة)</span>
-              <input
-                type="number"
-                min={1}
-                max={31}
-                value={targetCount}
-                onChange={(e) => setTargetCount(Math.max(1, Math.min(31, Number(e.target.value) || 12)))}
-                className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm"
-              />
-            </label>
-            <Button onClick={generate} disabled={busy}>
-              {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              {busy ? "عم نولّد…" : "ولّد أفكار"}
-            </Button>
-          </div>
-          {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+          {generating ? (
+            <div className="mt-4 flex items-center gap-3 rounded-xl border border-border bg-background/60 p-4">
+              <Loader2 className="size-5 shrink-0 animate-spin text-primary" />
+              <div>
+                <p className="text-sm font-semibold">عم نولّد أفكار {plan?.period} بالخلفية…</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  التوليد شغال عالسيرفر — فيك تتنقل أو تسكّر التطبيق وترجع، ما رح يقف.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="mt-1 text-sm text-muted-foreground">
+                بنفحص المناسبات وأبحاث السوق، وبنقترح ضعف العدد أفكار — إنت بتختار.
+              </p>
+              {plan?.status === "failed" && (
+                <p className="mt-3 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                  تعذّر التوليد المرة الماضية — جرّب كمان مرة.
+                </p>
+              )}
+              <div className="mt-4 flex flex-wrap items-end gap-3">
+                <label className="text-sm">
+                  <span className="mb-1 block text-muted-foreground">الشهر</span>
+                  <select
+                    value={period}
+                    onChange={(e) => setPeriod(e.target.value)}
+                    className="min-h-10 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  >
+                    {monthOptions(period).map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block text-muted-foreground">عدد الأفكار (الوتيرة)</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={targetCount}
+                    onChange={(e) => setTargetCount(Math.max(1, Math.min(31, Number(e.target.value) || 12)))}
+                    className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </label>
+                <Button onClick={generate} disabled={busy}>
+                  {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                  {busy ? "عم نولّد…" : "ولّد أفكار"}
+                </Button>
+              </div>
+              {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+            </>
+          )}
         </div>
       </div>
     );
@@ -246,9 +303,9 @@ export function SocialIdeasGallery({
       </div>
 
       <div className="pt-1">
-        <Button variant="outline" size="sm" onClick={generate} disabled={busy}>
-          {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-          إعادة توليد
+        <Button variant="outline" size="sm" onClick={generate} disabled={busy || generating}>
+          {busy || generating ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+          {generating ? "عم نولّد بالخلفية…" : "إعادة توليد"}
         </Button>
       </div>
     </div>

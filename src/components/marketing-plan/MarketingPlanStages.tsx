@@ -986,10 +986,12 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [suite, hasAnyPlanData]);
-  // Progressive reveal while the full-plan run is in flight: only sections
-  // that are ready (or currently generating) are shown.
+  // Progressive reveal while the full-plan run is in flight: a section only
+  // appears once it is COMPLETE — never half-filled (a lone competitor while
+  // more are coming reads as weak output). The in-flight stage shows as a
+  // dedicated generating card instead.
   const revealing = autoStage !== null;
-  const showStage = (slug: StageSlug) => !revealing || stageReady[slug] || autoStage === slug;
+  const showStage = (slug: StageSlug) => !revealing || stageReady[slug];
 
   const visualByKind = (kind: string) => visuals.find((item) => item.kind === kind)?.url || "";
 
@@ -1068,6 +1070,14 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         // One-shot journey: once the message exists, funnel visitors don't regenerate.
         canRegenerate={!isFunnelUser}
       /></div>}
+      {revealing && autoStage && !stageReady[autoStage] && (
+        <section className="flex items-center justify-center gap-3 rounded-3xl border border-dashed border-[color:var(--brand-accent)]/40 bg-card/60 p-8">
+          <Loader2 size={24} className="animate-spin text-[color:var(--deck-accent,var(--brand-accent))]" />
+          <p className="text-sm font-bold text-foreground" dir="auto">
+            {text.generatingNow} {stageTitleBySlug[autoStage]}
+          </p>
+        </section>
+      )}
       {(!revealing || stageReady.personas) && <MarketingPdfStage
         text={text}
         suiteId={suiteId}
