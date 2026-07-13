@@ -286,68 +286,62 @@ function PaidPlanPanel({
 }
 
 function PaidIdeaCard({ idea, selected, disabled, onClick }: { idea: PaidContentIdea; selected: boolean; disabled: boolean; onClick: () => void }) {
-  const FormatIcon = idea.ad_format === "carousel" ? Layers3 : idea.ad_format === "image_banner" ? Image : PlaySquare;
+  const recommendedFormat = idea.recommended_format || idea.ad_format || "video";
+  const description = idea.description || idea.visual_idea || idea.rationale || "";
+  const FormatIcon = recommendedFormat === "carousel"
+    ? Layers3
+    : recommendedFormat === "image_banner"
+      ? Image
+      : recommendedFormat === "ai_video"
+        ? Sparkles
+        : PlaySquare;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
+    <article
       className={[
         "rounded-2xl border bg-background p-4 text-start transition",
         selected ? "border-[#ff4fa3] shadow-sm ring-2 ring-[#ff4fa3]/20" : "border-border hover:border-[#ff4fa3]/50",
         disabled ? "opacity-50" : "",
       ].join(" ")}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary" className="gap-1">
               <FormatIcon size={13} />
-              {formatLabel(idea.ad_format)}
+              {formatLabel(recommendedFormat)}
             </Badge>
             {idea.channel && <Badge variant="outline">{idea.channel}</Badge>}
             {idea.provider && <Badge variant="outline">{idea.provider}</Badge>}
           </div>
           <h4 className="mt-3 text-lg font-semibold leading-7" dir="auto">{idea.title}</h4>
         </div>
-        {selected && <BadgeCheck size={20} className="shrink-0 text-[#ff4fa3]" />}
       </div>
-      {idea.hook && (
-        <div className="mt-3 space-y-1">
-          <p className="text-xs font-semibold text-muted-foreground">الافتتاحية / Hook</p>
-          <p className="text-sm font-semibold leading-6" dir="auto">{idea.hook}</p>
-        </div>
-      )}
-      {idea.visual_idea && (
-        <div className="mt-3 space-y-1">
-          <p className="text-xs font-semibold text-muted-foreground">الفكرة البصرية</p>
-          <p className="text-sm leading-6 text-muted-foreground" dir="auto">{idea.visual_idea}</p>
-        </div>
-      )}
-      {idea.copy && (
-        <div className="mt-3 rounded-xl bg-muted/60 p-3">
-          <p className="mb-1 text-xs font-semibold text-muted-foreground">النص / الكابشن</p>
-          <p className="whitespace-pre-line text-sm leading-6" dir="auto">{idea.copy}</p>
-        </div>
-      )}
-      {idea.cta && (
-        <div className="mt-3 space-y-1">
-          <p className="text-xs font-semibold text-muted-foreground">الدعوة للفعل</p>
-          <p className="text-sm leading-6 text-muted-foreground" dir="auto">{idea.cta}</p>
-        </div>
-      )}
-      {idea.extra_requirements && idea.extra_requirements.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {idea.extra_requirements.map((item) => <Badge key={item} variant="outline">{item}</Badge>)}
-        </div>
-      )}
-    </button>
+      {description && <p className="mt-2 text-sm leading-6 text-muted-foreground" dir="auto">{description}</p>}
+      <div className="mt-4 border-t border-dashed border-border pt-3">
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={disabled}
+          className={[
+            "flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-medium transition",
+            selected
+              ? "border-[#ff4fa3] bg-[#ff4fa3] text-white"
+              : "border-[#ff4fa3]/40 text-[#d52b82] hover:bg-[#ff4fa3]/10",
+            disabled ? "cursor-not-allowed" : "",
+          ].join(" ")}
+        >
+          {selected ? <BadgeCheck size={16} /> : <Sparkles size={16} />}
+          {selected ? "مضافة" : "أضف الفكرة"}
+        </button>
+      </div>
+    </article>
   );
 }
 
 function formatLabel(format?: string) {
   if (format === "image_banner") return "صورة / بانر";
   if (format === "carousel") return "كاروسيل";
+  if (format === "ai_video") return "فيديو AI";
   return "فيديو";
 }
 

@@ -1126,7 +1126,9 @@ export interface PaidContentIdea {
   idea?: string;
   activities?: string[];
   title: string;
-  ad_format?: "video" | "image_banner" | "carousel" | string;
+  description?: string;
+  recommended_format?: "video" | "image_banner" | "carousel" | "ai_video" | string;
+  ad_format?: "video" | "image_banner" | "carousel" | "ai_video" | string;
   channel?: string;
   hook?: string;
   visual_idea?: string;
