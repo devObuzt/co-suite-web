@@ -30,7 +30,8 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { api, Brand, MarketingCompetitor, MarketingIntelligence, MarketingKeyword, MarketingPersona, MarketingPlanResponse, PlanVisual, Suite } from "@/lib/api";
+import { ApiError, api, Brand, MarketingCompetitor, MarketingIntelligence, MarketingKeyword, MarketingPersona, MarketingPlanResponse, PlanVisual, Suite } from "@/lib/api";
+import { useAuthStore } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
@@ -54,6 +55,7 @@ const labels = {
     stageFailed: "تعذّر توليد",
     retryStage: "أعد المحاولة",
     networkError: "انقطع اتصال جهازك بالإنترنت أثناء العملية — هاي مش مشكلة من عنا. تأكد من الاتصال وجرّب مرة ثانية.",
+    funnelOneShot: "بمسار التجربة المجانية الرسالة بتتولد مرة واحدة — للتعديل أو إعادة التوليد تواصل معنا.",
     messageTitle: "الرسالة التسويقية",
     messageDesc: "خلاصة الخطة: الرسالة الأساسية اللي بتحكي فيها علامتك مع جمهورك.",
     generateMessage: "توليد الرسالة التسويقية",
@@ -174,6 +176,7 @@ const labels = {
     stageFailed: "Failed to generate",
     retryStage: "Try again",
     networkError: "Your device lost its internet connection during the operation — this is not a problem on our side. Check your connection and try again.",
+    funnelOneShot: "On the free trial journey the message is generated once — contact us to adjust or regenerate it.",
     messageTitle: "Marketing message",
     messageDesc: "The plan's essence: the core message your brand speaks to its audience.",
     generateMessage: "Generate the marketing message",
@@ -295,6 +298,7 @@ const labels = {
     stageFailed: "יצירה נכשלה",
     retryStage: "נסו שוב",
     networkError: "חיבור האינטרנט של המכשיר נותק במהלך הפעולה — זו לא תקלה אצלנו. בדקו את החיבור ונסו שוב.",
+    funnelOneShot: "במסלול ההתנסות המסר נוצר פעם אחת — צרו קשר כדי לעדכן או ליצור מחדש.",
     messageTitle: "המסר השיווקי",
     messageDesc: "תמצית התכנית: המסר המרכזי שהמותג שלך מדבר עם הקהל.",
     generateMessage: "צור את המסר השיווקי",
@@ -658,6 +662,7 @@ function CompetitorAvatar({ competitor }: { competitor: MarketingCompetitor }) {
 
 export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage?: StageSlug }) {
   const { lang, dir, t } = useLanguage();
+  const isFunnelUser = useAuthStore((s) => s.user?.approval_status === "funnel");
   const baseText = labels[lang as keyof typeof labels] || labels.en;
   const text = useMemo(() => withAdminTextOverrides(baseText, t), [baseText, t]);
   const [suite, setSuite] = useState<Suite | null>(null);
@@ -885,14 +890,20 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
   }
 
   const marketingMessage = suite?.strategy?.marketing_message || "";
+  const [messageError, setMessageError] = useState("");
 
   async function generateMessage() {
     setBusy("message");
     setError("");
+    setMessageError("");
     try {
       const res = await api.onboarding.generateStrategy({ suite_id: suiteId, user_language: lang });
       setSuite((prev) => (prev ? { ...prev, strategy: res.strategy } : prev));
     } catch (e) {
+      if (e instanceof ApiError && e.detail === "funnel_regeneration_blocked") {
+        setMessageError(text.funnelOneShot);
+        return;
+      }
       // The request may have died after the server saved the message — resync.
       try {
         const fresh = await api.suites.get(suiteId);
@@ -901,7 +912,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
       } catch {
         /* fall through to the error below */
       }
-      setError(friendlyError(e));
+      setMessageError(friendlyError(e));
     } finally {
       setBusy(null);
     }
@@ -1053,6 +1064,9 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         message={marketingMessage}
         loading={busy === "message"}
         onGenerate={generateMessage}
+        error={messageError}
+        // One-shot journey: once the message exists, funnel visitors don't regenerate.
+        canRegenerate={!isFunnelUser}
       /></div>}
       {(!revealing || stageReady.personas) && <MarketingPdfStage
         text={text}
@@ -1932,13 +1946,18 @@ function MarketingMessageStage({
   message,
   loading,
   onGenerate,
+  error,
+  canRegenerate,
 }: {
   text: typeof labels.en;
   message: string;
   loading: boolean;
   onGenerate: () => void;
+  error?: string;
+  canRegenerate?: boolean;
 }) {
   const tone = stageTones.message;
+  const showButton = !message || canRegenerate;
   return (
     <section className={`rounded-3xl border p-6 sm:p-8 scroll-mt-24 ${tone.section}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1951,13 +1970,20 @@ function MarketingMessageStage({
             <p className="text-sm text-muted-foreground">{text.messageDesc}</p>
           </div>
         </div>
-        <Button onClick={onGenerate} disabled={loading} variant={message ? "outline" : "default"} className="gap-2">
-          {loading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-          {message ? text.regenerateMessage : text.generateMessage}
-        </Button>
+        {showButton && (
+          <Button onClick={onGenerate} disabled={loading} variant={message ? "outline" : "default"} className="gap-2">
+            {loading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+            {message ? text.regenerateMessage : text.generateMessage}
+          </Button>
+        )}
       </div>
       {loading && !message && (
         <p className="mt-4 text-sm text-muted-foreground">{text.messageGenerating}</p>
+      )}
+      {error && (
+        <p className="os-text-wrap mt-4 rounded-xl border border-red-300/60 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300" dir="auto">
+          {error}
+        </p>
       )}
       {message && (
         <div className="mt-5 rounded-2xl border border-[color:var(--brand-accent)]/30 bg-[color:var(--brand-accent)]/10 p-5">
