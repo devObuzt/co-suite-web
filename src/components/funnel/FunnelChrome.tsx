@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/BrandMark";
+import { FunnelFooter } from "@/components/funnel/FunnelFooter";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { api, FunnelState } from "@/lib/api";
 
@@ -71,6 +72,7 @@ export function FunnelChrome({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className="flex-1">{children}</main>
+      <FunnelFooter />
     </div>
   );
 }
