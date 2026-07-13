@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Separator } from "@/components/ui/separator";
 import {
   Loader2, Plus, X, CheckCircle2, ChevronRight, ChevronLeft,
-  AtSign, AlertCircle, Building2, Info, MapPin, Users,
+  AtSign, AlertCircle, Building2, Info, MapPin, Users, Sparkles,
 } from "lucide-react";
 
 type Step = "name" | "links" | "extracting"
@@ -569,6 +569,10 @@ export default function NewSuitePage() {
   // Step F
   const [uspPoints, setUspPoints] = useState<string[]>([]);
   const [espPoints, setEspPoints] = useState<string[]>([]);
+  const [aiUspSuggestions, setAiUspSuggestions] = useState<string[]>([]);
+  const [aiEspSuggestions, setAiEspSuggestions] = useState<string[]>([]);
+  const [generatingWhyUs, setGeneratingWhyUs] = useState(false);
+  const [whyUsGenError, setWhyUsGenError] = useState("");
   // Step G
   const [generatingLogo, setGeneratingLogo] = useState(false);
   const [generatingColors, setGeneratingColors] = useState(false);
@@ -807,12 +811,20 @@ export default function NewSuitePage() {
           });
           if (translated.unique_value) setUspPoints([translated.unique_value]);
           if (translated.esp) setEspPoints([translated.esp]);
+          setAiUspSuggestions([translated.unique_value || rawUsp].filter(Boolean));
+          setAiEspSuggestions([translated.esp || rawEsp].filter(Boolean));
         } catch {
           // Keep originals on failure
+          setAiUspSuggestions(rawUsp ? [rawUsp] : []);
+          setAiEspSuggestions(rawEsp ? [rawEsp] : []);
         }
       } else {
-        setUspPoints(res.brand?.usp_points || (rawUsp ? [rawUsp] : []));
-        setEspPoints(res.brand?.esp_points || (rawEsp ? [rawEsp] : []));
+        const uspSeed = res.brand?.usp_points || (rawUsp ? [rawUsp] : []);
+        const espSeed = res.brand?.esp_points || (rawEsp ? [rawEsp] : []);
+        setUspPoints(uspSeed);
+        setEspPoints(espSeed);
+        setAiUspSuggestions(uspSeed);
+        setAiEspSuggestions(espSeed);
       }
       setLocalColors({
         primary: res.brand?.colors?.primary || "#0a0a0a",
@@ -840,6 +852,56 @@ export default function NewSuitePage() {
       setBrand(prev => ({ ...(prev || {}), ...data }));
     } catch {
       // non-fatal
+    }
+  }
+
+  // Step F: AI-generate personalized USP/ESP suggestions from the user's
+  // site/brand (re-uses the extract-brand endpoint — with no URLs the backend
+  // falls back to suggest_brand_identity from name + industry).
+  async function generateWhyUsSuggestions() {
+    if (generatingWhyUs) return;
+    setWhyUsGenError("");
+    setGeneratingWhyUs(true);
+    try {
+      const urls = links.map((l) => l.url).filter(Boolean);
+      const englishNiche = selectedResearchNiche || (selectedNicheIdx >= 0 ? getEnglishNiche(selectedNicheIdx) : customNiche);
+      const res = await api.onboarding.extractBrand({
+        suite_id: suiteId,
+        urls,
+        business_name: businessName || suiteName,
+        industry: englishNiche || brand?.industry || "business",
+        description: serviceItems.filter(Boolean).join(", ") || brand?.description || "",
+        user_language: lang,
+      });
+      let uspIdeas = [res.brand?.unique_value, res.brand?.how_they_help, ...(res.brand?.usp_points || [])]
+        .map((s) => (s || "").trim()).filter(Boolean);
+      let espIdeas = [res.brand?.esp, ...(res.brand?.esp_points || [])]
+        .map((s) => (s || "").trim()).filter(Boolean);
+      // Same safety net as the initial extraction: translate to the user's
+      // language when the model answered in English.
+      if (lang !== "en" && (uspIdeas[0] || espIdeas[0])) {
+        try {
+          const translated = await api.onboarding.translateBrandFields({
+            unique_value: uspIdeas[0] || "",
+            esp: espIdeas[0] || "",
+            target_language: lang,
+          });
+          if (translated.unique_value) uspIdeas = [translated.unique_value, ...uspIdeas.slice(1)];
+          if (translated.esp) espIdeas = [translated.esp, ...espIdeas.slice(1)];
+        } catch {
+          // Keep originals on failure
+        }
+      }
+      if (uspIdeas.length === 0 && espIdeas.length === 0) {
+        setWhyUsGenError(t("suite.new.whyUsAiError"));
+      } else {
+        setAiUspSuggestions((prev) => Array.from(new Set([...uspIdeas, ...prev])));
+        setAiEspSuggestions((prev) => Array.from(new Set([...espIdeas, ...prev])));
+      }
+    } catch (err: unknown) {
+      setWhyUsGenError(err instanceof ApiError && err.message ? err.message : t("suite.new.whyUsAiError"));
+    } finally {
+      setGeneratingWhyUs(false);
     }
   }
 
@@ -1643,6 +1705,28 @@ export default function NewSuitePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
+              {/* AI generation row — personalized USP/ESP from the user's site/brand */}
+              <div className="flex flex-col gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-2 text-sm text-foreground">
+                  <Sparkles size={16} className="mt-0.5 shrink-0 text-primary" />
+                  <span dir="auto">{t("suite.new.whyUsAiHint")}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={generateWhyUsSuggestions}
+                  disabled={generatingWhyUs}
+                  className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {generatingWhyUs
+                    ? (<><Loader2 size={14} className="animate-spin" /> {t("suite.new.whyUsAiGenerating")}</>)
+                    : (<><Sparkles size={14} /> {t("suite.new.whyUsAiGenerate")}</>)}
+                </button>
+              </div>
+              {whyUsGenError && (
+                <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-2.5" dir="auto">
+                  <AlertCircle size={14} className="shrink-0" /> {whyUsGenError}
+                </div>
+              )}
               <div className="space-y-2 rounded-2xl border border-border bg-background/60 p-4">
                 <Label className="text-foreground">{t("suite.new.uspLabel")}</Label>
                 {uspPoints.map((point, i) => (
@@ -1657,6 +1741,14 @@ export default function NewSuitePage() {
                   </div>
                 ))}
                 <div className="mt-2 flex flex-wrap gap-2">
+                  {aiUspSuggestions.filter((s) => !uspPoints.includes(s)).map((s) => (
+                    <button key={s} onClick={() => setUspPoints((prev) => [...prev, s])}
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 text-start text-xs leading-snug text-primary transition-colors hover:bg-primary/20"
+                      dir="auto"
+                    >
+                      <Sparkles size={11} className="shrink-0" /> {s}
+                    </button>
+                  ))}
                   {suggestions.usp.filter((s) => !uspPoints.includes(s)).map((s) => (
                     <button key={s} onClick={() => setUspPoints((prev) => [...prev, s])}
                       className="max-w-full rounded-full border border-border px-3 py-1.5 text-start text-xs leading-snug text-muted-foreground transition-colors hover:border-foreground hover:text-[#2f80ff]"
@@ -1669,7 +1761,7 @@ export default function NewSuitePage() {
                 <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                   <button
                     type="button"
-                    onClick={() => setUspPoints((prev) => Array.from(new Set([...prev, ...suggestions.usp])))}
+                    onClick={() => setUspPoints((prev) => Array.from(new Set([...prev, ...aiUspSuggestions, ...suggestions.usp])))}
                     className="inline-flex min-h-10 items-center justify-center rounded-lg border border-primary/40 bg-primary/10 px-3 text-sm font-medium text-primary hover:bg-primary/15 sm:w-auto"
                   >
                     {t("suite.new.addAllSuggestions")}
@@ -1694,6 +1786,14 @@ export default function NewSuitePage() {
                   </div>
                 ))}
                 <div className="mt-2 flex flex-wrap gap-2">
+                  {aiEspSuggestions.filter((s) => !espPoints.includes(s)).map((s) => (
+                    <button key={s} onClick={() => setEspPoints((prev) => [...prev, s])}
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 text-start text-xs leading-snug text-primary transition-colors hover:bg-primary/20"
+                      dir="auto"
+                    >
+                      <Sparkles size={11} className="shrink-0" /> {s}
+                    </button>
+                  ))}
                   {suggestions.esp.filter((s) => !espPoints.includes(s)).map((s) => (
                     <button key={s} onClick={() => setEspPoints((prev) => [...prev, s])}
                       className="max-w-full rounded-full border border-border px-3 py-1.5 text-start text-xs leading-snug text-muted-foreground transition-colors hover:border-foreground hover:text-[#2f80ff]"
@@ -1706,7 +1806,7 @@ export default function NewSuitePage() {
                 <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                   <button
                     type="button"
-                    onClick={() => setEspPoints((prev) => Array.from(new Set([...prev, ...suggestions.esp])))}
+                    onClick={() => setEspPoints((prev) => Array.from(new Set([...prev, ...aiEspSuggestions, ...suggestions.esp])))}
                     className="inline-flex min-h-10 items-center justify-center rounded-lg border border-primary/40 bg-primary/10 px-3 text-sm font-medium text-primary hover:bg-primary/15 sm:w-auto"
                   >
                     {t("suite.new.addAllSuggestions")}
