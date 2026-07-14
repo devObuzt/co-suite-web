@@ -210,10 +210,12 @@ const MagicIconNetwork = ({icons, outro}: {icons: string[]; outro: number}) => {
   const frame = useCurrentFrame();
   const {fps, width: canvasWidth, height: canvasHeight} = useVideoConfig();
   const centerX = canvasWidth / 2;
-  const headY = canvasHeight * 0.24;
+  // Below the title band (title ends ~18% down) so badges never collide
+  // with the 3D headline — they flank the head instead.
+  const headY = canvasHeight * 0.3;
   const angles = ICON_ARC_ANGLES[Math.min(4, Math.max(1, icons.length))] ?? [];
-  const radiusX = canvasWidth * 0.36;
-  const radiusY = canvasHeight * 0.09;
+  const radiusX = canvasWidth * 0.37;
+  const radiusY = canvasHeight * 0.07;
   const points = icons.slice(0, 4).map((icon, index) => {
     const angle = ((angles[index] ?? 90) * Math.PI) / 180;
     const emerge = spring({
@@ -225,7 +227,7 @@ const MagicIconNetwork = ({icons, outro}: {icons: string[]; outro: number}) => {
       icon,
       emerge,
       x: centerX + Math.cos(angle) * radiusX * emerge,
-      y: headY - Math.sin(angle) * radiusY * emerge - 40 * emerge,
+      y: headY - Math.sin(angle) * radiusY * emerge,
     };
   });
   const linesIn = interpolate(frame, [16, 30], [0, 1], {
