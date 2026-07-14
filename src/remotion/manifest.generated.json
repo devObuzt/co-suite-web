@@ -211,5 +211,6 @@
       "backgroundImagePublicPath": "/remotion/backgrounds/scene-10.png"
     }
   ],
-  "durationSeconds": 35.29
+  "durationSeconds": 35.29,
+  "magicStagePublicPath": null
 }

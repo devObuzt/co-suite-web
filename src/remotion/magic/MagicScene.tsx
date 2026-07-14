@@ -78,6 +78,10 @@ const shade = (hex: string, factor: number): string => {
 const STAGE_DEEP = shade(BRAND, 0.34);
 const STAGE_DARK = shade(BRAND, 0.55);
 const STAGE_LIGHT = shade(BRAND, 1.35);
+// The bottom stage: ONE clean generated brand image constant across the whole
+// video (behind the speaker and the captions). Falls back to the gradient.
+const MAGIC_STAGE_PATH =
+  (manifest as {magicStagePublicPath?: string | null}).magicStagePublicPath ?? null;
 
 /**
  * Camera scale for the scene: zoom_in rides the whole scene, zoom_out settles
@@ -321,12 +325,61 @@ export const MagicBackdrop = ({
   return (
     <AbsoluteFill
       style={{
-        // The solid brand stage: the floor of every Magic scene, and the whole
+        // The brand stage: the floor of every Magic scene, and the whole
         // frame when the director calls a typographic scene.
         background: `linear-gradient(180deg, ${STAGE_DARK} 0%, ${BRAND} 46%, ${STAGE_DEEP} 100%)`,
         zIndex: 0,
       }}
     >
+      {MAGIC_STAGE_PATH ? (
+        // The clean generated stage image replaces the flat gradient — slow
+        // breathing scale keeps it alive without cluttering it.
+        <Img
+          src={publicAsset(MAGIC_STAGE_PATH)}
+          style={{
+            height: '100%',
+            inset: 0,
+            objectFit: 'cover',
+            position: 'absolute',
+            transform: `scale(${1.04 + slowPulse * 0.02})`,
+            width: '100%',
+          }}
+        />
+      ) : null}
+      {!hasMedia && direction.background !== 'solid' ? (
+        // No media landed for this frame: the top zone still moves — a
+        // procedural animation keeps the frame alive (CSS-only, render-safe).
+        <div
+          style={{
+            height: `${MEDIA_ZONE_HEIGHT * 100}%`,
+            left: 0,
+            overflow: 'hidden',
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            WebkitMaskImage: 'linear-gradient(180deg, #000 56%, transparent 99%)',
+            maskImage: 'linear-gradient(180deg, #000 56%, transparent 99%)',
+          }}
+        >
+          <div
+            style={{
+              background: `radial-gradient(circle at ${30 + slowPulse * 40}% 40%, ${STAGE_LIGHT}66 0, transparent 34%), radial-gradient(circle at ${70 - slowPulse * 30}% 62%, ${BRAND}88 0, transparent 40%)`,
+              filter: 'blur(6px)',
+              inset: '-10%',
+              position: 'absolute',
+              transform: `rotate(${interpolate(progress, [0, 1], [-3, 3])}deg)`,
+            }}
+          />
+          <div
+            style={{
+              background: `linear-gradient(115deg, transparent 30%, ${STAGE_LIGHT}33 50%, transparent 70%)`,
+              inset: 0,
+              position: 'absolute',
+              transform: `translateX(${interpolate(progress, [0, 1], [-320, 320])}px)`,
+            }}
+          />
+        </div>
+      ) : null}
       {hasMedia && split ? (
         // Media fills the top zone and melts into the solid stage — no hard
         // seam between the visual and the typography below it.
