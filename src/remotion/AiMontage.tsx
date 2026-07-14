@@ -15,6 +15,13 @@ import {slide} from '@remotion/transitions/slide';
 import {fade} from '@remotion/transitions/fade';
 import {flip} from '@remotion/transitions/flip';
 import {zoom} from './transitions/zoom';
+import {
+  MagicBackdrop,
+  MagicTitleLayer,
+  magicCameraScale,
+  type MagicDirection,
+  type MagicSceneShape,
+} from './magic/MagicScene';
 import manifest from './manifest.generated.json';
 
 type Scene = (typeof manifest.scenes)[number];
@@ -37,6 +44,13 @@ const SHOW_TITLES = manifestFlags.showTitles !== false;
 const SUBJECT_HAS_ALPHA = manifest.source.hasAlpha !== false;
 const CAPTION_SCALE = Number((manifest.style as {captionScale?: number}).captionScale ?? 1);
 const BRAND_COLOR = String((manifest.style as {brandColor?: string}).brandColor ?? '#2f80ff');
+// OneShare Magic template: scenes carry a per-scene "magic" direction and
+// render through the Magic backdrop/title/camera instead of the defaults.
+const TEMPLATE = String((manifest as {template?: string}).template ?? 'default');
+const magicFor = (scene: Scene): MagicDirection | null =>
+  TEMPLATE === 'oneshare_magic'
+    ? ((scene as {magic?: MagicDirection}).magic ?? null)
+    : null;
 
 const styles = `
 @font-face {
@@ -549,24 +563,55 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
     zIndex: 2,
   };
 
+  const magic = magicFor(scene);
+  // The Magic camera move scales the whole staged scene (backdrop + titles +
+  // subject) while captions and audio stay fixed.
+  const cameraScale = magic ? magicCameraScale(magic.camera, frame, durationInFrames) : 1;
+
   return (
     <AbsoluteFill>
-      <SceneBackground scene={scene} durationInFrames={durationInFrames} />
-      {SHOW_TITLES ? <BehindPersonText scene={scene} /> : null}
-      {frameSrc ? (
-        <Img
-          src={frameSrc}
-          style={subjectStyle}
-        />
-      ) : (
-        <OffthreadVideo
-          muted
-          src={publicAsset(manifest.source.publicPath)}
-          startFrom={startFrom}
-          endAt={endAt}
-          style={subjectStyle}
-        />
-      )}
+      <AbsoluteFill
+        style={
+          magic
+            ? {transform: `scale(${cameraScale})`, transformOrigin: '50% 42%'}
+            : undefined
+        }
+      >
+        {magic ? (
+          <MagicBackdrop
+            scene={scene as unknown as MagicSceneShape}
+            direction={magic}
+            durationInFrames={durationInFrames}
+          />
+        ) : (
+          <SceneBackground scene={scene} durationInFrames={durationInFrames} />
+        )}
+        {SHOW_TITLES ? (
+          magic ? (
+            <MagicTitleLayer
+              scene={scene as unknown as MagicSceneShape}
+              direction={magic}
+              durationInFrames={durationInFrames}
+            />
+          ) : (
+            <BehindPersonText scene={scene} />
+          )
+        ) : null}
+        {frameSrc ? (
+          <Img
+            src={frameSrc}
+            style={subjectStyle}
+          />
+        ) : (
+          <OffthreadVideo
+            muted
+            src={publicAsset(manifest.source.publicPath)}
+            startFrom={startFrom}
+            endAt={endAt}
+            style={subjectStyle}
+          />
+        )}
+      </AbsoluteFill>
       <Audio src={publicAsset(sourceAudioPath)} startFrom={startFrom} endAt={endAt} />
       {SHOW_CAPTIONS ? <Captions scene={scene} /> : null}
       <AbsoluteFill style={{pointerEvents: 'none', zIndex: 3}}>

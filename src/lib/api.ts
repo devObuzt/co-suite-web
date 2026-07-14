@@ -412,6 +412,7 @@ export const api = {
       suiteId: string,
       data: {
         mode: string;
+        template?: string;
         sourceUrl?: string;
         options: string[];
         notes?: string;
@@ -428,6 +429,7 @@ export const api = {
     ) => {
       const form = new FormData();
       form.append("mode", data.mode);
+      form.append("template", data.template || "default");
       form.append("source_url", data.sourceUrl || "");
       form.append("options_json", JSON.stringify(data.options || []));
       form.append("backgrounds_mode", data.backgroundsMode || "blend");
@@ -1828,6 +1830,7 @@ export interface GenerationStatus {
   input?: {
     source_url?: string | null;
     source_file_name?: string | null;
+    template?: string | null;
     notes?: string | null;
     options?: string[];
     backgrounds_mode?: string | null;

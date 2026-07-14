@@ -70,6 +70,32 @@ type VideoMontageResult = {
   };
 };
 
+type MontageTemplateId = "default" | "oneshare_magic";
+
+type MontageTemplate = {
+  id: MontageTemplateId;
+  label: string;
+  badge?: string;
+  desc: string;
+  icon: React.ReactNode;
+};
+
+const templates: MontageTemplate[] = [
+  {
+    id: "default",
+    label: "الأساسي",
+    desc: "المونتاج المعتمد: خلفيات ذكية لكل مشهد، عناوين 3D، كابتشن، موسيقى ومؤثرات.",
+    icon: <Clapperboard size={18} />,
+  },
+  {
+    id: "oneshare_magic",
+    label: "OneShare Magic",
+    badge: "جديد ✨",
+    desc: "بيفهم كل لقطة لحالها وبمنتجها: خلفية سوليد ورا الشخصية، فيديو مدموج فوق، عناوين 3D ضخمة مع شادو، أيقونات، زوم ومؤثر صوتي لكل مشهد.",
+    icon: <WandSparkles size={18} />,
+  },
+];
+
 const options: MontageOption[] = [
   { id: "captions", label: "كابتشن وترجمة", desc: "نصوص واضحة فوق الفيديو حسب لغة الجمهور.", icon: <Captions size={18} /> },
   { id: "dead_spaces", label: "حذف الفراغات", desc: "قص السكتات والمقاطع الضعيفة لتحسين الإيقاع.", icon: <Scissors size={18} /> },
@@ -133,6 +159,7 @@ function formatJobTime(iso?: string): string {
 export default function VideoMontagePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [selectedOptions, setSelectedOptions] = useState<string[]>(options.map((option) => option.id));
+  const [selectedTemplate, setSelectedTemplate] = useState<MontageTemplateId>("default");
   const [notes, setNotes] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceFile, setSourceFile] = useState<File | null>(null);
@@ -344,6 +371,7 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     try {
       const next = await api.videoMontage.create(id, {
         mode: "talking_head",
+        template: selectedTemplate,
         sourceUrl: sourceFile ? "" : stagedUrl || effectiveSourceUrl,
         options: selectedOptions,
         notes,
@@ -761,6 +789,42 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
               </div>
               <Sparkles className="text-[#ff4fa3]" size={24} />
             </div>
+            <div className="mt-5">
+              <p className="text-sm font-semibold text-foreground">تمبليت المونتاج</p>
+              <div className="mt-2 grid gap-2">
+                {templates.map((template) => {
+                  const selected = selectedTemplate === template.id;
+                  return (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => setSelectedTemplate(template.id)}
+                      className={`flex min-h-16 items-center gap-3 rounded-2xl border p-3 text-right transition ${
+                        selected
+                          ? "border-[#ff4fa3]/45 bg-[#ff4fa3]/10"
+                          : "border-border bg-background hover:border-[#ff4fa3]/35"
+                      }`}
+                    >
+                      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${selected ? "bg-[#ff4fa3] text-white" : "bg-muted text-muted-foreground"}`}>
+                        {template.icon}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2 text-sm font-black text-foreground">
+                          {template.label}
+                          {template.badge && (
+                            <span className="rounded-full bg-[#ff4fa3]/15 px-2 py-0.5 text-[10px] font-bold text-[#c4267c]">
+                              {template.badge}
+                            </span>
+                          )}
+                        </span>
+                        <span className="os-text-wrap mt-1 block text-xs leading-5 text-muted-foreground">{template.desc}</span>
+                      </span>
+                      {selected && <CheckCircle2 size={18} className="shrink-0 text-[#ff4fa3]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <div className="mt-5 grid gap-2">
               {options.map((option) => {
                 const selected = selectedOptions.includes(option.id);
@@ -851,6 +915,12 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                         {state === "queued" && <Clock3 size={12} />}
                         {chip.label}
                       </span>
+                      {job.input?.template === "oneshare_magic" && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#ff4fa3]/12 px-3 py-1 text-xs font-black text-[#c4267c]">
+                          <WandSparkles size={12} />
+                          Magic
+                        </span>
+                      )}
                       {source.href ? (
                         <a href={source.href} target="_blank" rel="noreferrer" className="min-w-0 truncate text-sm font-bold text-[#2f80ff]" dir="ltr">
                           {source.label}

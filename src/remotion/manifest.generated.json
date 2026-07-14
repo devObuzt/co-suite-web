@@ -2,6 +2,7 @@
   "fps": 30,
   "width": 1080,
   "height": 1920,
+  "template": "default",
   "source": {
     "publicPath": "/remotion/inputs/BebRKg5D4i9pDK1Js3pZN_output.webm",
     "originalPath": "/Users/wisamsholy/Downloads/BebRKg5D4i9pDK1Js3pZN_output.webm",
