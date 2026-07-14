@@ -10,6 +10,16 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
+import {
+  AtSign,
+  Ghost,
+  Globe,
+  MapPin,
+  MessageCircle,
+  Music2,
+  Phone,
+  Users,
+} from 'lucide-react';
 import manifest from '../manifest.generated.json';
 
 /**
@@ -85,20 +95,190 @@ export const magicCameraScale = (
   if (camera === 'zoom_out') {
     return interpolate(progress, [0, 1], [1.16, 1.01], {easing: Easing.out(Easing.quad)});
   }
+  const punchAt = (at: number) =>
+    interpolate(frame, [Math.round(durationInFrames * at), Math.round(durationInFrames * at) + 6], [0, 1], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+      easing: Easing.out(Easing.back(1.7)),
+    });
   if (camera === 'punch_in') {
-    const punchAt = (at: number) =>
-      interpolate(frame, [Math.round(durationInFrames * at), Math.round(durationInFrames * at) + 6], [0, 1], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-        easing: Easing.out(Easing.back(1.7)),
-      });
     return 1.02 + punchAt(0.28) * 0.08 + punchAt(0.62) * 0.08;
+  }
+  if (camera === 'triple_punch') {
+    // Three escalating snaps — the reference's hardest emphasis moment.
+    return 1.0 + punchAt(0.2) * 0.075 + punchAt(0.48) * 0.075 + punchAt(0.76) * 0.075;
+  }
+  if (camera === 'zoom_in_out') {
+    // Push in on the key word, hold, settle back before the cut.
+    return interpolate(progress, [0, 0.38, 0.62, 1], [1, 1.15, 1.15, 1.0], {
+      easing: Easing.inOut(Easing.quad),
+    });
   }
   return interpolate(progress, [0, 1], [1, 1.03]);
 };
 
 /** Split layouts reserve the top of the frame for the background media. */
 const MEDIA_ZONE_HEIGHT = 0.52;
+
+type GlyphProps = {color?: string; size?: number; strokeWidth?: number};
+
+// Brand logos were removed from lucide-react, so the social glyphs are
+// inlined with the same stroke aesthetic.
+const brandGlyph = (paths: React.ReactNode) => {
+  const Glyph = ({color = '#fff', size = 24, strokeWidth = 2}: GlyphProps) => (
+    <svg
+      fill="none"
+      height={size}
+      stroke={color}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={strokeWidth}
+      viewBox="0 0 24 24"
+      width={size}
+    >
+      {paths}
+    </svg>
+  );
+  return Glyph;
+};
+
+const InstagramGlyph = brandGlyph(
+  <>
+    <rect height="20" rx="5" width="20" x="2" y="2" />
+    <circle cx="12" cy="12" r="4" />
+    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+  </>,
+);
+const FacebookGlyph = brandGlyph(
+  <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />,
+);
+const YoutubeGlyph = brandGlyph(
+  <>
+    <path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17" />
+    <path d="m10 15 5-3-5-3z" />
+  </>,
+);
+const LinkedinGlyph = brandGlyph(
+  <>
+    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4V8h4v2a6 6 0 0 1 4-2z" />
+    <rect height="12" width="4" x="2" y="9" />
+    <circle cx="4" cy="4" r="2" />
+  </>,
+);
+const XGlyph = brandGlyph(
+  <path d="M4 3h4.5l4.1 5.9L17.5 3H21l-6.7 8L21 21h-4.5l-4.4-6.3L7 21H3.5l7-8.4z" />,
+);
+
+// Contact icon keywords the director may stage (anything else in
+// direction.icons is an emoji). Kept in sync with MAGIC_ICON_KEYWORDS in
+// api/services/montage_magic_director.py.
+const ICON_GLYPHS: Record<string, React.ComponentType<GlyphProps>> = {
+  instagram: InstagramGlyph,
+  facebook: FacebookGlyph,
+  tiktok: Music2,
+  whatsapp: MessageCircle,
+  youtube: YoutubeGlyph,
+  linkedin: LinkedinGlyph,
+  x: XGlyph,
+  snapchat: Ghost,
+  phone: Phone,
+  email: AtSign,
+  location: MapPin,
+  web: Globe,
+  people: Users,
+};
+
+// Arc placement (degrees; 0° = right, 180° = left) around the head for 1-4
+// icons — the reference's contact-network constellation.
+const ICON_ARC_ANGLES: Record<number, number[]> = {
+  1: [115],
+  2: [150, 30],
+  3: [160, 90, 20],
+  4: [165, 115, 65, 15],
+};
+
+/**
+ * Icons zoom out from BEHIND the speaker's head: each badge starts small at
+ * the head center and springs outward to its arc position, then thin network
+ * lines connect the constellation.
+ */
+const MagicIconNetwork = ({icons, outro}: {icons: string[]; outro: number}) => {
+  const frame = useCurrentFrame();
+  const {fps, width: canvasWidth, height: canvasHeight} = useVideoConfig();
+  const centerX = canvasWidth / 2;
+  const headY = canvasHeight * 0.24;
+  const angles = ICON_ARC_ANGLES[Math.min(4, Math.max(1, icons.length))] ?? [];
+  const radiusX = canvasWidth * 0.36;
+  const radiusY = canvasHeight * 0.09;
+  const points = icons.slice(0, 4).map((icon, index) => {
+    const angle = ((angles[index] ?? 90) * Math.PI) / 180;
+    const emerge = spring({
+      frame: Math.max(0, frame - 4 - index * 3),
+      fps,
+      config: {damping: 12, stiffness: 130, mass: 0.9},
+    });
+    return {
+      icon,
+      emerge,
+      x: centerX + Math.cos(angle) * radiusX * emerge,
+      y: headY - Math.sin(angle) * radiusY * emerge - 40 * emerge,
+    };
+  });
+  const linesIn = interpolate(frame, [16, 30], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+
+  return (
+    <>
+      {points.length > 1 ? (
+        <svg
+          height={canvasHeight}
+          style={{left: 0, opacity: linesIn * 0.4 * outro, position: 'absolute', top: 0}}
+          width={canvasWidth}
+        >
+          <polyline
+            fill="none"
+            points={points.map((p) => `${p.x},${p.y}`).join(' ')}
+            stroke={STAGE_LIGHT}
+            strokeDasharray="3 9"
+            strokeWidth={3}
+          />
+        </svg>
+      ) : null}
+      {points.map(({icon, emerge, x, y}, index) => {
+        const Glyph = ICON_GLYPHS[icon];
+        return (
+          <div
+            key={`${icon}-${index}`}
+            style={{
+              alignItems: 'center',
+              backgroundColor: `${STAGE_DEEP}b8`,
+              border: '3px solid rgba(255,255,255,0.85)',
+              borderRadius: 999,
+              boxShadow: `0 12px 26px rgba(0,0,0,0.5), 0 0 26px ${STAGE_LIGHT}66`,
+              display: 'flex',
+              height: 108,
+              justifyContent: 'center',
+              left: x - 54,
+              opacity: Math.min(1, emerge * 1.3) * outro,
+              position: 'absolute',
+              top: y - 54 + Math.sin(frame / 21 + index * 1.7) * 5,
+              transform: `scale(${0.15 + emerge * 0.85})`,
+              width: 108,
+            }}
+          >
+            {Glyph ? (
+              <Glyph color="#ffffff" size={54} strokeWidth={2.2} />
+            ) : (
+              <span style={{fontSize: 56, lineHeight: 1}}>{icon}</span>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+};
 
 export const MagicBackdrop = ({
   scene,
@@ -238,7 +418,7 @@ export const MagicTitleLayer = ({
   const title = String(direction.title || scene.behindText || '').trim();
   const subtitle = String(direction.subtitle || '').trim();
   const emphasis = String(direction.emphasis || '').trim();
-  const icons = Array.isArray(direction.icons) ? direction.icons.slice(0, 3) : [];
+  const icons = Array.isArray(direction.icons) ? direction.icons.slice(0, 4) : [];
   const rtl = /[\u0590-\u05FF\u0600-\u06FF]/.test(title || subtitle);
 
   const pop = spring({frame, fps, config: {damping: 12, stiffness: 150, mass: 0.9}});
@@ -271,43 +451,7 @@ export const MagicTitleLayer = ({
 
   return (
     <AbsoluteFill style={{perspective: 1100, perspectiveOrigin: '50% 30%', zIndex: 1}}>
-      {icons.length ? (
-        <div
-          style={{
-            display: 'flex',
-            gap: 34,
-            // The canvas center belongs to the subject's head: multiple icons
-            // flank it from the edges, a single icon takes a side.
-            justifyContent: icons.length > 1 ? 'space-between' : 'flex-start',
-            left: 0,
-            padding: '0 72px',
-            position: 'absolute',
-            right: 0,
-            top: 64,
-          }}
-        >
-          {icons.map((icon, index) => {
-            const iconPop = spring({
-              frame: Math.max(0, frame - 6 - index * 4),
-              fps,
-              config: {damping: 10, stiffness: 190},
-            });
-            return (
-              <span
-                key={`${icon}-${index}`}
-                style={{
-                  filter: 'drop-shadow(0 10px 18px rgba(0,0,0,0.55))',
-                  fontSize: 92,
-                  opacity: iconPop * outro,
-                  transform: `translateY(${(1 - iconPop) * -40 + Math.sin(frame / 19 + index) * 5}px) scale(${iconPop})`,
-                }}
-              >
-                {icon}
-              </span>
-            );
-          })}
-        </div>
-      ) : null}
+      {icons.length ? <MagicIconNetwork icons={icons} outro={outro} /> : null}
       {title ? (
         <div
           dir={rtl ? 'rtl' : 'ltr'}
