@@ -84,41 +84,51 @@ const MAGIC_STAGE_PATH =
   (manifest as {magicStagePublicPath?: string | null}).magicStagePublicPath ?? null;
 
 /**
- * Camera scale for the scene: zoom_in rides the whole scene, zoom_out settles
- * in, punch_in snaps twice ("زوم إن، زوم إن") with a springy overshoot.
+ * Camera scale for the scene — SNAP AND HOLD, never continuous drift.
+ *
+ * Owner rule from the first render review: a zoom is a fast snap (~0.25s)
+ * followed by a DEAD-STILL hold of at least a second (or the rest of the
+ * frame). The subject must never breathe closer/farther across the scene.
  */
+const SNAP_FRAMES = 8;
+const MIN_HOLD_FRAMES = 30;
+
 export const magicCameraScale = (
   camera: string | undefined,
   frame: number,
   durationInFrames: number,
 ): number => {
-  const progress = Math.max(0, Math.min(1, frame / Math.max(1, durationInFrames)));
-  if (camera === 'zoom_in') {
-    return interpolate(progress, [0, 1], [1, 1.14], {easing: Easing.out(Easing.quad)});
-  }
-  if (camera === 'zoom_out') {
-    return interpolate(progress, [0, 1], [1.16, 1.01], {easing: Easing.out(Easing.quad)});
-  }
-  const punchAt = (at: number) =>
-    interpolate(frame, [Math.round(durationInFrames * at), Math.round(durationInFrames * at) + 6], [0, 1], {
+  const snapTo = (startFrame: number, from: number, to: number) =>
+    interpolate(frame, [startFrame, startFrame + SNAP_FRAMES], [from, to], {
       extrapolateLeft: 'clamp',
       extrapolateRight: 'clamp',
-      easing: Easing.out(Easing.back(1.7)),
+      easing: Easing.out(Easing.cubic),
     });
-  if (camera === 'punch_in') {
-    return 1.02 + punchAt(0.28) * 0.08 + punchAt(0.62) * 0.08;
+  if (camera === 'zoom_in') {
+    // Snap in at the cut, then hold to the end of the frame.
+    return snapTo(0, 1, 1.14);
   }
-  if (camera === 'triple_punch') {
-    // Three escalating snaps — the reference's hardest emphasis moment.
-    return 1.0 + punchAt(0.2) * 0.075 + punchAt(0.48) * 0.075 + punchAt(0.76) * 0.075;
+  if (camera === 'zoom_out') {
+    // Open tight, snap wide, hold.
+    return snapTo(0, 1.14, 1);
   }
   if (camera === 'zoom_in_out') {
-    // Push in on the key word, hold, settle back before the cut.
-    return interpolate(progress, [0, 0.38, 0.62, 1], [1, 1.15, 1.15, 1.0], {
-      easing: Easing.inOut(Easing.quad),
-    });
+    // Snap in → hold ≥1s → snap out → hold. Short frames just zoom in.
+    const outStart = durationInFrames - SNAP_FRAMES - 6;
+    if (outStart < SNAP_FRAMES + MIN_HOLD_FRAMES) return snapTo(0, 1, 1.14);
+    return frame < outStart ? snapTo(0, 1, 1.14) : snapTo(outStart, 1.14, 1);
   }
-  return interpolate(progress, [0, 1], [1, 1.03]);
+  if (camera === 'punch_in') {
+    // Two held steps: snap, hold, snap again, hold.
+    const second = Math.max(SNAP_FRAMES + MIN_HOLD_FRAMES, Math.round(durationInFrames * 0.55));
+    return snapTo(0, 1, 1.08) + snapTo(second, 0, 0.08);
+  }
+  if (camera === 'triple_punch') {
+    const step = Math.max(SNAP_FRAMES + Math.round(MIN_HOLD_FRAMES * 0.8), Math.round(durationInFrames / 3));
+    return snapTo(0, 1, 1.07) + snapTo(step, 0, 0.07) + snapTo(step * 2, 0, 0.07);
+  }
+  // "none" means NONE: perfectly still.
+  return 1;
 };
 
 /** Split layouts reserve the top of the frame for the background media. */

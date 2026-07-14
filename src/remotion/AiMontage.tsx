@@ -544,14 +544,19 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
   const {width: canvasWidth, height: canvasHeight} = useVideoConfig();
   const userOffsetX = (Math.max(-40, Math.min(40, Number(montageStyle.subjectOffsetXPct ?? 0))) / 100) * canvasWidth;
   const userOffsetY = (Math.max(-40, Math.min(40, Number(montageStyle.subjectOffsetYPct ?? 0))) / 100) * canvasHeight;
-  const subjectScale =
-    (interpolate(progress, [0, 0.5, 1], [1.035, 1.075, 1.045]) + zoomBeat * 0.07) * userZoom;
-  const subjectX = interpolate(progress, [0, 1], [-10, 10]) + overlayBeat * 12;
+  // Magic subjects stand DEAD STILL — the staged camera does all the moving
+  // (snap-and-hold). The default template keeps its breathing drift.
+  const magic = magicFor(scene);
+  const isMagicScene = Boolean(magic);
+  const subjectScale = isMagicScene
+    ? 1.05 * userZoom
+    : (interpolate(progress, [0, 0.5, 1], [1.035, 1.075, 1.045]) + zoomBeat * 0.07) * userZoom;
+  const subjectX = isMagicScene ? 0 : interpolate(progress, [0, 1], [-10, 10]) + overlayBeat * 12;
   // Scale from face height (~25% down the canvas): any zoom > 1 then pushes
   // the matte's bottom edge BELOW the canvas (hiding mid-leg cuts and objects
   // near the frame bottom) while keeping the head in view. Vertical drift is
   // downward-only so the cut edge never rises into the frame.
-  const subjectY = Math.abs(float) * 4 + zoomBeat * 10;
+  const subjectY = isMagicScene ? 0 : Math.abs(float) * 4 + zoomBeat * 10;
   const subjectStyle: React.CSSProperties = {
     height: '100%',
     inset: 0,
@@ -563,7 +568,6 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
     zIndex: 2,
   };
 
-  const magic = magicFor(scene);
   // The Magic camera move scales the whole staged scene (backdrop + titles +
   // subject) while captions and audio stay fixed.
   const cameraScale = magic ? magicCameraScale(magic.camera, frame, durationInFrames) : 1;
