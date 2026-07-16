@@ -2,8 +2,14 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Cairo, Noto_Sans_Hebrew } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n/LanguageContext";
-import { ThemeProvider } from "@/lib/theme/ThemeContext";
+import { AccessibilityProvider } from "@/lib/accessibility/AccessibilityContext";
+import { AccessibilityFab } from "@/components/AccessibilityFab";
 import { FirstTimeLanguagePicker } from "@/components/FirstTimeLanguagePicker";
+
+// Runs before first paint to apply saved accessibility prefs (theme, font
+// scale, contrast, motion) with no flash. Mirrors applyPrefs() in
+// AccessibilityContext. Kept dependency-free and defensive.
+const A11Y_INIT_SCRIPT = `(function(){try{var d=document.documentElement;var p=null;try{var raw=localStorage.getItem('oneshare_a11y_prefs');if(raw)p=JSON.parse(raw);}catch(e){}if(!p){var lg=localStorage.getItem('co_suite_theme');p={theme:(lg==='dark'||lg==='light')?lg:'light',fontScale:100,contrast:'normal',motion:'normal'};}var th=p.theme||'light';var res=th==='system'?((window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light'):th;d.classList.toggle('dark',res==='dark');d.dataset.theme=res;var fs=[100,125,150].indexOf(p.fontScale)>=0?p.fontScale:100;d.style.fontSize=fs+'%';if(p.contrast==='high')d.dataset.contrast='high';else delete d.dataset.contrast;if(p.motion==='reduced')d.dataset.motion='reduced';else delete d.dataset.motion;}catch(e){}})();`;
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -42,14 +48,20 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${cairo.variable} ${notoHebrew.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${inter.variable} ${cairo.variable} ${notoHebrew.variable} h-full antialiased`}
+    >
       <body className="min-h-full bg-background text-foreground">
-        <ThemeProvider>
+        <script dangerouslySetInnerHTML={{ __html: A11Y_INIT_SCRIPT }} />
+        <AccessibilityProvider>
           <LanguageProvider>
-            <FirstTimeLanguagePicker />
             {children}
+            <AccessibilityFab />
+            <FirstTimeLanguagePicker />
           </LanguageProvider>
-        </ThemeProvider>
+        </AccessibilityProvider>
       </body>
     </html>
   );

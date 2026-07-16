@@ -1,6 +1,6 @@
 "use client";
 import { Moon, Sun } from "lucide-react";
-import { useTheme } from "@/lib/theme/ThemeContext";
+import { useTheme } from "@/lib/accessibility/AccessibilityContext";
 
 export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
   const { theme, toggleTheme } = useTheme();

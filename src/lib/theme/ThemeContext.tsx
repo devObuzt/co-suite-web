@@ -1,50 +1,9 @@
 "use client";
-import { createContext, useContext, useEffect, useState } from "react";
-
-export type ThemeMode = "light" | "dark";
-
-interface ThemeContextValue {
-  theme: ThemeMode;
-  setTheme: (theme: ThemeMode) => void;
-  toggleTheme: () => void;
-}
-
-const ThemeContext = createContext<ThemeContextValue>({
-  theme: "light",
-  setTheme: () => {},
-  toggleTheme: () => {},
-});
-
-function applyTheme(theme: ThemeMode) {
-  document.documentElement.classList.toggle("dark", theme === "dark");
-  document.documentElement.dataset.theme = theme;
-}
-
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeMode>("light");
-
-  useEffect(() => {
-    const saved = localStorage.getItem("co_suite_theme") as ThemeMode | null;
-    const initial = saved === "light" || saved === "dark" ? saved : "light";
-    setThemeState(initial);
-    applyTheme(initial);
-  }, []);
-
-  function setTheme(nextTheme: ThemeMode) {
-    setThemeState(nextTheme);
-    localStorage.setItem("co_suite_theme", nextTheme);
-    applyTheme(nextTheme);
-  }
-
-  function toggleTheme() {
-    setTheme(theme === "dark" ? "light" : "dark");
-  }
-
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  );
-}
-
-export const useTheme = () => useContext(ThemeContext);
+// Backwards-compatibility shim. The theme now lives in the unified
+// accessibility preferences context. Prefer importing from
+// "@/lib/accessibility/AccessibilityContext" directly.
+export {
+  AccessibilityProvider as ThemeProvider,
+  useTheme,
+} from "@/lib/accessibility/AccessibilityContext";
+export type { ThemeMode } from "@/lib/accessibility/AccessibilityContext";
