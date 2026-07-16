@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { Moon, Sun } from "lucide-react";
 import { LANGUAGES, LangCode } from "@/lib/i18n/translations";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
-import { ThemeMode, useTheme } from "@/lib/theme/ThemeContext";
+import { ThemeMode, useTheme } from "@/lib/accessibility/AccessibilityContext";
 import { BrandMark } from "@/components/BrandMark";
 
 const PRIMARY_LANGUAGE_CODES: LangCode[] = ["en", "he", "ar"];
@@ -73,7 +73,8 @@ export function FirstTimeLanguagePicker() {
   useEffect(() => {
     if (pathname === "/" || step !== null) return;
     const langSet = localStorage.getItem("co_suite_lang_set");
-    const themeSet = localStorage.getItem("co_suite_theme");
+    const themeSet =
+      localStorage.getItem("oneshare_a11y_prefs") || localStorage.getItem("co_suite_theme");
     if (!langSet) {
       setTwoSteps(true);
       setStep("lang");
