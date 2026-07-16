@@ -7,11 +7,10 @@ import { api, ContentRule, MarketingPlanResponse, PaidContentIdea, PaidContentWo
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SuitePageShell } from "@/components/suite/SuitePageShell";
-import { SocialPlanCalendar } from "@/components/work-plans/SocialPlanCalendar";
 import { SocialIdeasGallery } from "@/components/work-plans/SocialIdeasGallery";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
-type Mode = "ideas" | "social" | "paid";
+type Mode = "ideas" | "paid";
 
 function paidItemsFor(plan: PaidContentWorkPlan | undefined, stage: string) {
   return plan?.candidates?.[stage] || [];
@@ -108,7 +107,7 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
 
         <TeachRulesBox suiteId={id} />
 
-        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <ModeButton
             active={mode === "ideas"}
             title="أفكار السوشيال"
@@ -117,15 +116,8 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
             onClick={() => setMode("ideas")}
           />
           <ModeButton
-            active={mode === "social"}
-            title="خطة محتوى للسوشيال ميديا"
-            description="أفكار ريلز وبوستات موزعة بين جذب، ثقة، ومبيعات."
-            icon={<Layers3 size={22} />}
-            onClick={() => setMode("social")}
-          />
-          <ModeButton
             active={mode === "paid"}
-            title="خطة محتوى للتسويق الممول"
+            title="القناة الإعلانية/التسويقية"
             description="أفكار إعلانات حسب مراحل الوعي، التفكير، والتحويل."
             icon={<Megaphone size={22} />}
             onClick={() => setMode("paid")}
@@ -136,8 +128,6 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
           <div className="rounded-2xl border border-border bg-card p-6 text-muted-foreground">جار تحميل خطة العمل...</div>
         ) : mode === "ideas" ? (
           <SocialIdeasGallery suiteId={id} response={response} onResponse={setResponse} />
-        ) : mode === "social" ? (
-          <SocialPlanCalendar suiteId={id} response={response} onResponse={setResponse} />
         ) : (
           <PaidPlanPanel
             plan={paidPlan}
