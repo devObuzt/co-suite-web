@@ -60,6 +60,11 @@ const labels = {
     messageDesc: "خلاصة الخطة: الرسالة الأساسية اللي بتحكي فيها علامتك مع جمهورك.",
     generateMessage: "توليد الرسالة التسويقية",
     regenerateMessage: "إعادة توليد الرسالة",
+    editMessage: "تعديل الرسالة",
+    saveMessage: "حفظ",
+    cancelEditMessage: "إلغاء",
+    messageSaving: "عم نحفظ...",
+    messagePlaceholder: "اكتب رسالتك التسويقية هون...",
     messageGenerating: "عم نولّد الرسالة التسويقية...",
     personasGenerating: "بعدنا عم نولّد شخصيات إضافية...",
     coverStatsKeywords: "كلمة مفتاحية",
@@ -181,6 +186,11 @@ const labels = {
     messageDesc: "The plan's essence: the core message your brand speaks to its audience.",
     generateMessage: "Generate the marketing message",
     regenerateMessage: "Regenerate the message",
+    editMessage: "Edit message",
+    saveMessage: "Save",
+    cancelEditMessage: "Cancel",
+    messageSaving: "Saving...",
+    messagePlaceholder: "Write your marketing message here...",
     messageGenerating: "Generating the marketing message...",
     personasGenerating: "Still generating more personas...",
     coverStatsKeywords: "keywords",
@@ -303,6 +313,11 @@ const labels = {
     messageDesc: "תמצית התכנית: המסר המרכזי שהמותג שלך מדבר עם הקהל.",
     generateMessage: "צור את המסר השיווקי",
     regenerateMessage: "צור מסר מחדש",
+    editMessage: "עריכת המסר",
+    saveMessage: "שמירה",
+    cancelEditMessage: "ביטול",
+    messageSaving: "שומרים...",
+    messagePlaceholder: "כתוב כאן את המסר השיווקי שלך...",
     messageGenerating: "יוצרים את המסר השיווקי...",
     personasGenerating: "עדיין יוצרים פרסונות נוספות...",
     coverStatsKeywords: "מילות מפתח",
@@ -918,6 +933,23 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     }
   }
 
+  // Manual edit of the message — not an AI regeneration, so it's open to everyone.
+  async function saveMessage(next: string): Promise<boolean> {
+    setMessageError("");
+    try {
+      const res = await api.marketingPlans.updateMessage(suiteId, { message: next });
+      setSuite((prev) =>
+        prev && prev.strategy
+          ? { ...prev, strategy: { ...prev.strategy, marketing_message: res.marketing_message } }
+          : prev,
+      );
+      return true;
+    } catch (e) {
+      setMessageError(friendlyError(e));
+      return false;
+    }
+  }
+
   async function runStageSafe(slug: StageSlug, fn: () => Promise<MarketingPlanResponse>): Promise<boolean> {
     setAutoStage(slug);
     setBusy(slug);
@@ -1066,6 +1098,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         message={marketingMessage}
         loading={busy === "message"}
         onGenerate={generateMessage}
+        onSave={saveMessage}
         error={messageError}
         // One-shot journey: once the message exists, funnel visitors don't regenerate.
         canRegenerate={!isFunnelUser}
@@ -1956,6 +1989,7 @@ function MarketingMessageStage({
   message,
   loading,
   onGenerate,
+  onSave,
   error,
   canRegenerate,
 }: {
@@ -1963,11 +1997,28 @@ function MarketingMessageStage({
   message: string;
   loading: boolean;
   onGenerate: () => void;
+  onSave: (next: string) => Promise<boolean>;
   error?: string;
   canRegenerate?: boolean;
 }) {
   const tone = stageTones.message;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(message);
+  const [saving, setSaving] = useState(false);
   const showButton = !message || canRegenerate;
+
+  function startEditing() {
+    setDraft(message);
+    setEditing(true);
+  }
+
+  async function commit() {
+    setSaving(true);
+    const ok = await onSave(draft.trim());
+    setSaving(false);
+    if (ok) setEditing(false);
+  }
+
   return (
     <section className={`rounded-3xl border p-6 sm:p-8 scroll-mt-24 ${tone.section}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1980,11 +2031,21 @@ function MarketingMessageStage({
             <p className="text-sm text-muted-foreground">{text.messageDesc}</p>
           </div>
         </div>
-        {showButton && (
-          <Button onClick={onGenerate} disabled={loading} variant={message ? "outline" : "default"} className="gap-2">
-            {loading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-            {message ? text.regenerateMessage : text.generateMessage}
-          </Button>
+        {!editing && (
+          <div className="flex flex-wrap items-center gap-2">
+            {message && (
+              <Button onClick={startEditing} disabled={loading} variant="outline" className="gap-2">
+                <Pencil size={15} />
+                {text.editMessage}
+              </Button>
+            )}
+            {showButton && (
+              <Button onClick={onGenerate} disabled={loading} variant={message ? "outline" : "default"} className="gap-2">
+                {loading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+                {message ? text.regenerateMessage : text.generateMessage}
+              </Button>
+            )}
+          </div>
         )}
       </div>
       {loading && !message && (
@@ -1995,10 +2056,35 @@ function MarketingMessageStage({
           {error}
         </p>
       )}
-      {message && (
-        <div className="mt-5 rounded-2xl border border-[color:var(--brand-accent)]/30 bg-[color:var(--brand-accent)]/10 p-5">
-          <p className="os-text-wrap text-base font-semibold leading-8 text-foreground" dir="auto">{message}</p>
+      {editing ? (
+        <div className="mt-5 space-y-3">
+          <textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            rows={5}
+            maxLength={4000}
+            placeholder={text.messagePlaceholder}
+            className="w-full resize-y rounded-2xl border border-input bg-background px-4 py-3 text-base leading-8 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            dir="auto"
+            autoFocus
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={commit} disabled={saving || !draft.trim()} className="gap-2">
+              {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+              {saving ? text.messageSaving : text.saveMessage}
+            </Button>
+            <Button onClick={() => setEditing(false)} disabled={saving} variant="outline" className="gap-2">
+              <X size={15} />
+              {text.cancelEditMessage}
+            </Button>
+          </div>
         </div>
+      ) : (
+        message && (
+          <div className="mt-5 rounded-2xl border border-[color:var(--brand-accent)]/30 bg-[color:var(--brand-accent)]/10 p-5">
+            <p className="os-text-wrap text-base font-semibold leading-8 text-foreground" dir="auto">{message}</p>
+          </div>
+        )
       )}
     </section>
   );

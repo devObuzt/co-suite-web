@@ -525,6 +525,11 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
+    updateMessage: (suiteId: string, data: { message: string }) =>
+      request<{ marketing_message: string }>(`/suites/${suiteId}/marketing-plan/message`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
     generateDemandSupply: (suiteId: string, data?: { language?: string; near_term_focus?: string; upcoming_campaigns?: string[]; planning_notes?: string }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/demand-supply/generate`, {
         method: "POST",
