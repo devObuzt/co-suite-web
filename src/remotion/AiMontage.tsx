@@ -47,10 +47,11 @@ const BRAND_COLOR = String((manifest.style as {brandColor?: string}).brandColor 
 // OneShare Magic template: scenes carry a per-scene "magic" direction and
 // render through the Magic backdrop/title/camera instead of the defaults.
 const TEMPLATE = String((manifest as {template?: string}).template ?? 'default');
+const IS_SUPERZOOM = TEMPLATE === 'oneshare_superzoom';
+// Both templates run the SAME Magic grammar; they differ only in zoom intensity.
+const IS_MAGIC_FAMILY = TEMPLATE === 'oneshare_magic' || IS_SUPERZOOM;
 const magicFor = (scene: Scene): MagicDirection | null =>
-  TEMPLATE === 'oneshare_superzoom'
-    ? ((scene as {magic?: MagicDirection}).magic ?? null)
-    : null;
+  IS_MAGIC_FAMILY ? ((scene as {magic?: MagicDirection}).magic ?? null) : null;
 
 // Deterministic per-scene hash → each Magic frame opens at a different (but
 // stable across re-renders) zoom level.
@@ -66,7 +67,12 @@ const magicHash = (value: string): number => {
 // stays clear for the 3D titles), and the per-scene base zoom rotates through
 // these levels — capped so the head never exceeds 90% of the frame width.
 const MAGIC_HEAD_TARGET_TOP = 0.25;
-const MAGIC_ZOOM_LEVELS = [1.0, 1.2, 1.5, 1.85, 2.3];
+// SuperZoom pushes hard per-scene zooms + strong camera snaps; Magic keeps the
+// exact same concept but with gentle, un-exaggerated zooms.
+const MAGIC_ZOOM_LEVELS = IS_SUPERZOOM
+  ? [1.0, 1.2, 1.5, 1.85, 2.3]
+  : [1.0, 1.06, 1.12, 1.18, 1.25];
+const MAGIC_CAMERA_INTENSITY = IS_SUPERZOOM ? 1 : 0.35;
 
 const styles = `
 @font-face {
@@ -612,7 +618,7 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
 
   // The Magic camera move scales the whole staged scene (backdrop + titles +
   // subject) while captions and audio stay fixed.
-  const cameraScale = magic ? magicCameraScale(magic.camera, frame, durationInFrames) : 1;
+  const cameraScale = magic ? magicCameraScale(magic.camera, frame, durationInFrames, MAGIC_CAMERA_INTENSITY) : 1;
 
   return (
     <AbsoluteFill>

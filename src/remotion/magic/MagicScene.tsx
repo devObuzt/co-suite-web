@@ -105,13 +105,17 @@ export const magicCameraScale = (
   camera: string | undefined,
   frame: number,
   durationInFrames: number,
+  // Scales every zoom delta: 1 = full (SuperZoom), <1 = gentler (Magic).
+  intensity: number = 1,
 ): number => {
-  const snapTo = (startFrame: number, from: number, to: number) =>
-    interpolate(frame, [startFrame, startFrame + SNAP_FRAMES], [from, to], {
+  const snapTo = (startFrame: number, from: number, to: number) => {
+    const target = from + (to - from) * intensity;
+    return interpolate(frame, [startFrame, startFrame + SNAP_FRAMES], [from, target], {
       extrapolateLeft: 'clamp',
       extrapolateRight: 'clamp',
       easing: Easing.out(Easing.cubic),
     });
+  };
   if (camera === 'zoom_in') {
     // Snap in at the cut, then hold to the end of the frame.
     return snapTo(0, 1, 1.14);

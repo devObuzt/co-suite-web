@@ -70,7 +70,7 @@ type VideoMontageResult = {
   };
 };
 
-type MontageTemplateId = "default" | "oneshare_superzoom";
+type MontageTemplateId = "default" | "oneshare_magic" | "oneshare_superzoom";
 
 type MontageTemplate = {
   id: MontageTemplateId;
@@ -88,10 +88,17 @@ const templates: MontageTemplate[] = [
     icon: <Clapperboard size={18} />,
   },
   {
+    id: "oneshare_magic",
+    label: "OneShare Magic",
+    badge: "جديد ✨",
+    desc: "بيفهم كل لقطة لحالها وبمنتجها: خلفية سوليد ورا الشخصية، فيديو مدموج فوق، عناوين 3D ضخمة مع شادو، أيقونات ومؤثر صوتي لكل مشهد. زوم هادي وناعم.",
+    icon: <WandSparkles size={18} />,
+  },
+  {
     id: "oneshare_superzoom",
     label: "OneShare SuperZoom",
     badge: "جديد ✨",
-    desc: "بيفهم كل لقطة لحالها وبمنتجها: خلفية سوليد ورا الشخصية، فيديو مدموج فوق، عناوين 3D ضخمة مع شادو، أيقونات، زوم ومؤثر صوتي لكل مشهد.",
+    desc: "نفس كونسبت Magic بالضبط، بس مع زوم قوي وحركة كاميرا مبالغة لكل مشهد — طاقة أعلى.",
     icon: <WandSparkles size={18} />,
   },
 ];
@@ -915,10 +922,11 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                         {state === "queued" && <Clock3 size={12} />}
                         {chip.label}
                       </span>
-                      {job.input?.template === "oneshare_superzoom" && (
+                      {(job.input?.template === "oneshare_magic" ||
+                        job.input?.template === "oneshare_superzoom") && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-[#ff4fa3]/12 px-3 py-1 text-xs font-black text-[#c4267c]">
                           <WandSparkles size={12} />
-                          SuperZoom
+                          {job.input?.template === "oneshare_superzoom" ? "SuperZoom" : "Magic"}
                         </span>
                       )}
                       {source.href ? (
