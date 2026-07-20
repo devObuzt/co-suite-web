@@ -48,7 +48,7 @@ const BRAND_COLOR = String((manifest.style as {brandColor?: string}).brandColor 
 // render through the Magic backdrop/title/camera instead of the defaults.
 const TEMPLATE = String((manifest as {template?: string}).template ?? 'default');
 const magicFor = (scene: Scene): MagicDirection | null =>
-  TEMPLATE === 'oneshare_magic'
+  TEMPLATE === 'oneshare_superzoom'
     ? ((scene as {magic?: MagicDirection}).magic ?? null)
     : null;
 
