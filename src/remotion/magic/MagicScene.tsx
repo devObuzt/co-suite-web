@@ -64,6 +64,14 @@ const STYLE = manifest.style as {
 const BRAND = String(STYLE.brandColor ?? '#2f80ff');
 const ARABIC_FONT = String(STYLE.arabicFontFamily ?? 'ConnecCairo');
 
+// The speaker leans to one side (subjectOffsetXPct); the OTHER side is the
+// empty canvas where solid-scene words can sit without hiding behind them.
+const SUBJECT_OFFSET_X = Number(
+  (manifest.style as {subjectOffsetXPct?: number}).subjectOffsetXPct ?? 0,
+);
+const EMPTY_SIDE: 'left' | 'right' = SUBJECT_OFFSET_X >= 0 ? 'left' : 'right';
+const BUSY_SIDE: 'left' | 'right' = EMPTY_SIDE === 'left' ? 'right' : 'left';
+
 /** Multiply a hex color's channels: factor < 1 darkens, > 1 lightens. */
 const shade = (hex: string, factor: number): string => {
   const raw = hex.replace('#', '');
@@ -393,8 +401,10 @@ export const MagicBackdrop = ({
         </div>
       ) : null}
       {hasMedia && split ? (
-        // Media fills the top zone and melts into the solid stage — no hard
-        // seam between the visual and the typography below it.
+        // The top-zone media melts DOWN into the solid brand stage — a long
+        // vertical feather plus a stage-tinted wash dissolve the seam so the
+        // clip reads as one blended backdrop behind the speaker, not a band
+        // stacked on top of the stage.
         <div
           style={{
             height: `${MEDIA_ZONE_HEIGHT * 100}%`,
@@ -403,14 +413,14 @@ export const MagicBackdrop = ({
             position: 'absolute',
             right: 0,
             top: 0,
-            WebkitMaskImage: 'linear-gradient(180deg, #000 56%, transparent 99%)',
-            maskImage: 'linear-gradient(180deg, #000 56%, transparent 99%)',
+            WebkitMaskImage: 'linear-gradient(180deg, #000 0%, #000 42%, transparent 96%)',
+            maskImage: 'linear-gradient(180deg, #000 0%, #000 42%, transparent 96%)',
           }}
         >
           {media}
           <div
             style={{
-              background: `linear-gradient(180deg, transparent 40%, ${STAGE_DARK}66 100%)`,
+              background: `linear-gradient(180deg, transparent 30%, ${BRAND}33 60%, ${STAGE_DEEP}cc 100%)`,
               inset: 0,
               position: 'absolute',
             }}
@@ -468,18 +478,72 @@ const titleFontSize = (title: string): number => {
   return Math.max(96, Math.min(210, Math.floor(1040 / length) + 66));
 };
 
+// Deterministic hash → the solid-scene word placement is "random" (varies per
+// scene) but STABLE across re-renders (same title → same layout every frame).
+const strHash = (value: string): number => {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+
+// Placement slots for a solid (typography-only) scene. `front: true` words are
+// painted OVER the speaker (a bold word that crosses in front on the empty
+// side / a small 3D concept overlap); `front: false` words sit at an edge
+// BEHIND the head. Every slot anchors to a side edge — never the center — so a
+// word is never swallowed by the speaker and never runs off the frame.
+type SolidSlot = {front: boolean; side: 'empty' | 'busy'; topPct: number; rotate: number; sizeMul: number};
+const SOLID_SLOTS: SolidSlot[] = [
+  {front: true, side: 'empty', topPct: 43, rotate: -7, sizeMul: 1.0},
+  {front: false, side: 'busy', topPct: 12, rotate: 6, sizeMul: 0.7},
+  {front: false, side: 'empty', topPct: 25, rotate: -14, sizeMul: 0.64},
+  {front: true, side: 'busy', topPct: 61, rotate: 10, sizeMul: 0.58},
+];
+
+type PlacedWord = {
+  word: string;
+  index: number;
+  front: boolean;
+  side: 'left' | 'right';
+  top: number;
+  rotate: number;
+  fontSize: number;
+};
+
+const planSolidWords = (words: string[], canvasWidth: number, canvasHeight: number): PlacedWord[] =>
+  words.slice(0, 4).map((word, index) => {
+    const slot = SOLID_SLOTS[index % SOLID_SLOTS.length];
+    const side = slot.side === 'empty' ? EMPTY_SIDE : BUSY_SIDE;
+    // Stable per-word jitter so no two scenes stack identically.
+    const jitter = (strHash(`${word}#${index}`) % 1000) / 1000;
+    const topPct = Math.max(6, Math.min(70, slot.topPct + (jitter - 0.5) * 8));
+    const rotate = slot.rotate + (jitter - 0.5) * 6;
+    const length = Math.max(2, Array.from(word).length);
+    const cap = Math.floor(190 * slot.sizeMul);
+    // Fit the word inside ~72% of the width so an edge anchor never overflows.
+    const fontSize = Math.max(56, Math.min(cap, Math.floor((canvasWidth * 0.72) / (length * 0.6))));
+    return {word, index, front: slot.front, side, top: canvasHeight * (topPct / 100), rotate, fontSize};
+  });
+
 export const MagicTitleLayer = ({
   scene,
   direction,
   durationInFrames,
+  layer = 'back',
 }: {
   scene: MagicSceneShape;
   direction: MagicDirection;
   durationInFrames: number;
+  // 'back' paints behind the speaker (below the subject); 'front' paints OVER
+  // the speaker — used only for solid scenes so a word can cross in front.
+  layer?: 'back' | 'front';
 }) => {
   const frame = useCurrentFrame();
-  const {fps, height: canvasHeight} = useVideoConfig();
+  const {fps, width: canvasWidth, height: canvasHeight} = useVideoConfig();
   const split = direction.layout === 'split';
+  const isSolid = direction.background === 'solid';
   const title = String(direction.title || scene.behindText || '').trim();
   const subtitle = String(direction.subtitle || '').trim();
   const emphasis = String(direction.emphasis || '').trim();
@@ -512,6 +576,127 @@ export const MagicTitleLayer = ({
     `0 0 46px ${STAGE_LIGHT}66`,
   ].join(', ');
 
+  // Shared nodes so the solid layout and the standard layout render the
+  // emphasis pill / subtitle identically.
+  const emphasisNode = emphasis ? (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'center',
+        left: 0,
+        position: 'absolute',
+        right: 0,
+        top: subtitleTop + (subtitle ? 100 : 0),
+      }}
+    >
+      <span
+        dir={rtl ? 'rtl' : 'ltr'}
+        style={{
+          backgroundColor: '#ffffff',
+          borderRadius: 999,
+          boxShadow: `0 14px 34px rgba(0,0,0,0.45), 0 0 30px ${STAGE_LIGHT}88`,
+          color: STAGE_DEEP,
+          fontFamily: ARABIC_FONT,
+          fontSize: 46,
+          fontWeight: 800,
+          opacity: spring({frame: Math.max(0, frame - 10), fps, config: {damping: 11, stiffness: 170}}) * outro,
+          padding: '10px 36px 14px',
+          transform: `rotate(-2.5deg) scale(${spring({
+            frame: Math.max(0, frame - 10),
+            fps,
+            config: {damping: 11, stiffness: 170},
+          })})`,
+        }}
+      >
+        {emphasis}
+      </span>
+    </div>
+  ) : null;
+  const subtitleNode = subtitle ? (
+    <div
+      dir={rtl ? 'rtl' : 'ltr'}
+      style={{
+        top: subtitleTop,
+        color: '#ffffffee',
+        fontFamily: ARABIC_FONT,
+        fontSize: 54,
+        fontWeight: 800,
+        left: 70,
+        opacity: interpolate(frame, [8, 22], [0, 1], {
+          extrapolateLeft: 'clamp',
+          extrapolateRight: 'clamp',
+        }) * outro,
+        position: 'absolute',
+        right: 70,
+        textAlign: 'center',
+        textShadow: `0 4px 0 ${STAGE_DEEP}, 0 18px 34px rgba(0,0,0,0.6)`,
+        transform: `rotateX(-13deg) translateY(${(1 - pop) * 40}px)`,
+        transformOrigin: '50% 0%',
+      }}
+    >
+      {subtitle}
+    </div>
+  ) : null;
+
+  // SOLID SCENE: no top media, so the 3D typography plays with the whole
+  // frame. Words are placed individually — one crossing in FRONT of the
+  // speaker on the empty side, one at an edge BEHIND the head, others on a
+  // diagonal — never centered (so nothing is swallowed by the speaker) and
+  // never off-frame.
+  if (isSolid && title) {
+    const placed = planSolidWords(title.split(/\s+/).filter(Boolean), canvasWidth, canvasHeight);
+    const renderWord = (word: PlacedWord) => {
+      const enter = spring({
+        frame: Math.max(0, frame - word.index * 3),
+        fps,
+        config: {damping: 12, stiffness: 150, mass: 0.9},
+      });
+      return (
+        <div
+          key={`${word.word}-${word.index}`}
+          dir={rtl ? 'rtl' : 'ltr'}
+          style={{
+            color: '#ffffff',
+            fontFamily: ARABIC_FONT,
+            fontSize: word.fontSize,
+            fontWeight: 800,
+            lineHeight: 1.0,
+            [word.side]: 44,
+            opacity: Math.min(1, enter * 1.2) * outro,
+            position: 'absolute',
+            textShadow: extrusion,
+            top: word.top,
+            transform: `rotate(${word.rotate}deg) translateY(${(1 - enter) * -40}px) scale(${0.75 + enter * 0.25})`,
+            transformOrigin: word.side === 'left' ? '0% 50%' : '100% 50%',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {word.word}
+        </div>
+      );
+    };
+    if (layer === 'front') {
+      const frontWords = placed.filter((word) => word.front);
+      if (!frontWords.length) return null;
+      return (
+        <AbsoluteFill style={{perspective: 1100, perspectiveOrigin: '50% 40%', zIndex: 1}}>
+          {frontWords.map(renderWord)}
+        </AbsoluteFill>
+      );
+    }
+    return (
+      <AbsoluteFill style={{perspective: 1100, perspectiveOrigin: '50% 40%', zIndex: 1}}>
+        {icons.length ? <MagicIconNetwork icons={icons} outro={outro} /> : null}
+        {placed.filter((word) => !word.front).map(renderWord)}
+        {emphasisNode}
+        {subtitleNode}
+      </AbsoluteFill>
+    );
+  }
+
+  // Non-solid scenes have no front layer — everything sits behind the speaker.
+  if (layer === 'front') return null;
+
   if (!title && !subtitle && !icons.length) return null;
 
   return (
@@ -542,65 +727,8 @@ export const MagicTitleLayer = ({
           {title}
         </div>
       ) : null}
-      {emphasis ? (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            left: 0,
-            position: 'absolute',
-            right: 0,
-            top: subtitleTop + (subtitle ? 100 : 0),
-          }}
-        >
-          <span
-            dir={rtl ? 'rtl' : 'ltr'}
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: 999,
-              boxShadow: `0 14px 34px rgba(0,0,0,0.45), 0 0 30px ${STAGE_LIGHT}88`,
-              color: STAGE_DEEP,
-              fontFamily: ARABIC_FONT,
-              fontSize: 46,
-              fontWeight: 800,
-              opacity: spring({frame: Math.max(0, frame - 10), fps, config: {damping: 11, stiffness: 170}}) * outro,
-              padding: '10px 36px 14px',
-              transform: `rotate(-2.5deg) scale(${spring({
-                frame: Math.max(0, frame - 10),
-                fps,
-                config: {damping: 11, stiffness: 170},
-              })})`,
-            }}
-          >
-            {emphasis}
-          </span>
-        </div>
-      ) : null}
-      {subtitle ? (
-        <div
-          dir={rtl ? 'rtl' : 'ltr'}
-          style={{
-            top: subtitleTop,
-            color: '#ffffffee',
-            fontFamily: ARABIC_FONT,
-            fontSize: 54,
-            fontWeight: 800,
-            left: 70,
-            opacity: interpolate(frame, [8, 22], [0, 1], {
-              extrapolateLeft: 'clamp',
-              extrapolateRight: 'clamp',
-            }) * outro,
-            position: 'absolute',
-            right: 70,
-            textAlign: 'center',
-            textShadow: `0 4px 0 ${STAGE_DEEP}, 0 18px 34px rgba(0,0,0,0.6)`,
-            transform: `rotateX(-13deg) translateY(${(1 - pop) * 40}px)`,
-            transformOrigin: '50% 0%',
-          }}
-        >
-          {subtitle}
-        </div>
-      ) : null}
+      {emphasisNode}
+      {subtitleNode}
     </AbsoluteFill>
   );
 };

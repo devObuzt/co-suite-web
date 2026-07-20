@@ -52,6 +52,22 @@ const magicFor = (scene: Scene): MagicDirection | null =>
     ? ((scene as {magic?: MagicDirection}).magic ?? null)
     : null;
 
+// Deterministic per-scene hash → each Magic frame opens at a different (but
+// stable across re-renders) zoom level.
+const magicHash = (value: string): number => {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+// Magic subject staging constants: the head sits ~25% from the top (top band
+// stays clear for the 3D titles), and the per-scene base zoom rotates through
+// these levels — capped so the head never exceeds 90% of the frame width.
+const MAGIC_HEAD_TARGET_TOP = 0.25;
+const MAGIC_ZOOM_LEVELS = [1.0, 1.2, 1.5, 1.85, 2.3];
+
 const styles = `
 @font-face {
   font-family: ConnecAssistant;
@@ -540,16 +556,38 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
     subjectOffsetXPct?: number;
     subjectOffsetYPct?: number;
   };
-  const userZoom = Math.min(3, Math.max(1, Number(montageStyle.subjectZoom ?? 1)));
   const {width: canvasWidth, height: canvasHeight} = useVideoConfig();
-  const userOffsetX = (Math.max(-40, Math.min(40, Number(montageStyle.subjectOffsetXPct ?? 0))) / 100) * canvasWidth;
-  const userOffsetY = (Math.max(-40, Math.min(40, Number(montageStyle.subjectOffsetYPct ?? 0))) / 100) * canvasHeight;
+  // Subject zoom now allows up to 5x (was 3).
+  const userZoomRaw = Number(montageStyle.subjectZoom ?? 1);
+  const userSetZoom = userZoomRaw > 1.001;
+  const userZoom = Math.min(5, Math.max(1, userZoomRaw));
+  const userOffsetXRaw = Number(montageStyle.subjectOffsetXPct ?? 0);
+  const userOffsetYRaw = Number(montageStyle.subjectOffsetYPct ?? 0);
+  const userSetOffsetY = Math.abs(userOffsetYRaw) > 0.001;
+  const userOffsetX = (Math.max(-40, Math.min(40, userOffsetXRaw)) / 100) * canvasWidth;
+  const userOffsetY = (Math.max(-40, Math.min(40, userOffsetYRaw)) / 100) * canvasHeight;
   // Magic subjects stand DEAD STILL — the staged camera does all the moving
   // (snap-and-hold). The default template keeps its breathing drift.
   const magic = magicFor(scene);
   const isMagicScene = Boolean(magic);
+
+  // Magic subject: pushed DOWN so the head sits ~25% from the top (the top band
+  // stays clear for the 3D titles; the lower body crops off-frame), with a
+  // per-scene base zoom so every frame opens at a different size. The user's
+  // explicit x/y offset or zoom overrides the automatic staging.
+  const src = manifest.source as {subjectTopRel?: number | null; subjectHeadWidthRel?: number | null};
+  const headTopRel = Math.min(0.4, Math.max(0.02, Number(src.subjectTopRel ?? 0.12)));
+  const headWidthRel = Math.min(0.6, Math.max(0.1, Number(src.subjectHeadWidthRel ?? 0.24)));
+  // Cap zoom so the head never exceeds 90% of the frame width.
+  const magicMaxZoom = Math.min(5, 0.9 / headWidthRel);
+  const autoMagicZoom = MAGIC_ZOOM_LEVELS[magicHash(String(scene.id ?? '')) % MAGIC_ZOOM_LEVELS.length];
+  const magicZoom = Math.min(magicMaxZoom, userSetZoom ? userZoom : autoMagicZoom);
+  const magicOffsetY = userSetOffsetY
+    ? userOffsetY
+    : Math.max(0, (MAGIC_HEAD_TARGET_TOP - headTopRel) * canvasHeight);
+
   const subjectScale = isMagicScene
-    ? 1.05 * userZoom
+    ? magicZoom
     : (interpolate(progress, [0, 0.5, 1], [1.035, 1.075, 1.045]) + zoomBeat * 0.07) * userZoom;
   const subjectX = isMagicScene ? 0 : interpolate(progress, [0, 1], [-10, 10]) + overlayBeat * 12;
   // Scale from face height (~25% down the canvas): any zoom > 1 then pushes
@@ -562,8 +600,12 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
     inset: 0,
     objectFit: 'cover',
     position: 'absolute',
-    transform: `translate3d(${subjectX + userOffsetX}px, ${subjectY + userOffsetY}px, 0) scale(${subjectScale})`,
-    transformOrigin: '50% 25%',
+    transform: isMagicScene
+      ? `translate3d(${userOffsetX}px, ${magicOffsetY}px, 0) scale(${magicZoom})`
+      : `translate3d(${subjectX + userOffsetX}px, ${subjectY + userOffsetY}px, 0) scale(${subjectScale})`,
+    // Magic scales around the head so the zoom keeps the face in place before
+    // the downward push; the default template scales around ~25% down.
+    transformOrigin: isMagicScene ? `50% ${headTopRel * 100}%` : '50% 25%',
     width: '100%',
     zIndex: 2,
   };
@@ -615,6 +657,18 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
             style={subjectStyle}
           />
         )}
+        {/* Solid scenes place a word IN FRONT of the speaker: this layer paints
+            after the subject (zIndex 3) so the front-slotted words cross over. */}
+        {SHOW_TITLES && magic && magic.background === 'solid' ? (
+          <AbsoluteFill style={{pointerEvents: 'none', zIndex: 3}}>
+            <MagicTitleLayer
+              scene={scene as unknown as MagicSceneShape}
+              direction={magic}
+              durationInFrames={durationInFrames}
+              layer="front"
+            />
+          </AbsoluteFill>
+        ) : null}
       </AbsoluteFill>
       <Audio src={publicAsset(sourceAudioPath)} startFrom={startFrom} endAt={endAt} />
       {SHOW_CAPTIONS ? <Captions scene={scene} /> : null}
