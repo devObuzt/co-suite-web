@@ -107,7 +107,7 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
 
         <TeachRulesBox suiteId={id} />
 
-        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <section className="grid grid-cols-2 gap-2.5 sm:gap-3">
           <ModeButton
             active={mode === "ideas"}
             title="أفكار السوشيال"
@@ -163,20 +163,20 @@ function ModeButton({
       type="button"
       onClick={onClick}
       className={[
-        "min-h-[25vh] rounded-3xl border p-4 text-start shadow-sm transition sm:p-5",
+        "flex min-h-[22vh] flex-col rounded-3xl border p-3.5 text-start shadow-sm transition sm:min-h-[25vh] sm:p-5",
         active
           ? "border-[#2f80ff] bg-gradient-to-br from-[#2f80ff]/14 via-[#18b89d]/8 to-transparent"
           : "border-border bg-card hover:border-[#2f80ff]/50",
       ].join(" ")}
     >
-      <div className="flex items-start justify-between gap-4">
-        <span className={["rounded-2xl p-3", active ? "bg-[#2f80ff] text-white" : "bg-muted text-foreground"].join(" ")}>
+      <div className="flex items-start justify-between gap-2">
+        <span className={["rounded-2xl p-2.5 sm:p-3", active ? "bg-[#2f80ff] text-white" : "bg-muted text-foreground"].join(" ")}>
           {icon}
         </span>
-        {active && <CheckCircle2 size={20} className="text-[#18b89d]" />}
+        {active && <CheckCircle2 size={20} className="shrink-0 text-[#18b89d]" />}
       </div>
-      <h2 className="mt-4 text-xl font-semibold leading-7 tracking-normal sm:mt-5 sm:text-2xl">{title}</h2>
-      <p className="mt-2 max-w-md text-xs leading-5 text-muted-foreground sm:text-sm sm:leading-6">{description}</p>
+      <h2 className="mt-3 text-base font-semibold leading-6 tracking-normal text-balance sm:mt-5 sm:text-2xl sm:leading-7">{title}</h2>
+      <p className="mt-1.5 text-xs leading-5 text-muted-foreground sm:mt-2 sm:text-sm sm:leading-6">{description}</p>
     </button>
   );
 }
