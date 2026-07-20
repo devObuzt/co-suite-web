@@ -541,7 +541,15 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
   const frame = useCurrentFrame();
   const startFrom = sourceFrames(scene.sourceStart, fps);
   const endAt = sourceFrames(scene.sourceEnd, fps);
-  const sourceFrame = startFrom + frame;
+  // Clamp to the last extracted frame: cross-dissolve transitions can make the
+  // tail sequence ask for a frame just past what was extracted, and a single
+  // missing PNG 404s the compositor and collapses the whole render.
+  const subjectFrameCount = Number(
+    (manifest.source as {subjectFrameCount?: number}).subjectFrameCount ?? 0,
+  );
+  const rawSourceFrame = startFrom + frame;
+  const sourceFrame =
+    subjectFrameCount > 0 ? Math.min(rawSourceFrame, subjectFrameCount - 1) : rawSourceFrame;
   const frameSrc =
     'framesPublicPath' in manifest.source
       ? publicAsset(
