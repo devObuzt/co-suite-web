@@ -8,8 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SuitePageShell } from "@/components/suite/SuitePageShell";
-import { ExternalLink, ImagePlus, Loader2, Plus, Save, UserPlus, X } from "lucide-react";
+import {
+  ChevronDown, ChevronUp, ExternalLink, ImagePlus, Loader2, Palette, Pencil, Plus,
+  Save, Sparkles, Tag, Type, Undo2, UserPlus, Users, Wand2, X,
+} from "lucide-react";
 
+// List-shaped fields are edited as chips, so they live as arrays in the form and
+// only collapse to brand arrays on save.
 type ProfileForm = {
   name: string;
   category: string;
@@ -21,24 +26,24 @@ type ProfileForm = {
   tiktok: string;
   linkedin: string;
   referenceLinks: BrandReferenceLink[];
-  productsServices: string;
-  audienceCountries: string;
-  audienceCities: string;
+  productsServices: string[];
+  audienceCountries: string[];
+  audienceCities: string[];
   audienceAgeRange: string;
   audienceGender: string;
   audienceNeed: string;
   audienceNotes: string;
-  audienceInterests: string;
-  audienceBehaviors: string;
-  audienceSegments: string;
+  audienceInterests: string[];
+  audienceBehaviors: string[];
+  audienceSegments: string[];
   uniqueValue: string;
   esp: string;
-  uspPoints: string;
-  espPoints: string;
+  uspPoints: string[];
+  espPoints: string[];
   colorPrimary: string;
   colorSecondary: string;
   colorAccent: string;
-  fonts: string;
+  fonts: string[];
   personaName: string;
 };
 
@@ -53,26 +58,50 @@ const emptyForm: ProfileForm = {
   tiktok: "",
   linkedin: "",
   referenceLinks: [],
-  productsServices: "",
-  audienceCountries: "",
-  audienceCities: "",
+  productsServices: [],
+  audienceCountries: [],
+  audienceCities: [],
   audienceAgeRange: "",
   audienceGender: "",
   audienceNeed: "",
   audienceNotes: "",
-  audienceInterests: "",
-  audienceBehaviors: "",
-  audienceSegments: "",
+  audienceInterests: [],
+  audienceBehaviors: [],
+  audienceSegments: [],
   uniqueValue: "",
   esp: "",
-  uspPoints: "",
-  espPoints: "",
+  uspPoints: [],
+  espPoints: [],
   colorPrimary: "",
   colorSecondary: "",
   colorAccent: "",
-  fonts: "",
+  fonts: [],
   personaName: "",
 };
+
+type TabKey = "identity" | "business" | "products" | "audience" | "value" | "personas" | "rules";
+
+// Which form fields each tab owns. Saving a tab persists only these, so edits
+// left behind on another tab never ride along.
+const TAB_FIELDS: Record<TabKey, (keyof ProfileForm)[]> = {
+  identity: ["name", "colorPrimary", "colorSecondary", "colorAccent", "fonts"],
+  business: [
+    "category", "audienceLanguages", "dialect", "website",
+    "instagram", "facebook", "tiktok", "linkedin", "referenceLinks",
+  ],
+  products: ["productsServices"],
+  audience: [
+    "audienceCountries", "audienceCities", "audienceAgeRange", "audienceGender",
+    "audienceNeed", "audienceNotes", "audienceInterests", "audienceBehaviors", "audienceSegments",
+  ],
+  value: ["uniqueValue", "esp", "uspPoints", "espPoints"],
+  personas: [],
+  rules: [],
+};
+
+// Personas and content rules save through their own endpoints as you act, so
+// they have no dirty state and no section save button.
+const SELF_SAVING_TABS: TabKey[] = ["personas", "rules"];
 
 export default function BusinessProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -81,9 +110,15 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
   const sourceLabels = getSourceLinkLabels(lang);
   const [suite, setSuite] = useState<Suite | null>(null);
   const [form, setForm] = useState<ProfileForm>(emptyForm);
+  // Last persisted values — the baseline every dirty check and section save
+  // compares against, so one tab's save never carries another tab's edits.
+  const [savedForm, setSavedForm] = useState<ProfileForm>(emptyForm);
+  const [activeTab, setActiveTab] = useState<TabKey>("identity");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingTab, setSavingTab] = useState<TabKey | null>(null);
+  const [regenerating, setRegenerating] = useState<string | null>(null);
   const [uploading, setUploading] = useState<"logo" | "persona" | null>(null);
+  const [undo, setUndo] = useState<{ label: string; restore: () => void } | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -91,7 +126,9 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
     api.suites.get(id)
       .then((data) => {
         setSuite(data);
-        setForm(formFromBrand(data.brand || {}));
+        const loaded = formFromBrand(data.brand || {});
+        setForm(loaded);
+        setSavedForm(loaded);
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : t("suite.profile.loadFailed")))
       .finally(() => setLoading(false));
@@ -105,20 +142,179 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
     [form.audienceLanguages]
   );
 
-  async function saveProfile() {
+  const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
+    { key: "identity", label: t("suite.profile.tab.identity"), icon: <Palette size={14} /> },
+    { key: "business", label: t("suite.profile.tab.business"), icon: <Tag size={14} /> },
+    { key: "products", label: t("suite.profile.tab.products"), icon: <Sparkles size={14} /> },
+    { key: "audience", label: t("suite.profile.tab.audience"), icon: <Users size={14} /> },
+    { key: "value", label: t("suite.profile.tab.value"), icon: <Wand2 size={14} /> },
+    { key: "personas", label: t("suite.profile.tab.personas"), icon: <UserPlus size={14} /> },
+    { key: "rules", label: t("suite.profile.tab.rules"), icon: <Type size={14} /> },
+  ];
+
+  const dirtyCountFor = React.useCallback(
+    (tab: TabKey) =>
+      TAB_FIELDS[tab].filter((field) => JSON.stringify(form[field]) !== JSON.stringify(savedForm[field])).length,
+    [form, savedForm]
+  );
+  const dirtyTabs = useMemo(
+    () => new Set((Object.keys(TAB_FIELDS) as TabKey[]).filter((tab) => dirtyCountFor(tab) > 0)),
+    [dirtyCountFor]
+  );
+  const activeDirtyCount = dirtyCountFor(activeTab);
+
+  // A reload mid-edit would silently drop unsaved section changes.
+  useEffect(() => {
+    if (dirtyTabs.size === 0) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirtyTabs]);
+
+  useEffect(() => {
+    if (!undo) return;
+    const timer = setTimeout(() => setUndo(null), 8000);
+    return () => clearTimeout(timer);
+  }, [undo]);
+
+  function switchTab(tab: TabKey) {
+    if (tab === activeTab) return;
+    if (dirtyCountFor(activeTab) > 0 && !window.confirm(t("suite.profile.unsavedWarning"))) return;
+    setActiveTab(tab);
+    setNotice("");
+    setError("");
+  }
+
+  async function saveTab(tab: TabKey) {
     if (!suite) return;
-    setSaving(true);
+    setSavingTab(tab);
     setNotice("");
     setError("");
     try {
-      const nextBrand = brandFromForm(form, suite.brand || {});
+      const merged: ProfileForm = { ...savedForm };
+      for (const field of TAB_FIELDS[tab]) {
+        (merged as Record<string, unknown>)[field] = form[field];
+      }
+      const nextBrand = brandFromForm(merged, suite.brand || {});
       await api.suites.updateBrand(id, nextBrand);
       setSuite({ ...suite, brand: nextBrand });
+      setSavedForm(merged);
       setNotice(t("suite.profile.saved"));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("suite.profile.saveFailed"));
     } finally {
-      setSaving(false);
+      setSavingTab(null);
+    }
+  }
+
+  function revertTab(tab: TabKey) {
+    setForm((current) => {
+      const next: ProfileForm = { ...current };
+      for (const field of TAB_FIELDS[tab]) {
+        (next as Record<string, unknown>)[field] = savedForm[field];
+      }
+      return next;
+    });
+  }
+
+  type ListField = { [K in keyof ProfileForm]: ProfileForm[K] extends string[] ? K : never }[keyof ProfileForm];
+
+  function setList(field: ListField, next: string[]) {
+    setForm((current) => ({ ...current, [field]: next }));
+  }
+
+  function addToList(field: ListField, value: string) {
+    const entry = value.trim();
+    if (!entry) return;
+    const list = form[field];
+    if (list.some((item) => item.toLowerCase() === entry.toLowerCase())) return;
+    setList(field, [...list, entry]);
+  }
+
+  function editListItem(field: ListField, index: number, value: string) {
+    const entry = value.trim();
+    const list = form[field];
+    setList(field, entry ? list.map((item, i) => (i === index ? entry : item)) : list.filter((_, i) => i !== index));
+  }
+
+  function removeListItem(field: ListField, index: number) {
+    const list = form[field];
+    const removed = list[index];
+    const before = list;
+    setList(field, list.filter((_, i) => i !== index));
+    setUndo({ label: removed, restore: () => setList(field, before) });
+  }
+
+  function moveListItem(field: ListField, index: number, delta: number) {
+    const list = [...form[field]];
+    const target = index + delta;
+    if (target < 0 || target >= list.length) return;
+    [list[index], list[target]] = [list[target], list[index]];
+    setList(field, list);
+  }
+
+  // Regenerating writes into the form only — the section stays dirty so the
+  // result is a preview until the section is explicitly saved.
+  async function regenerateAssets(kind: "colors" | "fonts" | "logo") {
+    setRegenerating(kind);
+    setNotice("");
+    setError("");
+    try {
+      const res = await api.onboarding.generateBrandAssets({
+        suite_id: id,
+        generate: [kind],
+        user_language: lang,
+      });
+      const fresh = formFromBrand(res.brand);
+      if (kind === "logo") {
+        setSuite((current) => (current ? { ...current, brand: res.brand } : current));
+      } else {
+        const keys: (keyof ProfileForm)[] = kind === "colors"
+          ? ["colorPrimary", "colorSecondary", "colorAccent"]
+          : ["fonts"];
+        setForm((current) => {
+          const next: ProfileForm = { ...current };
+          for (const key of keys) (next as Record<string, unknown>)[key] = fresh[key];
+          return next;
+        });
+      }
+      setNotice(t("suite.profile.regenerated"));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("suite.profile.regenerateFailed"));
+    } finally {
+      setRegenerating(null);
+    }
+  }
+
+  async function regenerateValue() {
+    setRegenerating("value");
+    setNotice("");
+    setError("");
+    try {
+      const res = await api.onboarding.extractBrand({
+        suite_id: id,
+        urls: [form.website, form.instagram, form.facebook].filter(Boolean),
+        business_name: form.name,
+        industry: form.category,
+        description: form.uniqueValue,
+        user_language: lang,
+      });
+      const fresh = formFromBrand(res.brand);
+      setForm((current) => ({
+        ...current,
+        uniqueValue: fresh.uniqueValue || current.uniqueValue,
+        esp: fresh.esp || current.esp,
+        uspPoints: fresh.uspPoints.length ? fresh.uspPoints : current.uspPoints,
+        espPoints: fresh.espPoints.length ? fresh.espPoints : current.espPoints,
+      }));
+      setNotice(t("suite.profile.regeneratedPreview"));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("suite.profile.regenerateFailed"));
+    } finally {
+      setRegenerating(null);
     }
   }
 
@@ -250,14 +446,165 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
           </div>
         )}
 
-        <ProfileSection title={t("suite.profile.section.business")}>
-          <div className="grid gap-3 md:grid-cols-2">
-            <TextField label={t("suite.profile.field.businessName")} value={form.name} onChange={(name) => setForm({ ...form, name })} />
-            <TextField label={t("suite.profile.field.category")} value={form.category} onChange={(category) => setForm({ ...form, category })} />
+        {/* Sticky identity header — who this profile belongs to, always visible. */}
+        <div className="sticky top-0 z-20 -mx-1 flex items-center gap-3 border-b border-border bg-background/95 px-1 py-3 backdrop-blur">
+          {brand.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={brand.logo_url} alt="" className="h-10 w-10 shrink-0 rounded-xl object-contain" />
+          ) : (
+            <span className="h-10 w-10 shrink-0 rounded-xl bg-gradient-to-br from-[#2f80ff] to-[#18b89d]" />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold text-foreground" dir="auto">{form.name || t("suite.profile.untitled")}</p>
+            <p className="truncate text-xs text-muted-foreground" dir="auto">
+              {[form.category, form.audienceCities[0] || form.audienceCountries[0]].filter(Boolean).join(" · ") || t("suite.profile.description")}
+            </p>
           </div>
-        </ProfileSection>
+          {dirtyTabs.size > 0 && (
+            <span className="shrink-0 rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+              {dirtyTabs.size} {t("suite.profile.unsavedSections")}
+            </span>
+          )}
+        </div>
 
-        <ProfileSection title={sourceLabels.title}>
+        {/* Tab bar */}
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+          {TABS.map(({ key, label, icon }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => switchTab(key)}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                activeTab === key
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+            >
+              {icon}
+              {label}
+              {dirtyTabs.has(key) && activeTab !== key && (
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Identity: name, logo, colours, fonts ── */}
+        {activeTab === "identity" && (
+          <ProfileSection title={t("suite.profile.tab.identity")}>
+            <div className="max-w-xl">
+              <TextField label={t("suite.profile.field.businessName")} value={form.name} onChange={(name) => setForm({ ...form, name })} />
+            </div>
+
+            <div className="mt-5">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-muted-foreground">{t("suite.profile.field.primaryLogo")}</span>
+                <RegenButton busy={regenerating === "logo"} onClick={() => regenerateAssets("logo")} label={t("suite.profile.regenerate")} />
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                {brand.logo_url && <LogoPreview url={brand.logo_url} label={t("suite.profile.field.primaryLogo")} isPrimary />}
+                {logos.filter((logo) => logo.url !== brand.logo_url).map((logo, index) => (
+                  <LogoPreview
+                    key={`${logo.url}-${index}`}
+                    url={logo.url}
+                    label={logo.shape || logo.name || t("suite.profile.field.logoFallback")}
+                    isPrimary={brand.logo_url === logo.url}
+                    onSetPrimary={() => setPrimaryLogo(logo.url)}
+                    primaryLabel={t("suite.new.primaryLogo")}
+                    setPrimaryLabel={t("suite.new.setPrimaryLogo")}
+                  />
+                ))}
+                <label className="inline-flex min-h-16 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">
+                  {uploading === "logo" ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
+                  {t("suite.profile.field.uploadLogo")}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                    multiple
+                    className="sr-only"
+                    onChange={(e) => {
+                      uploadLogos(e.target.files);
+                      e.currentTarget.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-muted-foreground">{t("suite.profile.section.identity")}</span>
+                <RegenButton busy={regenerating === "colors"} onClick={() => regenerateAssets("colors")} label={t("suite.profile.regenerate")} />
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <ColorField label={t("suite.profile.field.colorPrimary")} value={form.colorPrimary} onChange={(colorPrimary) => setForm({ ...form, colorPrimary })} />
+                <ColorField label={t("suite.profile.field.colorSecondary")} value={form.colorSecondary} onChange={(colorSecondary) => setForm({ ...form, colorSecondary })} />
+                <ColorField label={t("suite.profile.field.colorAccent")} value={form.colorAccent} onChange={(colorAccent) => setForm({ ...form, colorAccent })} />
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-muted-foreground">{t("suite.profile.field.fonts")}</span>
+                <RegenButton busy={regenerating === "fonts"} onClick={() => regenerateAssets("fonts")} label={t("suite.profile.regenerate")} />
+              </div>
+              <ChipsField
+                items={form.fonts}
+                placeholder={t("suite.profile.field.fontsPlaceholder")}
+                addLabel={t("suite.new.add")}
+                removeLabel={t("suite.profile.removeItem")}
+                editLabel={t("suite.profile.editItem")}
+                onAdd={(value) => addToList("fonts", value)}
+                onEdit={(index, value) => editListItem("fonts", index, value)}
+                onRemove={(index) => removeListItem("fonts", index)}
+              />
+            </div>
+          </ProfileSection>
+        )}
+
+        {/* ── Business: category, languages, source links ── */}
+        {activeTab === "business" && (
+          <ProfileSection title={t("suite.profile.tab.business")}>
+            <div className="max-w-xl">
+              <TextField label={t("suite.profile.field.category")} value={form.category} onChange={(category) => setForm({ ...form, category })} />
+            </div>
+
+            <div className="mt-5">
+              <span className="mb-2 block text-xs font-medium text-muted-foreground">{t("suite.profile.section.languages")}</span>
+              <div className="flex flex-wrap gap-2">
+                {LANGUAGES.map((lang) => {
+                  const active = form.audienceLanguages.includes(lang.code);
+                  return (
+                    <button
+                      key={lang.code}
+                      type="button"
+                      onClick={() => setForm({ ...form, audienceLanguages: toggleValue(form.audienceLanguages, lang.code) })}
+                      className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                        active ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                      }`}
+                      dir={lang.dir}
+                    >
+                      {lang.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedLanguages.length > 0 && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {t("suite.profile.field.primaryLanguage")} {selectedLanguages[0].label}
+                </p>
+              )}
+              <div className="mt-4 max-w-xl">
+                <TextField
+                  label={t("suite.profile.field.dialect")}
+                  value={form.dialect}
+                  onChange={(dialect) => setForm({ ...form, dialect })}
+                  placeholder={t("suite.profile.field.dialectPlaceholder")}
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 border-t border-border pt-5">
           <p className="mb-3 text-sm text-muted-foreground" dir="auto">{sourceLabels.description}</p>
           <div className="grid gap-3 md:grid-cols-2">
             <LinkField label={sourceLabels.website} value={form.website} onChange={(website) => setForm({ ...form, website })} placeholder="https://example.com" openLabel={sourceLabels.openLink} />
@@ -299,127 +646,144 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
               </div>
             ))}
           </div>
-        </ProfileSection>
+            </div>
+          </ProfileSection>
+        )}
 
-        <ProfileSection title={t("suite.profile.section.languages")}>
-          <div className="flex flex-wrap gap-2">
-            {LANGUAGES.map((lang) => {
-              const active = form.audienceLanguages.includes(lang.code);
-              return (
-                <button
-                  key={lang.code}
-                  type="button"
-                  onClick={() => setForm({ ...form, audienceLanguages: toggleValue(form.audienceLanguages, lang.code) })}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                    active ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
-                  }`}
-                  dir={lang.dir}
-                >
-                  {lang.label}
-                </button>
-              );
-            })}
-          </div>
-          {selectedLanguages.length > 0 && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              {t("suite.profile.field.primaryLanguage")} {selectedLanguages[0].label}
-            </p>
-          )}
-          <div className="mt-4 max-w-xl">
-            <TextField
-              label={t("suite.profile.field.dialect")}
-              value={form.dialect}
-              onChange={(dialect) => setForm({ ...form, dialect })}
-              placeholder={t("suite.profile.field.dialectPlaceholder")}
+        {/* ── Products & services ── */}
+        {activeTab === "products" && (
+          <ProfileSection title={t("suite.profile.tab.products")}>
+            <p className="mb-3 text-sm text-muted-foreground" dir="auto">{t("suite.profile.productsHint")}</p>
+            <ChipsField
+              items={form.productsServices}
+              placeholder={t("suite.profile.field.products")}
+              addLabel={t("suite.new.add")}
+              removeLabel={t("suite.profile.removeItem")}
+              editLabel={t("suite.profile.editItem")}
+              moveUpLabel={t("suite.profile.moveUp")}
+              moveDownLabel={t("suite.profile.moveDown")}
+              onAdd={(value) => addToList("productsServices", value)}
+              onEdit={(index, value) => editListItem("productsServices", index, value)}
+              onRemove={(index) => removeListItem("productsServices", index)}
+              onMove={(index, delta) => moveListItem("productsServices", index, delta)}
             />
-          </div>
-        </ProfileSection>
+          </ProfileSection>
+        )}
 
-        <ProfileSection title={t("suite.profile.section.products")}>
-          <TextareaField
-            label={t("suite.profile.field.products")}
-            value={form.productsServices}
-            onChange={(productsServices) => setForm({ ...form, productsServices })}
-            rows={5}
-          />
-        </ProfileSection>
-
-        <ProfileSection title={t("suite.profile.section.audience")}>
-          <div className="grid gap-3 md:grid-cols-2">
-            <TextField label={t("suite.profile.field.audienceCountries")} value={form.audienceCountries} onChange={(audienceCountries) => setForm({ ...form, audienceCountries })} placeholder={t("suite.profile.field.audienceCountriesPlaceholder")} />
-            <TextField label={t("suite.profile.field.audienceCities")} value={form.audienceCities} onChange={(audienceCities) => setForm({ ...form, audienceCities })} placeholder={t("suite.profile.field.audienceCitiesPlaceholder")} />
-            <TextField label={t("suite.profile.field.audienceAgeRange")} value={form.audienceAgeRange} onChange={(audienceAgeRange) => setForm({ ...form, audienceAgeRange })} placeholder={t("suite.profile.field.audienceAgeRangePlaceholder")} />
-            <TextField label={t("suite.profile.field.audienceGender")} value={form.audienceGender} onChange={(audienceGender) => setForm({ ...form, audienceGender })} placeholder={t("suite.profile.field.audienceGenderPlaceholder")} />
-          </div>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <TextareaField label={t("suite.profile.field.audienceNeed")} value={form.audienceNeed} onChange={(audienceNeed) => setForm({ ...form, audienceNeed })} rows={4} placeholder={t("suite.profile.field.audienceNeedPlaceholder")} />
-            <TextareaField label={t("suite.profile.field.audienceNote")} value={form.audienceNotes} onChange={(audienceNotes) => setForm({ ...form, audienceNotes })} rows={4} />
-          </div>
-          <div className="mt-3 grid gap-3 md:grid-cols-3">
-            <TextareaField label={t("suite.profile.field.interests")} value={form.audienceInterests} onChange={(audienceInterests) => setForm({ ...form, audienceInterests })} />
-            <TextareaField label={t("suite.profile.field.behaviors")} value={form.audienceBehaviors} onChange={(audienceBehaviors) => setForm({ ...form, audienceBehaviors })} />
-            <TextareaField label={t("suite.profile.field.segments")} value={form.audienceSegments} onChange={(audienceSegments) => setForm({ ...form, audienceSegments })} />
-          </div>
-        </ProfileSection>
-
-        <ProfileSection title={t("suite.profile.section.value")}>
-          <div className="grid gap-3 md:grid-cols-2">
-            <TextareaField label={t("suite.profile.field.uniqueValue")} value={form.uniqueValue} onChange={(uniqueValue) => setForm({ ...form, uniqueValue })} rows={4} />
-            <TextareaField label={t("suite.profile.field.esp")} value={form.esp} onChange={(esp) => setForm({ ...form, esp })} rows={4} />
-            <TextareaField label={t("suite.profile.field.uspPoints")} value={form.uspPoints} onChange={(uspPoints) => setForm({ ...form, uspPoints })} rows={5} />
-            <TextareaField label={t("suite.profile.field.espPoints")} value={form.espPoints} onChange={(espPoints) => setForm({ ...form, espPoints })} rows={5} />
-          </div>
-        </ProfileSection>
-
-        <ProfileSection title={t("suite.profile.section.identity")}>
-          <div className="grid gap-3 md:grid-cols-3">
-            <ColorField label={t("suite.profile.field.colorPrimary")} value={form.colorPrimary} onChange={(colorPrimary) => setForm({ ...form, colorPrimary })} />
-            <ColorField label={t("suite.profile.field.colorSecondary")} value={form.colorSecondary} onChange={(colorSecondary) => setForm({ ...form, colorSecondary })} />
-            <ColorField label={t("suite.profile.field.colorAccent")} value={form.colorAccent} onChange={(colorAccent) => setForm({ ...form, colorAccent })} />
-          </div>
-          <div className="mt-3">
-            <TextareaField
-              label={t("suite.profile.field.fonts")}
-              value={form.fonts}
-              onChange={(fonts) => setForm({ ...form, fonts })}
-              rows={3}
-              placeholder={t("suite.profile.field.fontsPlaceholder")}
-            />
-          </div>
-        </ProfileSection>
-
-        <ProfileSection title={t("suite.profile.section.assets")}>
-          <div className="flex flex-wrap items-center gap-3">
-            {brand.logo_url && <LogoPreview url={brand.logo_url} label={t("suite.profile.field.primaryLogo")} isPrimary />}
-            {logos.filter((logo) => logo.url !== brand.logo_url).map((logo, index) => (
-              <LogoPreview
-                key={`${logo.url}-${index}`}
-                url={logo.url}
-                label={logo.shape || logo.name || t("suite.profile.field.logoFallback")}
-                isPrimary={brand.logo_url === logo.url}
-                onSetPrimary={() => setPrimaryLogo(logo.url)}
-                primaryLabel={t("suite.new.primaryLogo")}
-                setPrimaryLabel={t("suite.new.setPrimaryLogo")}
+        {/* ── Audience ── */}
+        {activeTab === "audience" && (
+          <ProfileSection title={t("suite.profile.tab.audience")}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <ChipsField
+                label={t("suite.profile.field.audienceCountries")}
+                items={form.audienceCountries}
+                placeholder={t("suite.profile.field.audienceCountriesPlaceholder")}
+                addLabel={t("suite.new.add")}
+                removeLabel={t("suite.profile.removeItem")}
+                editLabel={t("suite.profile.editItem")}
+                onAdd={(value) => addToList("audienceCountries", value)}
+                onEdit={(index, value) => editListItem("audienceCountries", index, value)}
+                onRemove={(index) => removeListItem("audienceCountries", index)}
               />
-            ))}
-            <label className="inline-flex min-h-16 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">
-              {uploading === "logo" ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
-              {t("suite.profile.field.uploadLogo")}
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/svg+xml,image/webp"
-                multiple
-                className="sr-only"
-                onChange={(e) => {
-                  uploadLogos(e.target.files);
-                  e.currentTarget.value = "";
-                }}
+              <ChipsField
+                label={t("suite.profile.field.audienceCities")}
+                items={form.audienceCities}
+                placeholder={t("suite.profile.field.audienceCitiesPlaceholder")}
+                addLabel={t("suite.new.add")}
+                removeLabel={t("suite.profile.removeItem")}
+                editLabel={t("suite.profile.editItem")}
+                onAdd={(value) => addToList("audienceCities", value)}
+                onEdit={(index, value) => editListItem("audienceCities", index, value)}
+                onRemove={(index) => removeListItem("audienceCities", index)}
               />
-            </label>
-          </div>
-        </ProfileSection>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <TextField label={t("suite.profile.field.audienceAgeRange")} value={form.audienceAgeRange} onChange={(audienceAgeRange) => setForm({ ...form, audienceAgeRange })} placeholder={t("suite.profile.field.audienceAgeRangePlaceholder")} />
+              <TextField label={t("suite.profile.field.audienceGender")} value={form.audienceGender} onChange={(audienceGender) => setForm({ ...form, audienceGender })} placeholder={t("suite.profile.field.audienceGenderPlaceholder")} />
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <TextareaField label={t("suite.profile.field.audienceNeed")} value={form.audienceNeed} onChange={(audienceNeed) => setForm({ ...form, audienceNeed })} rows={4} placeholder={t("suite.profile.field.audienceNeedPlaceholder")} />
+              <TextareaField label={t("suite.profile.field.audienceNote")} value={form.audienceNotes} onChange={(audienceNotes) => setForm({ ...form, audienceNotes })} rows={4} />
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <ChipsField
+                label={t("suite.profile.field.interests")}
+                items={form.audienceInterests}
+                addLabel={t("suite.new.add")}
+                removeLabel={t("suite.profile.removeItem")}
+                editLabel={t("suite.profile.editItem")}
+                onAdd={(value) => addToList("audienceInterests", value)}
+                onEdit={(index, value) => editListItem("audienceInterests", index, value)}
+                onRemove={(index) => removeListItem("audienceInterests", index)}
+              />
+              <ChipsField
+                label={t("suite.profile.field.behaviors")}
+                items={form.audienceBehaviors}
+                addLabel={t("suite.new.add")}
+                removeLabel={t("suite.profile.removeItem")}
+                editLabel={t("suite.profile.editItem")}
+                onAdd={(value) => addToList("audienceBehaviors", value)}
+                onEdit={(index, value) => editListItem("audienceBehaviors", index, value)}
+                onRemove={(index) => removeListItem("audienceBehaviors", index)}
+              />
+              <ChipsField
+                label={t("suite.profile.field.segments")}
+                items={form.audienceSegments}
+                addLabel={t("suite.new.add")}
+                removeLabel={t("suite.profile.removeItem")}
+                editLabel={t("suite.profile.editItem")}
+                onAdd={(value) => addToList("audienceSegments", value)}
+                onEdit={(index, value) => editListItem("audienceSegments", index, value)}
+                onRemove={(index) => removeListItem("audienceSegments", index)}
+              />
+            </div>
+          </ProfileSection>
+        )}
 
-        <ProfileSection title={t("suite.profile.section.personas")}>
+        {/* ── Value: USP / ESP ── */}
+        {activeTab === "value" && (
+          <ProfileSection title={t("suite.profile.tab.value")}>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-sm text-muted-foreground" dir="auto">{t("suite.profile.valueHint")}</p>
+              <RegenButton busy={regenerating === "value"} onClick={regenerateValue} label={t("suite.profile.regenerate")} />
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <TextareaField label={t("suite.profile.field.uniqueValue")} value={form.uniqueValue} onChange={(uniqueValue) => setForm({ ...form, uniqueValue })} rows={4} />
+              <TextareaField label={t("suite.profile.field.esp")} value={form.esp} onChange={(esp) => setForm({ ...form, esp })} rows={4} />
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <ChipsField
+                label={t("suite.profile.field.uspPoints")}
+                items={form.uspPoints}
+                addLabel={t("suite.new.add")}
+                removeLabel={t("suite.profile.removeItem")}
+                editLabel={t("suite.profile.editItem")}
+                moveUpLabel={t("suite.profile.moveUp")}
+                moveDownLabel={t("suite.profile.moveDown")}
+                onAdd={(value) => addToList("uspPoints", value)}
+                onEdit={(index, value) => editListItem("uspPoints", index, value)}
+                onRemove={(index) => removeListItem("uspPoints", index)}
+                onMove={(index, delta) => moveListItem("uspPoints", index, delta)}
+              />
+              <ChipsField
+                label={t("suite.profile.field.espPoints")}
+                items={form.espPoints}
+                addLabel={t("suite.new.add")}
+                removeLabel={t("suite.profile.removeItem")}
+                editLabel={t("suite.profile.editItem")}
+                moveUpLabel={t("suite.profile.moveUp")}
+                moveDownLabel={t("suite.profile.moveDown")}
+                onAdd={(value) => addToList("espPoints", value)}
+                onEdit={(index, value) => editListItem("espPoints", index, value)}
+                onRemove={(index) => removeListItem("espPoints", index)}
+                onMove={(index, delta) => moveListItem("espPoints", index, delta)}
+              />
+            </div>
+          </ProfileSection>
+        )}
+
+        {activeTab === "personas" && (
+        <ProfileSection title={t("suite.profile.tab.personas")}>
           <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
             <TextField label={t("suite.profile.field.personaName")} value={form.personaName} onChange={(personaName) => setForm({ ...form, personaName })} />
             <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
@@ -472,17 +836,55 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
             </div>
           )}
         </ProfileSection>
+        )}
 
-        <ProfileSection title={t("suite.profile.section.rules")}>
-          <ContentRulesManager suiteId={id} />
-        </ProfileSection>
+        {activeTab === "rules" && (
+          <ProfileSection title={t("suite.profile.tab.rules")}>
+            <ContentRulesManager suiteId={id} />
+          </ProfileSection>
+        )}
 
-        <div className="sticky bottom-3 z-10 flex justify-end">
-          <Button onClick={saveProfile} disabled={saving} className="gap-2 shadow-lg">
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            {saving ? t("suite.profile.saving") : t("suite.profile.save")}
-          </Button>
-        </div>
+        {/* Personas and rules persist as you act, so they get a hint instead of
+            a save button that would have nothing to save. */}
+        {SELF_SAVING_TABS.includes(activeTab) ? (
+          <p className="px-1 text-xs text-muted-foreground" dir="auto">{t("suite.profile.autoSavedHint")}</p>
+        ) : (
+          <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-end gap-2">
+            {activeDirtyCount > 0 && (
+              <>
+                <span className="me-auto rounded-full bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                  {activeDirtyCount} {t("suite.profile.unsavedChanges")}
+                </span>
+                <Button variant="outline" onClick={() => revertTab(activeTab)} className="gap-2">
+                  <Undo2 size={15} /> {t("suite.profile.revert")}
+                </Button>
+              </>
+            )}
+            <Button
+              onClick={() => saveTab(activeTab)}
+              disabled={savingTab !== null || activeDirtyCount === 0}
+              className="gap-2 shadow-lg"
+            >
+              {savingTab === activeTab ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              {savingTab === activeTab ? t("suite.profile.saving") : t("suite.profile.saveSection")}
+            </Button>
+          </div>
+        )}
+
+        {undo && (
+          <div className="sticky bottom-16 z-20 flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2 shadow-lg">
+            <span className="min-w-0 truncate text-sm text-muted-foreground" dir="auto">
+              {t("suite.profile.deleted")} <span className="font-medium text-foreground">{undo.label}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => { undo.restore(); setUndo(null); }}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent"
+            >
+              <Undo2 size={14} /> {t("suite.profile.undo")}
+            </button>
+          </div>
+        )}
       </div>
     </SuitePageShell>
   );
@@ -502,29 +904,29 @@ function formFromBrand(brand: Brand): ProfileForm {
     tiktok: brand.social_links?.tiktok || "",
     linkedin: brand.social_links?.linkedin || "",
     referenceLinks: normalizeReferenceLinks(brand.reference_links || []),
-    productsServices: toLines(services),
-    audienceCountries: toLines(brand.audience_location?.countries),
-    audienceCities: toLines(brand.audience_location?.cities),
+    productsServices: toList(services),
+    audienceCountries: toList(brand.audience_location?.countries),
+    audienceCities: toList(brand.audience_location?.cities),
     audienceAgeRange: brand.audience_age_range || "",
     audienceGender: brand.audience_gender || "",
     audienceNeed: brand.audience_need || brand.audience_problem || "",
     audienceNotes: brand.audience_notes || brand.target_audience || "",
-    audienceInterests: toLines(brand.audience_interests),
-    audienceBehaviors: toLines(brand.audience_behaviors),
-    audienceSegments: toLines(brand.audience_social_statuses),
+    audienceInterests: toList(brand.audience_interests),
+    audienceBehaviors: toList(brand.audience_behaviors),
+    audienceSegments: toList(brand.audience_social_statuses),
     uniqueValue: brand.unique_value || brand.how_they_help || "",
     esp: brand.esp || "",
-    uspPoints: toLines(brand.usp_points),
-    espPoints: toLines(brand.esp_points),
+    uspPoints: toList(brand.usp_points),
+    espPoints: toList(brand.esp_points),
     colorPrimary: brand.colors?.primary || brand.color_palette?.primary || "",
     colorSecondary: brand.colors?.secondary || brand.color_palette?.secondary || "",
     colorAccent: brand.colors?.accent || brand.color_palette?.accent || "",
-    fonts: toLines(brand.font_suggestions || (brand as Record<string, unknown>).fonts as string[] | undefined),
+    fonts: toList(brand.font_suggestions || (brand as Record<string, unknown>).fonts as string[] | undefined),
   };
 }
 
 function brandFromForm(form: ProfileForm, current: Brand): Brand {
-  const productsServices = fromLines(form.productsServices);
+  const productsServices = form.productsServices;
   const category = form.category.trim();
   const uniqueValue = form.uniqueValue.trim();
   const esp = form.esp.trim();
@@ -549,9 +951,9 @@ function brandFromForm(form: ProfileForm, current: Brand): Brand {
     dialect: form.dialect.trim(),
     audience_location: {
       ...(current.audience_location || {}),
-      scope: form.audienceCountries.trim() || form.audienceCities.trim() ? "custom" : current.audience_location?.scope || "world",
-      countries: fromLines(form.audienceCountries),
-      cities: fromLines(form.audienceCities),
+      scope: form.audienceCountries.length || form.audienceCities.length ? "custom" : current.audience_location?.scope || "world",
+      countries: form.audienceCountries,
+      cities: form.audienceCities,
     },
     audience_age_range: form.audienceAgeRange.trim(),
     audience_gender: form.audienceGender.trim(),
@@ -559,14 +961,14 @@ function brandFromForm(form: ProfileForm, current: Brand): Brand {
     audience_problem: form.audienceNeed.trim(),
     target_audience: form.audienceNotes.trim(),
     audience_notes: form.audienceNotes.trim(),
-    audience_interests: fromLines(form.audienceInterests),
-    audience_behaviors: fromLines(form.audienceBehaviors),
-    audience_social_statuses: fromLines(form.audienceSegments),
+    audience_interests: form.audienceInterests,
+    audience_behaviors: form.audienceBehaviors,
+    audience_social_statuses: form.audienceSegments,
     unique_value: uniqueValue,
     how_they_help: uniqueValue,
     esp,
-    usp_points: fromLines(form.uspPoints),
-    esp_points: fromLines(form.espPoints),
+    usp_points: form.uspPoints,
+    esp_points: form.espPoints,
     colors: (form.colorPrimary || form.colorSecondary || form.colorAccent)
       ? {
           ...(current.colors || {}),
@@ -575,7 +977,7 @@ function brandFromForm(form: ProfileForm, current: Brand): Brand {
           accent: form.colorAccent.trim() || current.colors?.accent || "",
         }
       : current.colors,
-    font_suggestions: fromLines(form.fonts),
+    font_suggestions: form.fonts,
     // content_rules are managed via the dedicated content-rules endpoints; never overwrite here.
     content_rules: current.content_rules,
   };
@@ -644,12 +1046,8 @@ function getSourceLinkLabels(lang: string) {
   };
 }
 
-function fromLines(value: string): string[] {
-  return value.split(/\n|,/).map((item) => item.trim()).filter(Boolean);
-}
-
-function toLines(value?: string[]): string {
-  return (value || []).join("\n");
+function toList(value?: string[]): string[] {
+  return (value || []).map((item) => String(item).trim()).filter(Boolean);
 }
 
 function toggleValue(values: string[], value: string): string[] {
@@ -875,6 +1273,162 @@ function ContentRulesManager({ suiteId }: { suiteId: string }) {
           </Button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">{t("suite.profile.rules.hint")}</p>
+      </div>
+    </div>
+  );
+}
+
+function RegenButton({ busy, onClick, label }: { busy: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+    >
+      {busy ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
+      {label}
+    </button>
+  );
+}
+
+/**
+ * List editor: every entry is a chip you can rename in place, delete, or move.
+ * Replaces the comma-separated textareas so single items stay individually
+ * editable and the order carries meaning downstream.
+ */
+function ChipsField({
+  label,
+  items,
+  placeholder,
+  addLabel,
+  removeLabel,
+  editLabel,
+  moveUpLabel,
+  moveDownLabel,
+  onAdd,
+  onEdit,
+  onRemove,
+  onMove,
+}: {
+  label?: string;
+  items: string[];
+  placeholder?: string;
+  addLabel: string;
+  removeLabel: string;
+  editLabel: string;
+  moveUpLabel?: string;
+  moveDownLabel?: string;
+  onAdd: (value: string) => void;
+  onEdit: (index: number, value: string) => void;
+  onRemove: (index: number) => void;
+  onMove?: (index: number, delta: number) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+
+  function commitEdit() {
+    if (editingIndex === null) return;
+    onEdit(editingIndex, editingValue);
+    setEditingIndex(null);
+    setEditingValue("");
+  }
+
+  return (
+    <div className="space-y-2">
+      {label && <span className="block text-xs font-medium text-muted-foreground" dir="auto">{label}</span>}
+      {items.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {items.map((item, index) => (
+            editingIndex === index ? (
+              <span key={`edit-${index}`} className="inline-flex items-center gap-1">
+                <input
+                  autoFocus
+                  value={editingValue}
+                  onChange={(e) => setEditingValue(e.target.value)}
+                  onBlur={commitEdit}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); commitEdit(); }
+                    if (e.key === "Escape") { setEditingIndex(null); setEditingValue(""); }
+                  }}
+                  className="min-w-32 rounded-full border border-primary bg-background px-3 py-1 text-sm text-foreground outline-none"
+                  dir="auto"
+                />
+              </span>
+            ) : (
+              <span
+                key={`${item}-${index}`}
+                className="inline-flex max-w-full items-center gap-1 rounded-full bg-[#2f80ff]/15 py-1 pe-1.5 ps-3 text-sm text-foreground"
+                dir="auto"
+              >
+                <span className="truncate">{item}</span>
+                {onMove && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onMove(index, -1)}
+                      disabled={index === 0}
+                      aria-label={`${moveUpLabel} ${item}`}
+                      title={moveUpLabel}
+                      className="shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                    >
+                      <ChevronUp size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onMove(index, 1)}
+                      disabled={index === items.length - 1}
+                      aria-label={`${moveDownLabel} ${item}`}
+                      title={moveDownLabel}
+                      className="shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                    >
+                      <ChevronDown size={13} />
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setEditingIndex(index); setEditingValue(item); }}
+                  aria-label={`${editLabel} ${item}`}
+                  title={editLabel}
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                >
+                  <Pencil size={12} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRemove(index)}
+                  aria-label={`${removeLabel} ${item}`}
+                  title={removeLabel}
+                  className="shrink-0 text-muted-foreground hover:text-red-400"
+                >
+                  <X size={13} />
+                </button>
+              </span>
+            )
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); onAdd(draft); setDraft(""); }
+          }}
+          placeholder={placeholder}
+          className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-[#2f80ff]"
+          dir="auto"
+        />
+        <button
+          type="button"
+          onClick={() => { onAdd(draft); setDraft(""); }}
+          disabled={!draft.trim()}
+          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+        >
+          <Plus size={14} /> {addLabel}
+        </button>
       </div>
     </div>
   );
