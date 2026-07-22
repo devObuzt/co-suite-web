@@ -14,10 +14,15 @@ import { Separator } from "@/components/ui/separator";
 import {
   Loader2, Plus, X, CheckCircle2, ChevronRight, ChevronLeft,
   AtSign, AlertCircle, Building2, Info, MapPin, Users, Sparkles,
+  Store, Truck, Globe,
 } from "lucide-react";
 
 type Step = "name" | "links" | "extracting"
-  | "step-a" | "step-b" | "step-c" | "step-d" | "step-e" | "step-f" | "step-g" | "step-h";
+  | "step-a" | "step-b" | "step-c" | "step-d" | "step-e" | "step-delivery" | "step-f" | "step-g" | "step-h";
+
+// How the business reaches its customers. Drives where we advertise and whether
+// the plan pushes "we deliver" or "visit us" messaging.
+type DeliveryMode = "onsite" | "areas" | "nationwide" | "international";
 
 // ── Platform helpers ──────────────────────────────────────────────────────────
 
@@ -415,6 +420,7 @@ export default function NewSuitePage() {
     { key: "step-c", label: t("suite.new.stepLanguages") },
     { key: "step-d", label: t("suite.new.stepServices") },
     { key: "step-e", label: t("suite.new.stepAudience") },
+    { key: "step-delivery", label: t("suite.new.stepDelivery") },
     { key: "step-f", label: t("suite.new.stepWhyUs") },
     // Funnel visitors skip brand assets; the marketing message now lives at
     // the end of the marketing plan instead of a wizard step.
@@ -561,6 +567,47 @@ export default function NewSuitePage() {
       audience_notes: audienceNotes,
       target_audience: targetAudience,
     });
+    setStep("step-delivery");
+  }
+
+  // Step Delivery: reach — on-site only, limited areas, nationwide, or abroad.
+  // Only the modes that need a list ask for one; nationwide needs nothing.
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode | "">("");
+  const [deliveryAreas, setDeliveryAreas] = useState<string[]>([]);
+  const [deliveryAreaInput, setDeliveryAreaInput] = useState("");
+  const [deliveryWorldwide, setDeliveryWorldwide] = useState(false);
+
+  const deliveryNeedsAreas = deliveryMode === "onsite" || deliveryMode === "areas"
+    || (deliveryMode === "international" && !deliveryWorldwide);
+
+  function addDeliveryArea(value: string) {
+    const entry = value.trim();
+    if (!entry) return;
+    setDeliveryAreas((prev) => (prev.some((a) => a.toLowerCase() === entry.toLowerCase()) ? prev : [...prev, entry]));
+    setDeliveryAreaInput("");
+  }
+
+  function pickDeliveryMode(mode: DeliveryMode) {
+    setDeliveryMode(mode);
+    // Nationwide carries no list; drop anything typed for a previous mode so we
+    // never persist areas that contradict the chosen reach.
+    if (mode === "nationwide") {
+      setDeliveryAreas([]);
+      setDeliveryWorldwide(false);
+    }
+    if (mode !== "international") setDeliveryWorldwide(false);
+  }
+
+  async function saveDeliveryStep() {
+    if (deliveryMode) {
+      await saveStep("delivery", {
+        delivery: {
+          mode: deliveryMode,
+          areas: deliveryMode === "nationwide" ? [] : deliveryAreas,
+          worldwide: deliveryMode === "international" ? deliveryWorldwide : false,
+        },
+      });
+    }
     setStep("step-f");
   }
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
@@ -594,7 +641,8 @@ export default function NewSuitePage() {
       "step-c": "step-b",
       "step-d": "step-c",
       "step-e": "step-d",
-      "step-f": "step-e",
+      "step-delivery": "step-e",
+      "step-f": "step-delivery",
       "step-g": "step-f",
       "step-h": isFunnelUser ? "step-f" : "step-g",
     };
@@ -1688,8 +1736,144 @@ export default function NewSuitePage() {
                 className="min-h-10 text-sm text-muted-foreground hover:text-foreground sm:px-2"
               >{t("suite.new.audienceBack")}</button>
             )}
-            <button onClick={() => setStep("step-f")} className="min-h-10 text-sm text-muted-foreground hover:text-foreground sm:px-2">{t("suite.new.skip")}</button>
+            <button onClick={() => setStep("step-delivery")} className="min-h-10 text-sm text-muted-foreground hover:text-foreground sm:px-2">{t("suite.new.skip")}</button>
           </div>
+          </StepActions>
+        </div>
+      )}
+
+      {/* ── Step Delivery: how the business reaches customers ── */}
+      {step === "step-delivery" && (
+        <div className="space-y-4">
+          <Card className="border-border bg-card text-card-foreground">
+            <CardHeader>
+              <CardTitle>{t("suite.new.deliveryTitle")}</CardTitle>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground" dir="auto">
+                {t("suite.new.deliverySubtitle")}
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <TargetAreaCard
+                  selected={deliveryMode === "onsite"}
+                  icon={<Store size={18} />}
+                  title={t("suite.new.deliveryOnsite")}
+                  description={t("suite.new.deliveryOnsiteDesc")}
+                  onClick={() => pickDeliveryMode("onsite")}
+                />
+                <TargetAreaCard
+                  selected={deliveryMode === "areas"}
+                  icon={<MapPin size={18} />}
+                  title={t("suite.new.deliveryAreas")}
+                  description={t("suite.new.deliveryAreasDesc")}
+                  onClick={() => pickDeliveryMode("areas")}
+                />
+                <TargetAreaCard
+                  selected={deliveryMode === "nationwide"}
+                  icon={<Truck size={18} />}
+                  title={t("suite.new.deliveryNationwide")}
+                  description={t("suite.new.deliveryNationwideDesc")}
+                  onClick={() => pickDeliveryMode("nationwide")}
+                />
+                <TargetAreaCard
+                  selected={deliveryMode === "international"}
+                  icon={<Globe size={18} />}
+                  title={t("suite.new.deliveryInternational")}
+                  description={t("suite.new.deliveryInternationalDesc")}
+                  onClick={() => pickDeliveryMode("international")}
+                />
+              </div>
+
+              {deliveryMode === "international" && (
+                <label className="flex cursor-pointer items-center gap-2.5 rounded-2xl border border-border bg-background/60 p-4">
+                  <input
+                    type="checkbox"
+                    checked={deliveryWorldwide}
+                    onChange={(e) => setDeliveryWorldwide(e.target.checked)}
+                    className="h-4 w-4 accent-[#2f80ff]"
+                  />
+                  <span className="text-sm font-medium text-foreground" dir="auto">
+                    {t("suite.new.deliveryAllWorld")}
+                  </span>
+                </label>
+              )}
+
+              {deliveryNeedsAreas && (
+                <div className="space-y-2.5 rounded-2xl border border-border bg-background/60 p-4">
+                  <Label className="text-foreground" dir="auto">
+                    {deliveryMode === "onsite"
+                      ? t("suite.new.deliveryOnsitePrompt")
+                      : deliveryMode === "areas"
+                        ? t("suite.new.deliveryAreasPrompt")
+                        : t("suite.new.deliveryInternationalPrompt")}
+                  </Label>
+                  {deliveryAreas.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {deliveryAreas.map((area) => (
+                        <span
+                          key={area}
+                          className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-[#2f80ff]/15 px-3 py-1 text-sm text-foreground"
+                          dir="auto"
+                        >
+                          <span className="truncate">{area}</span>
+                          <button
+                            type="button"
+                            onClick={() => setDeliveryAreas((prev) => prev.filter((a) => a !== area))}
+                            aria-label={`${t("suite.new.deliveryRemoveArea")} ${area}`}
+                            className="shrink-0 text-muted-foreground hover:text-foreground"
+                          >
+                            <X size={13} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Input
+                      value={deliveryAreaInput}
+                      onChange={(e) => setDeliveryAreaInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addDeliveryArea(deliveryAreaInput);
+                        }
+                      }}
+                      placeholder={
+                        deliveryMode === "onsite"
+                          ? t("suite.new.deliveryOnsitePlaceholder")
+                          : t("suite.new.deliveryAreaPlaceholder")
+                      }
+                      className="bg-background text-foreground text-sm"
+                      dir="auto"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => addDeliveryArea(deliveryAreaInput)}
+                      disabled={!deliveryAreaInput.trim()}
+                      className="shrink-0 gap-1"
+                    >
+                      <Plus size={15} /> {t("suite.new.add")}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <StepActions sticky={isFunnelUser}>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+              <Button
+                onClick={saveDeliveryStep}
+                disabled={!deliveryMode}
+                className="w-full justify-center gap-2 bg-foreground text-background hover:bg-foreground/90 sm:w-auto"
+              >
+                <ForwardIcon size={15} /> {t("suite.new.continue")}
+              </Button>
+              <button
+                onClick={() => setStep("step-f")}
+                className="min-h-10 text-sm text-muted-foreground hover:text-foreground sm:px-2"
+              >{t("suite.new.skip")}</button>
+            </div>
           </StepActions>
         </div>
       )}

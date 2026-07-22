@@ -1915,6 +1915,11 @@ export interface Brand {
     scope: "world" | "region" | "custom";
   };
   audience_interests?: string[];
+  delivery?: {
+    mode: "onsite" | "areas" | "nationwide" | "international";
+    areas: string[];
+    worldwide: boolean;
+  };
   usp_points?: string[];
   esp_points?: string[];
   brand_generated?: {
