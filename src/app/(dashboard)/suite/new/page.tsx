@@ -1048,10 +1048,19 @@ export default function NewSuitePage() {
     });
   }
 
+  // Each step (and each audience sub-phase) starts at the top — otherwise you
+  // advance from a long step and land mid-form. The dashboard shell scrolls in
+  // <main>, not the window, so scroll the element into view instead of
+  // window.scrollTo, which would target the wrong container.
+  const topRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    topRef.current?.scrollIntoView({ block: "start" });
+  }, [step, audiencePhase]);
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-4xl items-start justify-center px-4 py-8" dir={dir}>
+    <div ref={topRef} className="mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-4xl items-start justify-center px-4 py-8" dir={dir}>
       <div className="w-full max-w-3xl">
       <div className="mb-6 rounded-3xl border border-border bg-card/70 p-5 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
