@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   type MarketingPlanResponse,
@@ -121,13 +121,26 @@ export function SocialIdeasGallery({
   // navigates away or closes the app — this component only polls the plan
   // until the run finishes, and resumes polling on any later visit.
   const generating = plan?.status === "generating";
+  // A healthy run finishes in ~3 min. If polling has shown "generating" for
+  // longer than STALL_MS, offer a manual retry — this is the client-side escape
+  // hatch so a dead server run (worker restarted mid-flight) can never trap the
+  // user on an endless spinner.
+  const STALL_MS = 240_000;
+  const [stalled, setStalled] = useState(false);
+  const genStartRef = useRef(0);
   useEffect(() => {
-    if (!generating) return;
+    if (!generating) {
+      setStalled(false);
+      return;
+    }
+    genStartRef.current = Date.now();
+    setStalled(false);
     const timer = window.setInterval(() => {
       api.marketingPlans
         .get(suiteId)
         .then(onResponse)
         .catch(() => undefined);
+      if (Date.now() - genStartRef.current > STALL_MS) setStalled(true);
     }, 5000);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -143,6 +156,9 @@ export function SocialIdeasGallery({
       });
       onResponse(res);
       setFilter("all");
+      // Fresh run requested — restart the stall clock.
+      genStartRef.current = Date.now();
+      setStalled(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذّر توليد الأفكار");
     } finally {
@@ -195,14 +211,25 @@ export function SocialIdeasGallery({
             <h3 className="text-lg font-semibold">أفكار السوشيال</h3>
           </div>
           {generating ? (
-            <div className="mt-4 flex items-center gap-3 rounded-xl border border-border bg-background/60 p-4">
-              <Loader2 className="size-5 shrink-0 animate-spin text-primary" />
-              <div>
-                <p className="text-sm font-semibold">عم نولّد أفكار {plan?.period} بالخلفية…</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  التوليد شغال عالسيرفر — فيك تتنقل أو تسكّر التطبيق وترجع، ما رح يقف.
-                </p>
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center gap-3 rounded-xl border border-border bg-background/60 p-4">
+                <Loader2 className="size-5 shrink-0 animate-spin text-primary" />
+                <div>
+                  <p className="text-sm font-semibold">عم نولّد أفكار {plan?.period} بالخلفية…</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    التوليد شغال عالسيرفر — فيك تتنقل أو تسكّر التطبيق وترجع، ما رح يقف.
+                  </p>
+                </div>
               </div>
+              {stalled && (
+                <div className="flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+                  <span>أخذ وقت أطول من المعتاد. إذا ما ظهرت الأفكار، جرّب إعادة المحاولة.</span>
+                  <Button onClick={generate} disabled={busy} size="sm" variant="outline" className="gap-2 self-start">
+                    {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                    إعادة المحاولة
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <>
