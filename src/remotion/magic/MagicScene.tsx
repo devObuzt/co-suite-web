@@ -36,6 +36,9 @@ export type MagicDirection = {
   layout?: 'split' | 'full' | string;
   background?: 'solid' | 'video' | 'image' | string;
   title?: string;
+  // Scene-relative seconds when the title's word is actually SPOKEN — the
+  // headline holds back until this moment (backend align_magic_titles).
+  titleAt?: number;
   subtitle?: string;
   icons?: string[];
   emphasis?: string;
@@ -60,9 +63,17 @@ const STYLE = manifest.style as {
   arabicFontFamily?: string;
   fontFamily?: string;
   brandColor?: string;
+  stageTone?: string;
+  stageColor?: string;
 };
 const BRAND = String(STYLE.brandColor ?? '#2f80ff');
 const ARABIC_FONT = String(STYLE.arabicFontFamily ?? 'ConnecCairo');
+// Light stage mode (opt-in via style.stageTone="light"): the whole frame keys
+// off a bright brand canvas — light washes, dark ink typography — instead of
+// the default dark premium stage. stageColor is the light canvas (usually the
+// brand's background color).
+const LIGHT_STAGE = String(STYLE.stageTone ?? 'dark') === 'light';
+const STAGE_BASE = String(STYLE.stageColor ?? '#faf8f4');
 
 // The speaker leans to one side (subjectOffsetXPct); the OTHER side is the
 // empty canvas where solid-scene words can sit without hiding behind them.
@@ -83,9 +94,26 @@ const shade = (hex: string, factor: number): string => {
     .join('')}`;
 };
 
+/** Mix a hex color toward white: factor 0 = unchanged, 1 = pure white. */
+const tint = (hex: string, factor: number): string => {
+  const raw = hex.replace('#', '');
+  const full = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw;
+  const channel = (offset: number) => {
+    const value = parseInt(full.slice(offset, offset + 2), 16);
+    return Math.max(0, Math.min(255, Math.round(value + (255 - value) * factor)));
+  };
+  return `#${[channel(0), channel(2), channel(4)]
+    .map((value) => value.toString(16).padStart(2, '0'))
+    .join('')}`;
+};
+
 const STAGE_DEEP = shade(BRAND, 0.34);
 const STAGE_DARK = shade(BRAND, 0.55);
 const STAGE_LIGHT = shade(BRAND, 1.35);
+// Light-stage palette: washes stay airy, typography turns to dark brand ink.
+const STAGE_WASH = LIGHT_STAGE ? tint(BRAND, 0.8) : STAGE_DEEP;
+const TITLE_INK = LIGHT_STAGE ? shade(BRAND, 0.48) : '#ffffff';
+const SUBTITLE_INK = LIGHT_STAGE ? shade(BRAND, 0.55) : '#ffffffee';
 // The bottom stage: ONE clean generated brand image constant across the whole
 // video (behind the speaker and the captions). Falls back to the gradient.
 const MAGIC_STAGE_PATH =
@@ -217,8 +245,10 @@ const ICON_GLYPHS: Record<string, React.ComponentType<GlyphProps>> = {
 // Arc placement (degrees; 0° = right, 180° = left) around the head for 1-4
 // icons — the reference's contact-network constellation.
 const ICON_ARC_ANGLES: Record<number, number[]> = {
-  1: [115],
-  2: [150, 30],
+  // A single/double icon sits well out on the SIDES (never up-center where it
+  // would collide with the headline); 3-4 spread into the contact constellation.
+  1: [152],
+  2: [155, 25],
   3: [160, 90, 20],
   4: [165, 115, 65, 15],
 };
@@ -228,13 +258,22 @@ const ICON_ARC_ANGLES: Record<number, number[]> = {
  * the head center and springs outward to its arc position, then thin network
  * lines connect the constellation.
  */
-const MagicIconNetwork = ({icons, outro}: {icons: string[]; outro: number}) => {
+const MagicIconNetwork = ({
+  icons,
+  outro,
+  headYFactor = 0.3,
+}: {
+  icons: string[];
+  outro: number;
+  headYFactor?: number;
+}) => {
   const frame = useCurrentFrame();
   const {fps, width: canvasWidth, height: canvasHeight} = useVideoConfig();
   const centerX = canvasWidth / 2;
-  // Below the title band (title ends ~18% down) so badges never collide
-  // with the 3D headline — they flank the head instead.
-  const headY = canvasHeight * 0.3;
+  // Flank the head BELOW the title band so badges never collide with the 3D
+  // headline. Non-solid scenes push this lower (bigger factor) because their
+  // headline can run to two lines.
+  const headY = canvasHeight * headYFactor;
   const angles = ICON_ARC_ANGLES[Math.min(4, Math.max(1, icons.length))] ?? [];
   const radiusX = canvasWidth * 0.37;
   const radiusY = canvasHeight * 0.07;
@@ -268,7 +307,7 @@ const MagicIconNetwork = ({icons, outro}: {icons: string[]; outro: number}) => {
           <polyline
             fill="none"
             points={points.map((p) => `${p.x},${p.y}`).join(' ')}
-            stroke={STAGE_LIGHT}
+            stroke={LIGHT_STAGE ? BRAND : STAGE_LIGHT}
             strokeDasharray="3 9"
             strokeWidth={3}
           />
@@ -281,10 +320,12 @@ const MagicIconNetwork = ({icons, outro}: {icons: string[]; outro: number}) => {
             key={`${icon}-${index}`}
             style={{
               alignItems: 'center',
-              backgroundColor: `${STAGE_DEEP}b8`,
+              backgroundColor: LIGHT_STAGE ? `${BRAND}e6` : `${STAGE_DEEP}b8`,
               border: '3px solid rgba(255,255,255,0.85)',
               borderRadius: 999,
-              boxShadow: `0 12px 26px rgba(0,0,0,0.5), 0 0 26px ${STAGE_LIGHT}66`,
+              boxShadow: LIGHT_STAGE
+                ? '0 10px 24px rgba(120, 70, 50, 0.3)'
+                : `0 12px 26px rgba(0,0,0,0.5), 0 0 26px ${STAGE_LIGHT}66`,
               display: 'flex',
               height: 108,
               justifyContent: 'center',
@@ -350,8 +391,11 @@ export const MagicBackdrop = ({
     <AbsoluteFill
       style={{
         // The brand stage: the floor of every Magic scene, and the whole
-        // frame when the director calls a typographic scene.
-        background: `linear-gradient(180deg, ${STAGE_DARK} 0%, ${BRAND} 46%, ${STAGE_DEEP} 100%)`,
+        // frame when the director calls a typographic scene. Light mode swaps
+        // the premium dark gradient for a bright brand canvas.
+        background: LIGHT_STAGE
+          ? `linear-gradient(180deg, ${tint(BRAND, 0.86)} 0%, ${STAGE_BASE} 46%, ${tint(BRAND, 0.68)} 100%)`
+          : `linear-gradient(180deg, ${STAGE_DARK} 0%, ${BRAND} 46%, ${STAGE_DEEP} 100%)`,
         zIndex: 0,
       }}
     >
@@ -424,7 +468,7 @@ export const MagicBackdrop = ({
           {media}
           <div
             style={{
-              background: `linear-gradient(180deg, transparent 30%, ${BRAND}33 60%, ${STAGE_DEEP}cc 100%)`,
+              background: `linear-gradient(180deg, transparent 30%, ${BRAND}33 60%, ${STAGE_WASH}cc 100%)`,
               inset: 0,
               position: 'absolute',
             }}
@@ -436,7 +480,7 @@ export const MagicBackdrop = ({
           {media}
           <div
             style={{
-              background: `linear-gradient(180deg, ${STAGE_DEEP}55 0%, transparent 26%, transparent 58%, ${STAGE_DEEP}e8 100%)`,
+              background: `linear-gradient(180deg, ${STAGE_WASH}55 0%, transparent 26%, transparent 58%, ${STAGE_WASH}e8 100%)`,
               inset: 0,
               position: 'absolute',
             }}
@@ -446,8 +490,9 @@ export const MagicBackdrop = ({
       {/* Depth grid drifting toward the vanishing point of the 3D titles. */}
       <div
         style={{
-          backgroundImage:
-            'linear-gradient(90deg, rgba(255,255,255,.10) 1px, transparent 1px), linear-gradient(180deg, rgba(255,255,255,.07) 1px, transparent 1px)',
+          backgroundImage: LIGHT_STAGE
+            ? 'linear-gradient(90deg, rgba(120,70,50,.14) 1px, transparent 1px), linear-gradient(180deg, rgba(120,70,50,.10) 1px, transparent 1px)'
+            : 'linear-gradient(90deg, rgba(255,255,255,.10) 1px, transparent 1px), linear-gradient(180deg, rgba(255,255,255,.07) 1px, transparent 1px)',
           backgroundSize: '120px 120px',
           inset: '-12%',
           opacity: 0.07 + slowPulse * 0.03,
@@ -459,7 +504,7 @@ export const MagicBackdrop = ({
       {/* Soft key light behind the subject on the solid stage. */}
       <div
         style={{
-          background: `radial-gradient(circle at 50% ${split ? 74 : 58}%, ${STAGE_LIGHT}55 0, transparent 44%)`,
+          background: `radial-gradient(circle at 50% ${split ? 74 : 58}%, ${LIGHT_STAGE ? '#ffffff' : STAGE_LIGHT}55 0, transparent 44%)`,
           filter: 'blur(10px)',
           inset: 0,
           opacity: 0.75,
@@ -468,7 +513,9 @@ export const MagicBackdrop = ({
       />
       <div
         style={{
-          background: `linear-gradient(180deg, #02040a3d 0%, transparent 26%, transparent 66%, #02040a8f 100%)`,
+          background: LIGHT_STAGE
+            ? `linear-gradient(180deg, #ffffff30 0%, transparent 26%, transparent 66%, ${tint(BRAND, 0.62)}66 100%)`
+            : `linear-gradient(180deg, #02040a3d 0%, transparent 26%, transparent 66%, #02040a8f 100%)`,
           inset: 0,
           position: 'absolute',
         }}
@@ -480,6 +527,25 @@ export const MagicBackdrop = ({
 const titleFontSize = (title: string): number => {
   const length = Math.max(3, Array.from(title.replace(/\s+/g, '')).length);
   return Math.max(96, Math.min(210, Math.floor(1040 / length) + 66));
+};
+
+// Non-solid title: fit the headline into AT MOST 2 lines so it never sprawls
+// down the frame and collides with the icons/subject below it. Shrinks the
+// font until the estimated line count is <= 2 (down to a floor).
+const fitTitleFontSize = (title: string, canvasWidth: number): number => {
+  const chars = Math.max(3, Array.from(title.replace(/\s+/g, '')).length);
+  const avail = canvasWidth - 80;
+  let size = Math.min(168, Math.floor(1040 / chars) + 66);
+  for (let i = 0; i < 8; i += 1) {
+    const charsPerLine = Math.max(1, Math.floor(avail / (size * 0.56)));
+    if (Math.ceil(chars / charsPerLine) <= 2) break;
+    size = Math.floor(size * 0.88);
+    if (size <= 92) {
+      size = 92;
+      break;
+    }
+  }
+  return size;
 };
 
 // Deterministic hash → the solid-scene word placement is "random" (varies per
@@ -548,13 +614,25 @@ export const MagicTitleLayer = ({
   const {fps, width: canvasWidth, height: canvasHeight} = useVideoConfig();
   const split = direction.layout === 'split';
   const isSolid = direction.background === 'solid';
-  const title = String(direction.title || scene.behindText || '').trim();
+  // A direction that EXPLICITLY sets title: "" means "no headline this scene"
+  // (sparse-title direction) — only a missing key falls back to behindText.
+  const title = String(direction.title ?? scene.behindText ?? '').trim();
   const subtitle = String(direction.subtitle || '').trim();
   const emphasis = String(direction.emphasis || '').trim();
   const icons = Array.isArray(direction.icons) ? direction.icons.slice(0, 4) : [];
   const rtl = /[\u0590-\u05FF\u0600-\u06FF]/.test(title || subtitle);
 
-  const pop = spring({frame, fps, config: {damping: 12, stiffness: 150, mass: 0.9}});
+  // The headline waits for its spoken word: everything title-related runs on
+  // titleFrame (frames since the word lands), not on the scene clock.
+  const titleDelayFrames = Math.max(0, Math.round(Number(direction.titleAt ?? 0) * fps));
+  const titleFrame = frame - titleDelayFrames;
+  const titleVisible = titleFrame >= 0 ? 1 : 0;
+
+  const pop = spring({
+    frame: Math.max(0, titleFrame),
+    fps,
+    config: {damping: 12, stiffness: 150, mass: 0.9},
+  });
   const outro = interpolate(
     frame,
     [Math.max(0, durationInFrames - 12), durationInFrames],
@@ -569,16 +647,25 @@ export const MagicTitleLayer = ({
   const titleTop = split ? canvasHeight * 0.1 : canvasHeight * 0.075;
   const subtitleTop = titleTop + fontSize * 1.18;
   // Hard 3D extrusion: stacked solid shadows in the deep brand shade, then a
-  // long soft drop — the "3D مع شادو" block look.
-  const extrusion = [
-    `0 3px 0 ${STAGE_DEEP}`,
-    `0 7px 0 ${STAGE_DEEP}`,
-    `0 11px 0 ${STAGE_DEEP}`,
-    `0 15px 0 ${shade(BRAND, 0.22)}`,
-    `0 19px 0 ${shade(BRAND, 0.18)}`,
-    '0 34px 52px rgba(0,0,0,0.62)',
-    `0 0 46px ${STAGE_LIGHT}66`,
-  ].join(', ');
+  // long soft drop — the "3D مع شادو" block look. Light stage flips it: dark
+  // ink letters extruded in white/cream so the block reads on a bright canvas.
+  const extrusion = LIGHT_STAGE
+    ? [
+        '0 3px 0 #ffffff',
+        '0 7px 0 #ffffff',
+        `0 11px 0 ${tint(BRAND, 0.55)}`,
+        `0 15px 0 ${tint(BRAND, 0.4)}`,
+        '0 26px 40px rgba(120, 70, 50, 0.28)',
+      ].join(', ')
+    : [
+        `0 3px 0 ${STAGE_DEEP}`,
+        `0 7px 0 ${STAGE_DEEP}`,
+        `0 11px 0 ${STAGE_DEEP}`,
+        `0 15px 0 ${shade(BRAND, 0.22)}`,
+        `0 19px 0 ${shade(BRAND, 0.18)}`,
+        '0 34px 52px rgba(0,0,0,0.62)',
+        `0 0 46px ${STAGE_LIGHT}66`,
+      ].join(', ');
 
   // Shared nodes so the solid layout and the standard layout render the
   // emphasis pill / subtitle identically.
@@ -596,10 +683,12 @@ export const MagicTitleLayer = ({
       <span
         dir={rtl ? 'rtl' : 'ltr'}
         style={{
-          backgroundColor: '#ffffff',
+          backgroundColor: LIGHT_STAGE ? BRAND : '#ffffff',
           borderRadius: 999,
-          boxShadow: `0 14px 34px rgba(0,0,0,0.45), 0 0 30px ${STAGE_LIGHT}88`,
-          color: STAGE_DEEP,
+          boxShadow: LIGHT_STAGE
+            ? '0 12px 28px rgba(120, 70, 50, 0.3)'
+            : `0 14px 34px rgba(0,0,0,0.45), 0 0 30px ${STAGE_LIGHT}88`,
+          color: LIGHT_STAGE ? '#ffffff' : STAGE_DEEP,
           fontFamily: ARABIC_FONT,
           fontSize: 46,
           fontWeight: 800,
@@ -621,19 +710,21 @@ export const MagicTitleLayer = ({
       dir={rtl ? 'rtl' : 'ltr'}
       style={{
         top: subtitleTop,
-        color: '#ffffffee',
+        color: SUBTITLE_INK,
         fontFamily: ARABIC_FONT,
         fontSize: 54,
         fontWeight: 800,
         left: 70,
-        opacity: interpolate(frame, [8, 22], [0, 1], {
+        opacity: interpolate(titleFrame, [8, 22], [0, 1], {
           extrapolateLeft: 'clamp',
           extrapolateRight: 'clamp',
-        }) * outro,
+        }) * outro * titleVisible,
         position: 'absolute',
         right: 70,
         textAlign: 'center',
-        textShadow: `0 4px 0 ${STAGE_DEEP}, 0 18px 34px rgba(0,0,0,0.6)`,
+        textShadow: LIGHT_STAGE
+          ? '0 3px 0 #ffffff, 0 12px 24px rgba(120, 70, 50, 0.25)'
+          : `0 4px 0 ${STAGE_DEEP}, 0 18px 34px rgba(0,0,0,0.6)`,
         transform: `rotateX(-13deg) translateY(${(1 - pop) * 40}px)`,
         transformOrigin: '50% 0%',
       }}
@@ -651,7 +742,7 @@ export const MagicTitleLayer = ({
     const placed = planSolidWords(title.split(/\s+/).filter(Boolean), canvasWidth, canvasHeight);
     const renderWord = (word: PlacedWord) => {
       const enter = spring({
-        frame: Math.max(0, frame - word.index * 3),
+        frame: Math.max(0, titleFrame - word.index * 3),
         fps,
         config: {damping: 12, stiffness: 150, mass: 0.9},
       });
@@ -660,13 +751,13 @@ export const MagicTitleLayer = ({
           key={`${word.word}-${word.index}`}
           dir={rtl ? 'rtl' : 'ltr'}
           style={{
-            color: '#ffffff',
+            color: TITLE_INK,
             fontFamily: ARABIC_FONT,
             fontSize: word.fontSize,
             fontWeight: 800,
             lineHeight: 1.0,
             [word.side]: 44,
-            opacity: Math.min(1, enter * 1.2) * outro,
+            opacity: Math.min(1, enter * 1.2) * outro * titleVisible,
             position: 'absolute',
             textShadow: extrusion,
             top: word.top,
@@ -701,18 +792,26 @@ export const MagicTitleLayer = ({
   // Non-solid scenes have no front layer — everything sits behind the speaker.
   if (layer === 'front') return null;
 
-  if (!title && !subtitle && !icons.length) return null;
+  if (!title && !icons.length) return null;
 
+  // Clean zone system for media scenes: ONLY the 3D headline (top band, fit to
+  // <=2 lines) plus the icon constellation flanking the head BELOW it. The
+  // subtitle + emphasis pills used to stack on top of the title and each other
+  // (and a lone emoji landed in the headline) — dropped here so nothing but the
+  // subject ever overlaps the title, and never a word/icon over a word/icon.
+  const headlineFont = fitTitleFontSize(title, canvasWidth);
   return (
     <AbsoluteFill style={{perspective: 1100, perspectiveOrigin: '50% 30%', zIndex: 1}}>
-      {icons.length ? <MagicIconNetwork icons={icons} outro={outro} /> : null}
+      {icons.length ? (
+        <MagicIconNetwork icons={icons} outro={outro} headYFactor={0.42} />
+      ) : null}
       {title ? (
         <div
           dir={rtl ? 'rtl' : 'ltr'}
           style={{
-            color: '#ffffff',
+            color: TITLE_INK,
             fontFamily: ARABIC_FONT,
-            fontSize,
+            fontSize: headlineFont,
             fontWeight: 800,
             left: 40,
             lineHeight: 1.02,
@@ -722,8 +821,6 @@ export const MagicTitleLayer = ({
             textAlign: 'center',
             textShadow: extrusion,
             top: titleTop,
-            // Leaning toward a far vanishing point; the subtitle leans the
-            // opposite way so the two read as one 3D corridor.
             transform: `rotateX(14deg) translateY(${(1 - pop) * -70}px) scale(${0.7 + pop * 0.3})`,
             transformOrigin: '50% 100%',
           }}
@@ -731,8 +828,6 @@ export const MagicTitleLayer = ({
           {title}
         </div>
       ) : null}
-      {emphasisNode}
-      {subtitleNode}
     </AbsoluteFill>
   );
 };
