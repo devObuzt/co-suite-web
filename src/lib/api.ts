@@ -663,8 +663,15 @@ export const api = {
     auditLogs: (period = "month") => request<AuditLog[]>(`/admin/audit-logs?period=${period}`),
     providerUsage: (period = "month") => request<ProviderUsageEvent[]>(`/admin/provider-usage?period=${period}`),
     providerUsageSummary: (period = "month") => request<ProviderUsageSummary[]>(`/admin/provider-usage/summary?period=${period}`),
-    creativeAssets: (kind = "") =>
-      request<CreativeAsset[]>(`/admin/creative-assets${kind ? `?kind=${encodeURIComponent(kind)}` : ""}`),
+    creativeAssets: (kind = "", active?: boolean) => {
+      const q = new URLSearchParams();
+      if (kind) q.set("kind", kind);
+      if (active === false) q.set("active", "false");
+      const qs = q.toString();
+      return request<CreativeAsset[]>(`/admin/creative-assets${qs ? `?${qs}` : ""}`);
+    },
+    createCreativeAssetRemote: (data: { kind: string; source_url: string; title?: string }) =>
+      request<CreativeAsset>("/admin/creative-assets", { method: "POST", body: JSON.stringify(data) }),
     seedCreativeBuiltins: () =>
       request<{ ok: boolean; seeded: number }>("/admin/creative-assets/seed-builtins", { method: "POST", body: "{}" }),
     uploadCreativeAsset: (data: { kind: string; title?: string; file: File }) => {
