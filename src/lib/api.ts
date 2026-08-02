@@ -653,6 +653,10 @@ export const api = {
     providers: () => request<AdminProvider[]>("/admin/providers"),
     users: (q = "") => request<AdminUser[]>(`/admin/users${q ? `?q=${encodeURIComponent(q)}` : ""}`),
     user: (userId: string) => request<AdminUserDetail>(`/admin/users/${userId}`),
+    createUser: (data: { email: string; full_name: string; password: string; is_super_admin?: boolean; is_active?: boolean; is_verified?: boolean; approval_status?: string }) =>
+      request<AdminUser>("/admin/users", { method: "POST", body: JSON.stringify(data) }),
+    bulkDeactivateUsers: (userIds: string[]) =>
+      request<{ ok: boolean; deactivated: number; skipped_self: boolean }>("/admin/users/bulk-deactivate", { method: "POST", body: JSON.stringify({ user_ids: userIds }) }),
     updateUser: (userId: string, data: Partial<Pick<AdminUser, "email" | "full_name" | "is_active" | "is_verified" | "is_super_admin" | "approval_status">>) =>
       request<AdminUser>(`/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(data) }),
     changePassword: (userId: string, password: string) =>
