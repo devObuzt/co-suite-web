@@ -164,6 +164,7 @@ export const api = {
       request<{ id: string; name: string; slug: string; status: string }>(
         "/funnel/suite", { method: "POST", body: JSON.stringify(data) }),
     catalog: () => request<ServiceItem[]>("/funnel/catalog"),
+    packages: () => request<Package[]>("/funnel/packages"),
     recommendations: () =>
       request<{ recommended_service_ids: string[] }>("/funnel/recommendations", { method: "POST" }),
     submitRequest: (data: { items: { service_id: string; qty: number }[]; customer_notes?: string }) =>
@@ -708,6 +709,20 @@ export const api = {
       request<ServiceItem>(`/admin/services/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deactivateService: (id: string) =>
       request<{ ok: boolean }>(`/admin/services/${id}`, { method: "DELETE" }),
+    listPackages: () => request<Package[]>("/admin/packages"),
+    createPackage: (data: Omit<Package, "id" | "cover_image_url">) =>
+      request<Package>("/admin/packages", { method: "POST", body: JSON.stringify(data) }),
+    updatePackage: (id: string, data: Partial<Omit<Package, "id">>) =>
+      request<Package>(`/admin/packages/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deactivatePackage: (id: string) =>
+      request<{ ok: boolean }>(`/admin/packages/${id}`, { method: "DELETE" }),
+    uploadPackageCover: (id: string, file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return request<Package>(`/admin/packages/${id}/cover`, { method: "POST", body: form });
+    },
+    generatePackageCover: (id: string) =>
+      request<Package>(`/admin/packages/${id}/cover/generate`, { method: "POST", body: "{}" }),
     listLeads: (status?: string) =>
       request<AdminLead[]>(`/admin/leads${status ? `?status=${status}` : ""}`),
     leadDetail: (id: string) => request<AdminLeadDetail>(`/admin/leads/${id}`),
@@ -1337,6 +1352,18 @@ export interface ServiceItem {
   price_min: number;
   price_max: number | null;
   unit: Record<string, string> | null;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface Package {
+  id: string;
+  name: Record<string, string>;
+  description: Record<string, string>;
+  billing_cycle: BillingCycle;
+  price_min: number;
+  price_max: number | null;
+  cover_image_url: string | null;
   is_active: boolean;
   sort_order: number;
 }

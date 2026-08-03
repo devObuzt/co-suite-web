@@ -3,10 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useLanguage, useT } from "@/lib/i18n/LanguageContext";
-import { api, ServiceItem } from "@/lib/api";
+import { api, API_BASE, Package, ServiceItem } from "@/lib/api";
 import { loadSelection, saveSelection } from "@/lib/funnelSelection";
 
-function price(item: ServiceItem): string {
+const API_ORIGIN = API_BASE.replace(/\/api\/v1\/?$/, "");
+const coverSrc = (url: string) => (/^https?:\/\//.test(url) ? url : `${API_ORIGIN}${url}`);
+
+function price(item: { price_min: number; price_max: number | null }): string {
   const min = item.price_min.toLocaleString();
   return item.price_max ? `₪${min}–${item.price_max.toLocaleString()}` : `₪${min}`;
 }
@@ -17,12 +20,14 @@ export default function FunnelServicesPage() {
   const router = useRouter();
   const catalogLang = lang === "he" ? "he" : "ar";
   const [items, setItems] = useState<ServiceItem[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]);
   const [recommended, setRecommended] = useState<string[]>([]);
   const [selection, setSelection] = useState<Record<string, number>>({});
 
   useEffect(() => {
     setSelection(loadSelection());
     api.funnel.catalog().then(setItems).catch(() => setItems([]));
+    api.funnel.packages().then(setPackages).catch(() => setPackages([]));
     api.funnel.recommendations()
       .then((r) => setRecommended(r.recommended_service_ids || []))
       .catch(() => setRecommended([]));
@@ -63,6 +68,31 @@ export default function FunnelServicesPage() {
         <h1 className="text-3xl font-bold">{t("sbc.services.title")}</h1>
         <p className="text-muted-foreground">{t("sbc.services.subtitle")}</p>
       </div>
+      {packages.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">{catalogLang === "he" ? "החבילות שלנו" : "باقاتنا"}</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {packages.map((pkg) => (
+              <div key={pkg.id} className="overflow-hidden rounded-xl border border-border bg-card">
+                {pkg.cover_image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={coverSrc(pkg.cover_image_url)} alt="" className="aspect-video w-full object-cover" />
+                ) : null}
+                <div className="p-4">
+                  <h3 className="font-semibold">{pkg.name[catalogLang] || pkg.name.ar}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{pkg.description[catalogLang] || pkg.description.ar}</p>
+                  <div className="mt-3 flex items-center gap-2 text-sm">
+                    <span className="font-bold">{price(pkg)}</span>
+                    <span className="rounded-full border border-border px-2 py-0.5 text-xs">
+                      {t(`sbc.services.cycle.${pkg.billing_cycle}`)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       {grouped.map(([category, rows]) => (
         <section key={category} className="space-y-3">
           <h2 className="text-lg font-semibold">{category}</h2>
