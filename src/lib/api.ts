@@ -664,7 +664,13 @@ export const api = {
     deactivateUser: (userId: string) =>
       request<{ ok: boolean; deactivated: boolean }>(`/admin/users/${userId}`, { method: "DELETE" }),
     billingUsage: (period = "month") => request<AdminBillingUsageEvent[]>(`/admin/billing-usage?period=${period}`),
-    auditLogs: (period = "month") => request<AuditLog[]>(`/admin/audit-logs?period=${period}`),
+    auditLogs: (period = "month", opts: { action?: string; user_id?: string; limit?: number } = {}) => {
+      const q = new URLSearchParams({ period });
+      if (opts.action) q.set("action", opts.action);
+      if (opts.user_id) q.set("user_id", opts.user_id);
+      if (opts.limit) q.set("limit", String(opts.limit));
+      return request<AuditLog[]>(`/admin/audit-logs?${q.toString()}`);
+    },
     providerUsage: (period = "month") => request<ProviderUsageEvent[]>(`/admin/provider-usage?period=${period}`),
     providerUsageSummary: (period = "month") => request<ProviderUsageSummary[]>(`/admin/provider-usage/summary?period=${period}`),
     creativeAssets: (kind = "", active?: boolean) => {

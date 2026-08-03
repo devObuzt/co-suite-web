@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { api, AdminBillingUsageEvent, AdminProvider, AdminSummary, AdminUser, AdminUserDetail, AuditLog, CreativeAsset, ProviderUsageEvent, ProviderUsageSummary } from "@/lib/api";
+import { api, AdminBillingUsageEvent, AdminProvider, AdminSummary, CreativeAsset, ProviderUsageEvent, ProviderUsageSummary } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Activity, CircleDollarSign, KeyRound, Loader2, RefreshCw, Search, ShieldCheck, Tags, Upload, UserCog, Users, WandSparkles } from "lucide-react";
+import { Activity, CircleDollarSign, Loader2, RefreshCw, ShieldCheck, Tags, Upload, UserCog, Users, WandSparkles } from "lucide-react";
 
 const PERIODS = [
   { value: "today", label: "Today" },
@@ -29,9 +29,6 @@ const CREATIVE_ASSET_KINDS = [
 export default function AdminPage() {
   const [period, setPeriod] = useState("month");
   const [summary, setSummary] = useState<AdminSummary | null>(null);
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [selectedUser, setSelectedUser] = useState<AdminUserDetail | null>(null);
-  const [logs, setLogs] = useState<AuditLog[]>([]);
   const [providerRows, setProviderRows] = useState<ProviderUsageEvent[]>([]);
   const [providerSummary, setProviderSummary] = useState<ProviderUsageSummary[]>([]);
   const [providers, setProviders] = useState<AdminProvider[]>([]);
@@ -42,9 +39,7 @@ export default function AdminPage() {
   const [savingCreativeId, setSavingCreativeId] = useState<string | null>(null);
   const [seedingCreativeAssets, setSeedingCreativeAssets] = useState(false);
   const [billingRows, setBillingRows] = useState<AdminBillingUsageEvent[]>([]);
-  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
-  const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,25 +48,21 @@ export default function AdminPage() {
     [providerSummary]
   );
 
-  async function load(nextPeriod = period, nextQuery = query) {
+  async function load(nextPeriod = period) {
     setError(null);
-    const [s, u, catalog, billing, ps, pr, l, ca] = await Promise.all([
+    const [s, catalog, billing, ps, pr, ca] = await Promise.all([
       api.admin.summary(nextPeriod),
-      api.admin.users(nextQuery),
       api.admin.providers(),
       api.admin.billingUsage(nextPeriod),
       api.admin.providerUsageSummary(nextPeriod),
       api.admin.providerUsage(nextPeriod),
-      api.admin.auditLogs(nextPeriod),
       api.admin.creativeAssets(),
     ]);
     setSummary(s);
-    setUsers(u);
     setProviders(catalog);
     setBillingRows(billing);
     setProviderSummary(ps);
     setProviderRows(pr);
-    setLogs(l);
     setCreativeAssets(ca);
   }
 
@@ -85,67 +76,6 @@ export default function AdminPage() {
     setPeriod(value);
     setLoading(true);
     await load(value).catch((err) => setError(err instanceof Error ? err.message : "Could not load admin")).finally(() => setLoading(false));
-  }
-
-  async function searchUsers() {
-    setLoading(true);
-    await load(period, query).catch((err) => setError(err instanceof Error ? err.message : "Search failed")).finally(() => setLoading(false));
-  }
-
-  async function openUser(userId: string) {
-    setBusyUserId(userId);
-    try {
-      setSelectedUser(await api.admin.user(userId));
-    } finally {
-      setBusyUserId(null);
-    }
-  }
-
-  async function updateUser(userId: string, patch: Partial<AdminUser>) {
-    setBusyUserId(userId);
-    setNotice(null);
-    try {
-      await api.admin.updateUser(userId, patch);
-      await load();
-      if (selectedUser?.user.id === userId) setSelectedUser(await api.admin.user(userId));
-      setNotice("User updated.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Update failed");
-    } finally {
-      setBusyUserId(null);
-    }
-  }
-
-  async function changePassword(userId: string) {
-    const password = window.prompt("New password, minimum 8 characters");
-    if (!password) return;
-    setBusyUserId(userId);
-    setNotice(null);
-    try {
-      await api.admin.changePassword(userId, password);
-      await load();
-      setNotice("Password changed.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Password change failed");
-    } finally {
-      setBusyUserId(null);
-    }
-  }
-
-  async function deactivateUser(userId: string) {
-    if (!window.confirm("Deactivate this user? They will not be able to log in.")) return;
-    setBusyUserId(userId);
-    setNotice(null);
-    try {
-      await api.admin.deactivateUser(userId);
-      await load();
-      if (selectedUser?.user.id === userId) setSelectedUser(await api.admin.user(userId));
-      setNotice("User deactivated.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Deactivate failed");
-    } finally {
-      setBusyUserId(null);
-    }
   }
 
   async function uploadCreativeAsset() {
@@ -217,7 +147,7 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl space-y-6 p-6">
+    <main className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
       <header className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm font-medium text-primary"><ShieldCheck size={16} /> Super admin</div>
@@ -268,7 +198,7 @@ export default function AdminPage() {
         </Link>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-5">
         <Metric icon={<Users size={18} />} label="Users" value={summary?.users ?? 0} note={`${summary?.active_users ?? 0} active`} />
         <Metric icon={<UserCog size={18} />} label="Suites" value={summary?.suites ?? 0} note="owned workspaces" />
         <Metric icon={<Activity size={18} />} label="Jobs" value={summary?.generation_jobs ?? 0} note={period} />
@@ -291,117 +221,6 @@ export default function AdminPage() {
         onUpdateTags={updateCreativeTags}
         onDeactivate={deactivateCreative}
       />
-
-      <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-        <Panel title="Users" action={
-          <div className="flex gap-2">
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search email or name" className="w-56" />
-            <Button variant="outline" size="sm" onClick={searchUsers} className="gap-2"><Search size={14} /> Search</Button>
-          </div>
-        }>
-          <div className="os-scroll-x">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead className="border-b border-border text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="py-2 pr-3">User</th>
-                  <th className="py-2 pr-3">Phone</th>
-                  <th className="py-2 pr-3">Status</th>
-                  <th className="py-2 pr-3">Approval</th>
-                  <th className="py-2 pr-3">Suites</th>
-                  <th className="py-2 pr-3">Created</th>
-                  <th className="py-2 pr-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((item) => (
-                  <tr key={item.id} className="border-b border-border/60">
-                    <td className="py-3 pr-3">
-                      <div className="font-medium">{item.full_name}</div>
-                      <div className="text-xs text-muted-foreground">{item.email}</div>
-                    </td>
-                    <td className="py-3 pr-3 text-muted-foreground">{item.phone || "—"}</td>
-                    <td className="py-3 pr-3">
-                      <div className="flex flex-wrap gap-1">
-                        <Badge variant={item.is_active ? "outline" : "destructive"}>{item.is_active ? "active" : "inactive"}</Badge>
-                        {item.is_super_admin && <Badge>admin</Badge>}
-                        {item.is_verified && <Badge variant="secondary">verified</Badge>}
-                      </div>
-                    </td>
-                    <td className="py-3 pr-3">
-                      <Badge variant={item.approval_status === "approved" ? "outline" : item.approval_status === "frozen" ? "destructive" : "secondary"}>
-                        {item.approval_status || "frozen"}
-                      </Badge>
-                    </td>
-                    <td className="py-3 pr-3">{item.suite_count ?? 0}</td>
-                    <td className="py-3 pr-3 text-muted-foreground">{formatDate(item.created_at)}</td>
-                    <td className="py-3 pr-3">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => openUser(item.id)} disabled={busyUserId === item.id}>View</Button>
-                        <Button variant="outline" size="sm" onClick={() => updateUser(item.id, { is_active: !item.is_active })} disabled={busyUserId === item.id}>
-                          {item.is_active ? "Disable" : "Enable"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={item.approval_status === "approved" ? "outline" : "default"}
-                          disabled={busyUserId === item.id}
-                          onClick={async () => {
-                            setBusyUserId(item.id);
-                            try {
-                              const next = item.approval_status === "approved" ? "frozen" : "approved";
-                              await api.admin.updateUser(item.id, { approval_status: next });
-                              setUsers((prev) => prev.map((x) => (x.id === item.id ? { ...x, approval_status: next } : x)));
-                            } finally {
-                              setBusyUserId(null);
-                            }
-                          }}
-                        >
-                          {item.approval_status === "approved" ? "Freeze" : "Approve"}
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => changePassword(item.id)} disabled={busyUserId === item.id} className="gap-1">
-                          <KeyRound size={13} /> Password
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
-
-        <Panel title="Selected User">
-          {!selectedUser ? (
-            <p className="text-sm text-muted-foreground">Select a user to inspect suites and admin actions.</p>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <div className="text-lg font-semibold">{selectedUser.user.full_name}</div>
-                <div className="text-sm text-muted-foreground">{selectedUser.user.email}</div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => updateUser(selectedUser.user.id, { is_super_admin: !selectedUser.user.is_super_admin })}>
-                  {selectedUser.user.is_super_admin ? "Remove admin" : "Make admin"}
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => updateUser(selectedUser.user.id, { is_verified: !selectedUser.user.is_verified })}>
-                  {selectedUser.user.is_verified ? "Unverify" : "Verify"}
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => deactivateUser(selectedUser.user.id)}>Safe delete</Button>
-              </div>
-              <div className="space-y-2">
-                <div className="text-sm font-medium">Suites</div>
-                {selectedUser.suites.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No suites.</p>
-                ) : selectedUser.suites.map((suite) => (
-                  <div key={suite.id} className="rounded-md border border-border p-3">
-                    <div className="font-medium">{suite.name}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{suite.slug} · {suite.status} · {formatDate(suite.created_at)}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </Panel>
-      </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
         <Panel title="Billed Usage Requests">
@@ -510,27 +329,6 @@ export default function AdminPage() {
         </Panel>
       </section>
 
-      <Panel title="Audit Logs">
-        <div className="os-scroll-x">
-          <table className="w-full min-w-[920px] text-sm">
-            <thead className="border-b border-border text-left text-xs text-muted-foreground">
-              <tr><th className="py-2 pr-3">Time</th><th className="py-2 pr-3">Actor</th><th className="py-2 pr-3">Action</th><th className="py-2 pr-3">Resource</th><th className="py-2 pr-3">Metadata</th></tr>
-            </thead>
-            <tbody>
-              {logs.map((item) => (
-                <tr key={item.id} className="border-b border-border/60">
-                  <td className="py-3 pr-3 text-muted-foreground">{formatDate(item.created_at)}</td>
-                  <td className="py-3 pr-3">{item.actor_email || "-"}</td>
-                  <td className="py-3 pr-3 font-medium">{item.action}</td>
-                  <td className="py-3 pr-3 text-muted-foreground">{item.resource_type}{item.resource_id ? `/${shortId(item.resource_id)}` : ""}</td>
-                  <td className="max-w-[360px] truncate py-3 pr-3 text-xs text-muted-foreground">{JSON.stringify(item.metadata || {})}</td>
-                </tr>
-              ))}
-              {logs.length === 0 && <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No audit logs for this period.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
     </main>
   );
 }

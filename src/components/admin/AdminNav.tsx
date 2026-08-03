@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { Film, Languages, LayoutDashboard, Tags, UserCog, Users, WandSparkles } from "lucide-react";
+import { Film, Languages, LayoutDashboard, ScrollText, Tags, UserCog, Users, WandSparkles } from "lucide-react";
 
 type AdminNavItem = {
   href: string;
@@ -20,6 +20,7 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { href: "/admin/services", label: "Services", icon: <Tags size={15} /> },
   { href: "/admin/creative-assets", label: "Creative Assets", icon: <Film size={15} /> },
   { href: "/admin/users", label: "Users", icon: <UserCog size={15} /> },
+  { href: "/admin/audit-logs", label: "Audit Logs", icon: <ScrollText size={15} /> },
   { href: "/admin/leads", label: "Leads", icon: <Users size={15} /> },
 ];
 
