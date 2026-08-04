@@ -22,6 +22,7 @@ import {
   type MagicDirection,
   type MagicSceneShape,
 } from './magic/MagicScene';
+import {ClassicBackdrop, ClassicLowerThird, type ClassicSceneShape} from './classic/ClassicScene';
 import manifest from './manifest.generated.json';
 
 type Scene = (typeof manifest.scenes)[number];
@@ -52,6 +53,12 @@ const IS_SUPERZOOM = TEMPLATE === 'oneshare_superzoom';
 const IS_MAGIC_FAMILY = TEMPLATE === 'oneshare_magic' || IS_SUPERZOOM;
 const magicFor = (scene: Scene): MagicDirection | null =>
   IS_MAGIC_FAMILY ? ((scene as {magic?: MagicDirection}).magic ?? null) : null;
+
+// Classic family — calm "editor's cut": per-scene background + lower-third
+// title (classic) or one static brand backdrop + captions only (minimal).
+const IS_CLASSIC = TEMPLATE === 'oneshare_classic';
+const IS_MINIMAL = TEMPLATE === 'oneshare_minimal';
+const IS_CLASSIC_FAMILY = IS_CLASSIC || IS_MINIMAL;
 
 // Deterministic per-scene hash → each Magic frame opens at a different (but
 // stable across re-renders) zoom level.
@@ -600,15 +607,18 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
     ? userOffsetY
     : Math.max(0, (MAGIC_HEAD_TARGET_TOP - headTopRel) * canvasHeight);
 
+  // Classic subjects stand calmly still too (no breathing drift), at a modest
+  // fixed zoom — the default template keeps its drift.
+  const still = isMagicScene || IS_CLASSIC_FAMILY;
   const subjectScale = isMagicScene
     ? magicZoom
-    : (interpolate(progress, [0, 0.5, 1], [1.035, 1.075, 1.045]) + zoomBeat * 0.07) * userZoom;
-  const subjectX = isMagicScene ? 0 : interpolate(progress, [0, 1], [-10, 10]) + overlayBeat * 12;
+    : (still ? 1.05 : interpolate(progress, [0, 0.5, 1], [1.035, 1.075, 1.045]) + zoomBeat * 0.07) * userZoom;
+  const subjectX = still ? 0 : interpolate(progress, [0, 1], [-10, 10]) + overlayBeat * 12;
   // Scale from face height (~25% down the canvas): any zoom > 1 then pushes
   // the matte's bottom edge BELOW the canvas (hiding mid-leg cuts and objects
   // near the frame bottom) while keeping the head in view. Vertical drift is
   // downward-only so the cut edge never rises into the frame.
-  const subjectY = isMagicScene ? 0 : Math.abs(float) * 4 + zoomBeat * 10;
+  const subjectY = still ? 0 : Math.abs(float) * 4 + zoomBeat * 10;
   const subjectStyle: React.CSSProperties = {
     height: '100%',
     inset: 0,
@@ -643,6 +653,12 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
             direction={magic}
             durationInFrames={durationInFrames}
           />
+        ) : IS_CLASSIC_FAMILY ? (
+          <ClassicBackdrop
+            scene={scene as unknown as ClassicSceneShape}
+            minimal={IS_MINIMAL}
+            durationInFrames={durationInFrames}
+          />
         ) : (
           <SceneBackground scene={scene} durationInFrames={durationInFrames} />
         )}
@@ -653,6 +669,9 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
               direction={magic}
               durationInFrames={durationInFrames}
             />
+          ) : IS_CLASSIC_FAMILY ? (
+            // Minimal shows no titles at all; classic shows a clean lower-third.
+            IS_CLASSIC ? <ClassicLowerThird scene={scene as unknown as ClassicSceneShape} /> : null
           ) : (
             <BehindPersonText scene={scene} />
           )
@@ -686,30 +705,33 @@ const SceneLayer = ({scene, durationInFrames}: {scene: Scene; durationInFrames: 
       </AbsoluteFill>
       <Audio src={publicAsset(sourceAudioPath)} startFrom={startFrom} endAt={endAt} />
       {SHOW_CAPTIONS ? <Captions scene={scene} /> : null}
-      <AbsoluteFill style={{pointerEvents: 'none', zIndex: 3}}>
-        <div
-          style={{
-            border: `3px solid ${scene.palette[2]}55`,
-            borderRadius: 38,
-            inset: 70,
-            opacity: overlayBeat * 0.7,
-            position: 'absolute',
-            transform: `scale(${1 - overlayBeat * 0.035})`,
-          }}
-        />
-        <div
-          style={{
-            background: `linear-gradient(90deg, transparent, ${scene.palette[1]}aa, transparent)`,
-            bottom: 360,
-            height: 8,
-            left: 120,
-            opacity: (overlayBeat + flashBeat) * 0.62,
-            position: 'absolute',
-            right: 120,
-            transform: `translateY(${overlayBeat * -22}px)`,
-          }}
-        />
-      </AbsoluteFill>
+      {/* Flashy beat accents — muted entirely for the calm Classic family. */}
+      {!IS_CLASSIC_FAMILY ? (
+        <AbsoluteFill style={{pointerEvents: 'none', zIndex: 3}}>
+          <div
+            style={{
+              border: `3px solid ${scene.palette[2]}55`,
+              borderRadius: 38,
+              inset: 70,
+              opacity: overlayBeat * 0.7,
+              position: 'absolute',
+              transform: `scale(${1 - overlayBeat * 0.035})`,
+            }}
+          />
+          <div
+            style={{
+              background: `linear-gradient(90deg, transparent, ${scene.palette[1]}aa, transparent)`,
+              bottom: 360,
+              height: 8,
+              left: 120,
+              opacity: (overlayBeat + flashBeat) * 0.62,
+              position: 'absolute',
+              right: 120,
+              transform: `translateY(${overlayBeat * -22}px)`,
+            }}
+          />
+        </AbsoluteFill>
+      ) : null}
     </AbsoluteFill>
   );
 };

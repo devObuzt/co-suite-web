@@ -70,7 +70,7 @@ type VideoMontageResult = {
   };
 };
 
-type MontageTemplateId = "default" | "oneshare_magic" | "oneshare_superzoom";
+type MontageTemplateId = "default" | "oneshare_magic" | "oneshare_superzoom" | "oneshare_classic" | "oneshare_minimal";
 
 type MontageTemplate = {
   id: MontageTemplateId;
@@ -100,6 +100,20 @@ const templates: MontageTemplate[] = [
     badge: "جديد ✨",
     desc: "نفس كونسبت Magic بالضبط، بس مع زوم قوي وحركة كاميرا مبالغة لكل مشهد — طاقة أعلى.",
     icon: <WandSparkles size={18} />,
+  },
+  {
+    id: "oneshare_classic",
+    label: "OneShare Classic",
+    badge: "جديد ✨",
+    desc: "مونتاج كلاسيكي أنيق: خلفية لكل مشهد بهدوء، lower-third نظيف للعناوين، انتقالات mix سلسة — بلا عناوين 3D ولا زوم قوي ولا أيقونات. ستايل محرر محترف.",
+    icon: <Clapperboard size={18} />,
+  },
+  {
+    id: "oneshare_minimal",
+    label: "OneShare Minimal",
+    badge: "جديد ✨",
+    desc: "الأبسط: الشخصية على خلفية براند ثابتة، كابتشن واضح وموسيقى — بلا خلفيات متغيّرة ولا عناوين. هادئ وأنيق.",
+    icon: <Clapperboard size={18} />,
   },
 ];
 
