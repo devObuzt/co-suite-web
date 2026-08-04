@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { BusinessCard } from "@/components/ex/bc/BusinessCard";
-import { allCardSlugs, getCard } from "@/lib/ex/bc/cards";
+import { allCardSlugs, CARD_ORIGIN, getCard } from "@/lib/ex/bc/cards";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -34,14 +34,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!card) return { title: "Not found" };
 
   return {
+    metadataBase: new URL(CARD_ORIGIN),
     title: card.title,
     description: card.description,
     icons: { icon: card.icon, apple: card.icon },
+    alternates: { canonical: `/ex/bc/${card.slug}` },
     openGraph: {
       type: "profile",
       title: card.title,
       description: card.description,
-      url: `https://www.cosuite.app/ex/bc/${card.slug}`,
+      url: `${CARD_ORIGIN}/ex/bc/${card.slug}`,
       images: [{ url: card.ogImage, width: 1200, height: 630, alt: card.title }],
     },
     twitter: {

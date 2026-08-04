@@ -1,6 +1,13 @@
 import type { BusinessCard } from "./types";
 
 /**
+ * Cards are shared as links — WhatsApp, Facebook and iMessage all fetch the
+ * preview from a crawler, so og:image has to be absolute. Without an explicit
+ * base Next resolves relative metadata URLs against localhost.
+ */
+export const CARD_ORIGIN = "https://www.cosuite.app";
+
+/**
  * Hand-maintained card registry. One entry per `/ex/bc/<slug>` page.
  * Slugs are short client codes (ts = Tamim Shehab).
  */
