@@ -51,7 +51,8 @@ const labels = {
     generateFullPlan: "توليد كل الخطة",
     preparingPlan: "عم نجهّز خطتك التسويقية…",
     preparingPlanHint: "الصفحة بتتحدث لحالها أول ما يجهز أول قسم — ما في داعي تعيد التحميل.",
-    generatingNow: "عم نولّد:",
+    generatingNow: "قيد التوليد الآن",
+    generatingHint: "لسا عم نشتغل على هالقسم — رح يظهر تلقائيًا لما يخلص.",
     stageFailed: "تعذّر توليد",
     retryStage: "أعد المحاولة",
     networkError: "انقطع اتصال جهازك بالإنترنت أثناء العملية — هاي مش مشكلة من عنا. تأكد من الاتصال وجرّب مرة ثانية.",
@@ -177,7 +178,8 @@ const labels = {
     generateFullPlan: "Generate the full plan",
     preparingPlan: "Preparing your marketing plan…",
     preparingPlanHint: "The page updates by itself as soon as the first section is ready — no need to reload.",
-    generatingNow: "Generating:",
+    generatingNow: "Generating now",
+    generatingHint: "We're still working on this section — it appears automatically when it's ready.",
     stageFailed: "Failed to generate",
     retryStage: "Try again",
     networkError: "Your device lost its internet connection during the operation — this is not a problem on our side. Check your connection and try again.",
@@ -304,7 +306,8 @@ const labels = {
     generateFullPlan: "צור את כל התכנית",
     preparingPlan: "מכינים את התכנית השיווקית שלך…",
     preparingPlanHint: "העמוד מתעדכן לבד ברגע שהחלק הראשון מוכן — אין צורך לרענן.",
-    generatingNow: "יוצרים:",
+    generatingNow: "בתהליך יצירה",
+    generatingHint: "אנחנו עדיין עובדים על החלק הזה — הוא יופיע אוטומטית כשיהיה מוכן.",
     stageFailed: "יצירה נכשלה",
     retryStage: "נסו שוב",
     networkError: "חיבור האינטרנט של המכשיר נותק במהלך הפעולה — זו לא תקלה אצלנו. בדקו את החיבור ונסו שוב.",
@@ -1036,14 +1039,29 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     personas: text.personasTitle,
     message: text.messageTitle,
   };
+  // Unmistakable "still generating" state: a solid veil, a pulsing brand ring
+  // around the whole box, a labelled chip and a moving progress bar — the
+  // faint translucent spinner read as "maybe stuck / maybe done".
   const generatingVeil = (slug: StageSlug) =>
     autoStage === slug && !stageReady[slug] ? (
-      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-3xl bg-background/70 backdrop-blur-[2px]">
-        <Loader2 size={30} className="animate-spin text-[color:var(--deck-accent,var(--brand-accent))]" />
-        <p className="px-4 text-center text-sm font-bold text-foreground" dir="auto">
-          {text.generatingNow} {stageTitleBySlug[slug]}
-        </p>
-      </div>
+      <>
+        <div className="pointer-events-none absolute inset-0 z-20 animate-pulse rounded-3xl ring-2 ring-[color:var(--deck-accent,var(--brand-accent))]" />
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-3xl bg-background/92 backdrop-blur-[3px]">
+          <span className="inline-flex items-center gap-2 rounded-full bg-[color:var(--deck-accent,var(--brand-accent))] px-4 py-1.5 text-xs font-black text-white shadow-lg">
+            <Loader2 size={15} className="animate-spin" />
+            {text.generatingNow}
+          </span>
+          <p className="px-4 text-center text-lg font-black text-foreground" dir="auto">
+            {stageTitleBySlug[slug]}
+          </p>
+          <div className="h-1.5 w-40 overflow-hidden rounded-full bg-muted">
+            <div className="h-full w-1/3 animate-[deckSweep_1.4s_ease-in-out_infinite] rounded-full bg-[color:var(--deck-accent,var(--brand-accent))]" />
+          </div>
+          <p className="px-6 text-center text-xs text-muted-foreground" dir="auto">
+            {text.generatingHint}
+          </p>
+        </div>
+      </>
     ) : null;
 
   const allStages = (

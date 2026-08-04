@@ -446,3 +446,9 @@
     color: #111111 !important;
   }
 }
+
+/* Indeterminate progress sweep for the marketing-plan "generating" veil. */
+@keyframes deckSweep {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
