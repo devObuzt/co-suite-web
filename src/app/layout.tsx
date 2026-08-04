@@ -3,8 +3,7 @@ import { Inter, Cairo, Noto_Sans_Hebrew } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n/LanguageContext";
 import { AccessibilityProvider } from "@/lib/accessibility/AccessibilityContext";
-import { AccessibilityFab } from "@/components/AccessibilityFab";
-import { FirstTimeLanguagePicker } from "@/components/FirstTimeLanguagePicker";
+import { GlobalChrome } from "@/components/GlobalChrome";
 
 // Runs before first paint to apply saved accessibility prefs (theme, font
 // scale, contrast, motion) with no flash. Mirrors applyPrefs() in
@@ -58,8 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AccessibilityProvider>
           <LanguageProvider>
             {children}
-            <AccessibilityFab />
-            <FirstTimeLanguagePicker />
+            <GlobalChrome />
           </LanguageProvider>
         </AccessibilityProvider>
       </body>

@@ -1,0 +1,258 @@
+/*
+ * Digital business card — a self-contained, full-viewport surface.
+ *
+ * Everything here is deliberately written in px and explicit colours rather
+ * than the app's design tokens: the card must render identically for every
+ * visitor, regardless of the co-Suite theme or accessibility font scale
+ * stored in their localStorage.
+ */
+
+.page {
+  display: flex;
+  justify-content: center;
+  min-height: 100dvh;
+  background: #eeeeee;
+}
+
+.card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  width: 100%;
+  max-width: 705px;
+  min-height: 100dvh;
+  overflow: hidden;
+  color: var(--bc-contact-text);
+  font-family: var(--font-hebrew), var(--font-inter), "Roboto", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* On a desktop window the card keeps the portrait proportions of the photo
+   instead of stretching into a letterbox that crops the subject's face. */
+@media (min-width: 711px) {
+  .page {
+    align-items: center;
+    padding: 24px 0;
+  }
+
+  .card {
+    height: calc(100dvh - 48px);
+    min-height: 520px;
+    width: min(705px, calc((100dvh - 48px) * 0.62));
+    border: 3px solid var(--bc-frame);
+  }
+}
+
+.photo {
+  object-fit: cover;
+  object-position: center 28%;
+  z-index: 0;
+}
+
+/* Top darkening mirrors the original inset shadow; the bottom half earns the
+   contrast the white contact text needs over the desk and hands. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.3) 0%,
+    rgba(0, 0, 0, 0) 18%,
+    rgba(0, 0, 0, 0) 42%,
+    rgba(0, 0, 0, 0.24) 62%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+}
+
+.content {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: 44px 0 clamp(48px, 13vh, 110px);
+}
+
+/* ---- intro (logo + heading chips) -------------------------------------- */
+
+/* direction: ltr on the row keeps the block on the physical left, matching
+   the original layout, while the chips themselves stay RTL. */
+.introRow {
+  direction: ltr;
+  display: flex;
+  padding-left: 5%;
+}
+
+.intro {
+  direction: rtl;
+  width: fit-content;
+  max-width: 90%;
+}
+
+.logoLink {
+  display: inline-block;
+  margin-bottom: 14px;
+}
+
+.logo {
+  height: auto;
+  /* keeps the navy wordmark legible if it lands on a dark part of the photo */
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.8));
+}
+
+.chip {
+  display: block;
+  font-family: inherit;
+  margin-top: 5px;
+  padding: 5px 14px;
+  background: var(--bc-chip);
+  color: var(--bc-chip-text);
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 1px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* ---- contacts ---------------------------------------------------------- */
+
+.contactsRow {
+  display: flex;
+  justify-content: center;
+}
+
+/* direction: ltr fixes the tile order to the original layout (phone first,
+   top-left); each label/value carries dir="auto" so Hebrew still reads RTL. */
+.contacts {
+  position: relative;
+  direction: ltr;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: min(400px, 92%);
+  text-align: center;
+}
+
+/* The cross divider — a CSS rendition of the original line.png, fading out
+   at both ends. */
+.contacts::before,
+.contacts::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.contacts::before {
+  left: 50%;
+  top: 2%;
+  height: 96%;
+  border-left: 1px solid transparent;
+  border-image: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0),
+      rgba(255, 255, 255, 0.65) 12%,
+      rgba(255, 255, 255, 0.65) 88%,
+      rgba(255, 255, 255, 0)
+    )
+    1;
+}
+
+.contacts::after {
+  top: 50%;
+  left: 16%;
+  width: 68%;
+  border-top: 1px solid transparent;
+  border-image: linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0),
+      rgba(255, 255, 255, 0.65) 14%,
+      rgba(255, 255, 255, 0.65) 86%,
+      rgba(255, 255, 255, 0)
+    )
+    1;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px 8px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+}
+
+.tileAction,
+.copyButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  text-decoration: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.tileAction:focus-visible,
+.copyButton:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 4px;
+}
+
+/* font-family: inherit keeps the app-wide `[dir="auto"] { font-family: Cairo }`
+   base rule from overriding the card's own stack. */
+.label {
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: 0.95;
+}
+
+.value {
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  line-height: 1.45;
+  word-break: break-word;
+  color: inherit;
+  text-decoration: none;
+}
+
+.value:hover,
+.tileAction:hover .value {
+  text-decoration: underline;
+}
+
+/* ---- copy toast -------------------------------------------------------- */
+
+.toast {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 11px 14px;
+  background: #3176a4;
+  color: #ffffff;
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-align: center;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+
+.toastVisible {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    transition: none;
+  }
+}
