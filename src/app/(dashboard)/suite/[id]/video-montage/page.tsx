@@ -343,6 +343,29 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
     }
   }, [id]);
 
+  const [reviseText, setReviseText] = useState<Record<string, string>>({});
+  const [revisingId, setRevisingId] = useState<string | null>(null);
+  const [reviseError, setReviseError] = useState<string | null>(null);
+  const handleRevise = useCallback(
+    async (jobId: string) => {
+      const prompt = (reviseText[jobId] || "").trim();
+      if (prompt.length < 3) return;
+      setRevisingId(jobId);
+      setReviseError(null);
+      try {
+        const next = await api.videoMontage.revise(id, jobId, prompt);
+        setReviseText((m) => ({ ...m, [jobId]: "" }));
+        setJobs((current) => [next, ...current.filter((j) => j.job_id !== next.job_id)].slice(0, 10));
+        await refreshJobs();
+      } catch (err) {
+        setReviseError(err instanceof Error ? err.message : "تعذّر إرسال طلب التعديل");
+      } finally {
+        setRevisingId(null);
+      }
+    },
+    [reviseText, id, refreshJobs],
+  );
+
   useEffect(() => {
     void refreshJobs();
   }, [refreshJobs]);
@@ -1035,6 +1058,34 @@ export default function VideoMontagePage({ params }: { params: Promise<{ id: str
                             </a>
                           ) : null;
                         })()}
+                      </div>
+
+                      {/* Automated edit-by-prompt: re-render steered by a note. */}
+                      <div className="mt-4 rounded-2xl border border-[#2f80ff]/25 bg-[#2f80ff]/5 p-3">
+                        <div className="text-xs font-black text-[#2f80ff]">✏️ طلب تعديل</div>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          اكتب شو بدك نغيّر (مثلاً: «خلّي العناوين أكبر»، «خلفيات أهدأ»، «شيل الزوم») ومنعيد الرندر تلقائيًا كنسخة جديدة.
+                        </p>
+                        <textarea
+                          value={reviseText[job.job_id ?? ""] || ""}
+                          onChange={(e) => setReviseText((m) => ({ ...m, [job.job_id ?? ""]: e.target.value }))}
+                          placeholder="وصف التعديل المطلوب…"
+                          className="mt-2 min-h-16 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                          dir="rtl"
+                        />
+                        <div className="mt-2 flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => handleRevise(job.job_id ?? "")}
+                            disabled={revisingId === job.job_id || (reviseText[job.job_id ?? ""] || "").trim().length < 3}
+                            className="inline-flex min-h-9 items-center justify-center rounded-xl bg-[#2f80ff] px-4 text-xs font-black text-white transition hover:bg-[#2568cc] disabled:opacity-50"
+                          >
+                            {revisingId === job.job_id ? "عم نرسل…" : "اطلب التعديل وأعد الرندر"}
+                          </button>
+                          {reviseError && revisingId === null ? (
+                            <span className="text-xs text-red-600">{reviseError}</span>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   )}

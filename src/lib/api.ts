@@ -448,6 +448,11 @@ export const api = {
         body: form,
       });
     },
+    revise: (suiteId: string, jobId: string, prompt: string) =>
+      request<GenerationStatus>(`/suites/${suiteId}/video-montage/jobs/${jobId}/revise`, {
+        method: "POST",
+        body: JSON.stringify({ prompt }),
+      }),
   },
 
   media: {
