@@ -91,12 +91,15 @@
 }
 
 .logoLink {
-  display: inline-block;
-  margin-bottom: 14px;
+  display: block;
 }
 
+/* margin lives on the image so the spacing is identical whether or not the
+   logo is wrapped in a link */
 .logo {
+  display: block;
   height: auto;
+  margin-bottom: 14px;
   /* keeps the navy wordmark legible if it lands on a dark part of the photo */
   filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.8));
 }
