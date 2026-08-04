@@ -24,9 +24,10 @@ export const CARDS: Record<string, BusinessCard> = {
       alt: "עו״ד תמים שהאב במשרדו",
     },
     logo: {
+      // No href: shehablaw.co.il currently serves a 404 (the domain is live for
+      // mail only). Restore the link once the site is up.
       src: "/ex/bc/ts/logo.png",
       alt: "Tamim Shehab — Shehab, Solomon & Co.",
-      href: "https://shehablaw.co.il",
       width: 150,
     },
     headings: [
