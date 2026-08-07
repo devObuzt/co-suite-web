@@ -1,19 +1,32 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api, Suite } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowRight, Loader2, Sparkles, Trash2, X } from "lucide-react";
+import { Plus, ArrowRight, Loader2, Search, Sparkles, Trash2, X } from "lucide-react";
 
 export default function DashboardPage() {
   const [suites, setSuites] = useState<Suite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     api.suites.list().then(setSuites).finally(() => setLoading(false));
   }, []);
+
+  // Client-side filter: the list is already fetched in full, so matching on
+  // name/slug/status here is instant and needs no extra request.
+  const visibleSuites = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return suites;
+    return suites.filter((suite) =>
+      [suite.name, suite.slug, suite.status]
+        .filter(Boolean)
+        .some((field) => String(field).toLowerCase().includes(q)),
+    );
+  }, [suites, query]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
@@ -75,15 +88,53 @@ export default function DashboardPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {suites.map((suite) => (
-            <SuiteCard
-              key={suite.id}
-              suite={suite}
-              onDeleted={(deletedId) => setSuites((current) => current.filter((item) => item.id !== deletedId))}
-            />
-          ))}
-        </div>
+        <>
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <div className="relative min-w-0 flex-1 sm:max-w-sm">
+              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search suites by name or status…"
+                aria-label="Search suites"
+                className="h-10 w-full rounded-xl border border-border bg-card pl-9 pr-9 text-sm outline-none transition-colors focus:border-primary"
+              />
+              {query ? (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <X size={14} />
+                </button>
+              ) : null}
+            </div>
+            <span className="text-sm text-muted-foreground">
+              {query ? `${visibleSuites.length} of ${suites.length}` : `${suites.length} suite${suites.length === 1 ? "" : "s"}`}
+            </span>
+          </div>
+
+          {visibleSuites.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border py-16 text-center">
+              <p className="text-muted-foreground">No suites match “{query}”.</p>
+              <Button variant="outline" className="mt-4" onClick={() => setQuery("")}>
+                Clear search
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {visibleSuites.map((suite) => (
+                <SuiteCard
+                  key={suite.id}
+                  suite={suite}
+                  onDeleted={(deletedId) => setSuites((current) => current.filter((item) => item.id !== deletedId))}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
