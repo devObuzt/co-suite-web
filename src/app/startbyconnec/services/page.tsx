@@ -22,6 +22,7 @@ export default function FunnelServicesPage() {
   const [items, setItems] = useState<ServiceItem[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [recommended, setRecommended] = useState<string[]>([]);
+  const [reasons, setReasons] = useState<Record<string, string>>({});
   const [selection, setSelection] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -29,7 +30,10 @@ export default function FunnelServicesPage() {
     api.funnel.catalog().then(setItems).catch(() => setItems([]));
     api.funnel.packages().then(setPackages).catch(() => setPackages([]));
     api.funnel.recommendations()
-      .then((r) => setRecommended(r.recommended_service_ids || []))
+      .then((r) => {
+        setRecommended(r.recommended_service_ids || []);
+        setReasons(r.reasons || {});
+      })
       .catch(() => setRecommended([]));
   }, []);
 
@@ -119,6 +123,13 @@ export default function FunnelServicesPage() {
                   <p className="text-sm text-muted-foreground mt-1">
                     {item.description[catalogLang] || item.description.ar}
                   </p>
+                  {reasons[item.id] ? (
+                    // Why the plan calls for this service — turns the list into
+                    // a proposal instead of a generic catalog.
+                    <p className="mt-2 rounded-lg bg-emerald-500/10 px-2.5 py-1.5 text-xs leading-5 text-emerald-700">
+                      {reasons[item.id]}
+                    </p>
+                  ) : null}
                   <div className="flex items-center gap-2 mt-3 text-sm">
                     <span className="font-bold">{price(item)}</span>
                     <span className="rounded-full border border-border px-2 py-0.5 text-xs">

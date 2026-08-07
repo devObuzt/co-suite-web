@@ -166,7 +166,10 @@ export const api = {
     catalog: () => request<ServiceItem[]>("/funnel/catalog"),
     packages: () => request<Package[]>("/funnel/packages"),
     recommendations: () =>
-      request<{ recommended_service_ids: string[] }>("/funnel/recommendations", { method: "POST" }),
+      request<{ recommended_service_ids: string[]; reasons?: Record<string, string>; plan_based?: boolean }>(
+        "/funnel/recommendations",
+        { method: "POST" },
+      ),
     submitRequest: (data: { items: { service_id: string; qty: number }[]; customer_notes?: string }) =>
       request<ServiceRequestOut>("/funnel/service-request", { method: "POST", body: JSON.stringify(data) }),
   },
