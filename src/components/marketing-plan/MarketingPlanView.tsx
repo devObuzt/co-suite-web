@@ -4,6 +4,7 @@
 import { CalendarDays, CheckCircle2, FileText, Megaphone, Play, Target, TrendingUp } from "lucide-react";
 import { GenerateContentRequest, MarketingPlanDeck } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 const rtlLangs = new Set(["ar", "he", "fa", "ur"]);
 
@@ -87,9 +88,13 @@ export function MarketingPlanView({
   onGenerateItem?: (request: GenerateContentRequest, title: string) => void;
   showExecutionSections?: boolean;
 }) {
+  // Chrome (labels) follows the language the USER picked; direction follows the
+  // language the deck CONTENT was generated in, so Arabic copy never flips LTR
+  // just because the interface is in English.
+  const { lang: uiLang } = useLanguage();
   const lang = (deck.language || "").split("-")[0];
   const dir = rtlLangs.has(lang) ? "rtl" : "ltr";
-  const t = planCopy(deck.language);
+  const t = planCopy(uiLang || deck.language);
   const sections = deck.sections || [];
   const featured = sections.slice(0, 4);
   const rest = sections.slice(4);
