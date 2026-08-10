@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useLanguage, useT } from "@/lib/i18n/LanguageContext";
 import { api, BillingCycle, ServiceItem } from "@/lib/api";
-import { loadSelection } from "@/lib/funnelSelection";
+import { loadPackage, loadSelection } from "@/lib/funnelSelection";
 
 const CYCLES: BillingCycle[] = ["one_time", "monthly", "yearly"];
 
@@ -18,6 +18,7 @@ export default function FunnelRequestPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const selection = useMemo(() => loadSelection(), []);
+  const packageId = useMemo(() => loadPackage(), []);
 
   useEffect(() => {
     api.funnel.catalog().then(setItems).catch(() => setItems([]));
@@ -39,6 +40,7 @@ export default function FunnelRequestPage() {
     setBusy(true); setError("");
     try {
       await api.funnel.submitRequest({
+        package_id: packageId,
         items: chosen.map((i) => ({ service_id: i.id, qty: Math.max(1, selection[i.id] || 1) })),
         customer_notes: notes.trim() || undefined,
       });
