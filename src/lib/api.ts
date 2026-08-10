@@ -718,6 +718,9 @@ export const api = {
     deactivateService: (id: string) =>
       request<{ ok: boolean }>(`/admin/services/${id}`, { method: "DELETE" }),
     listPackages: () => request<Package[]>("/admin/packages"),
+    seedPackages: (overwrite = false) =>
+      request<{ created: number; updated: number; total: number }>(
+        `/admin/packages/seed?overwrite=${overwrite}`, { method: "POST", body: "{}" }),
     createPackage: (data: Omit<Package, "id" | "cover_image_url">) =>
       request<Package>("/admin/packages", { method: "POST", body: JSON.stringify(data) }),
     updatePackage: (id: string, data: Partial<Omit<Package, "id">>) =>

@@ -29,6 +29,8 @@ interface FormState {
   price_max: string;
   is_active: boolean;
   sort_order: string;
+  features_text: string;
+  audience: string;
   cover_image_url: string | null;
 }
 
@@ -43,6 +45,8 @@ const EMPTY_FORM: FormState = {
   price_max: "",
   is_active: true,
   sort_order: "0",
+  features_text: "",
+  audience: "all",
   cover_image_url: null,
 };
 
@@ -58,6 +62,9 @@ function toForm(p: Package): FormState {
     price_max: p.price_max != null ? String(p.price_max) : "",
     is_active: p.is_active,
     sort_order: String(p.sort_order ?? 0),
+    // One bullet per line, "arabic | hebrew".
+    features_text: (p.features || []).map((f) => `${f.ar || ""} | ${f.he || ""}`).join("\n"),
+    audience: p.audience || "all",
     cover_image_url: p.cover_image_url ?? null,
   };
 }
@@ -73,6 +80,22 @@ export default function AdminPackagesPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
+  const [seeding, setSeeding] = useState(false);
+
+  async function seedLadder() {
+    setSeeding(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await api.admin.seedPackages();
+      await load();
+      setNotice(`Seeded ${res.created} new package(s) — ${res.total} in the ladder.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Seed failed");
+    } finally {
+      setSeeding(false);
+    }
+  }
 
   async function load() {
     setError(null);
@@ -128,6 +151,15 @@ export default function AdminPackagesPage() {
         price_max: priceMax,
         is_active: form.is_active,
         sort_order: parseInt(form.sort_order, 10) || 0,
+        audience: form.audience,
+        features: form.features_text
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line) => {
+            const [ar, he] = line.split("|");
+            return { ar: (ar || "").trim(), he: (he || ar || "").trim() };
+          }),
       };
       if (form.id) {
         await api.admin.updatePackage(form.id, payload);
@@ -211,7 +243,12 @@ export default function AdminPackagesPage() {
           <h1 className="mt-1 text-3xl font-semibold">Packages</h1>
           <p className="mt-1 text-sm text-muted-foreground">Curated offerings with a cover image, shown to leads on the pricing proposal.</p>
         </div>
-        <Button size="sm" onClick={resetForm} className="gap-2"><Plus size={14} /> New package</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="gap-2" disabled={seeding} onClick={seedLadder}>
+            {seeding ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Seed ladder
+          </Button>
+          <Button size="sm" onClick={resetForm} className="gap-2"><Plus size={14} /> New package</Button>
+        </div>
       </header>
 
       {error && <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -227,6 +264,7 @@ export default function AdminPackagesPage() {
                 <tr>
                   <th className="py-2 pr-3">Cover</th>
                   <th className="py-2 pr-3">Name (ar / he)</th>
+                  <th className="py-2 pr-3">Audience</th>
                   <th className="py-2 pr-3">Cycle</th>
                   <th className="py-2 pr-3">Price</th>
                   <th className="py-2 pr-3">Sort</th>
@@ -249,6 +287,7 @@ export default function AdminPackagesPage() {
                       <div className="font-medium">{p.name.ar}</div>
                       <div className="text-xs text-muted-foreground" dir="rtl">{p.name.he}</div>
                     </td>
+                    <td className="py-3 pr-3"><Badge variant="secondary" className="font-mono text-[11px]">{p.audience || "all"}</Badge></td>
                     <td className="py-3 pr-3">{p.billing_cycle}</td>
                     <td className="py-3 pr-3">{priceLabel(p)}</td>
                     <td className="py-3 pr-3">{p.sort_order}</td>
@@ -264,7 +303,7 @@ export default function AdminPackagesPage() {
                   </tr>
                 ))}
                 {items.length === 0 && !loading && (
-                  <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">No packages yet.</td></tr>
+                  <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">No packages yet.</td></tr>
                 )}
               </tbody>
             </table>
@@ -312,6 +351,31 @@ export default function AdminPackagesPage() {
               </Button>
               {form.id && <Button variant="outline" onClick={resetForm} disabled={saving}>Cancel</Button>}
             </div>
+
+            <label className="grid gap-1 text-sm">
+              <span className="font-medium">Audience</span>
+              <select
+                value={form.audience}
+                onChange={(e) => setForm((f) => ({ ...f, audience: e.target.value }))}
+                className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm"
+              >
+                <option value="all">all — الجميع</option>
+                <option value="very_small">very_small — ميزانيات صغيرة جداً فقط</option>
+                <option value="retail_web">retail_web — متاجر ومواقع</option>
+                <option value="local_service">local_service — خدمات محلية</option>
+              </select>
+            </label>
+
+            <label className="grid gap-1 text-sm">
+              <span className="font-medium">Features — سطر لكل ميزة: عربي | עברית</span>
+              <textarea
+                className="min-h-24 w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm"
+                value={form.features_text}
+                onChange={(e) => setForm((f) => ({ ...f, features_text: e.target.value }))}
+                placeholder={"إدارة الحملات على ميتا | ניהול קמפיינים במטא\nتصاميم وبانرات | עיצובים ובאנרים"}
+                dir="rtl"
+              />
+            </label>
 
             {/* Cover — needs a saved package to attach to */}
             <div className="mt-2 rounded-lg border border-dashed border-border p-3">
