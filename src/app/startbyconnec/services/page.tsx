@@ -68,10 +68,15 @@ export default function FunnelServicesPage() {
     });
   }
 
-  // Show only what the plan-driven recommender picked for this business;
-  // fall back to the full active list if it returned nothing.
+  // Show only what the plan-driven recommender picked for this business. When
+  // it has nothing to say (no suite yet, or the call failed) fall back to the
+  // general ladder — NOT the raw list: audience-targeted tiers are gated on
+  // purpose (very_small must never be offered to a normal business) and the
+  // owner's rule is 3-7 options, so an unfiltered dump breaks both.
   const visiblePackages = useMemo(() => {
-    if (!recommendedPackages.length) return packages;
+    if (!recommendedPackages.length) {
+      return packages.filter((p) => !p.audience || p.audience === "all").slice(0, 7);
+    }
     const order = new Map(recommendedPackages.map((id, i) => [id, i]));
     return packages.filter((p) => order.has(p.id)).sort((a, b) => (order.get(a.id)! - order.get(b.id)!));
   }, [packages, recommendedPackages]);
@@ -138,6 +143,12 @@ export default function FunnelServicesPage() {
               : "الأسعار شاملة الضريبة وهي مقترح أولي فقط. قد يتغيّر السعر حسب نوع المصلحة (مجالات مثل المالية أو السياسية تحتاج مجهوداً أكبر وتسعيراً مختلفاً)، وكل عرض يحتاج موافقة يدوية من فريقنا."}
           </p>
         </section>
+      )}
+      {/* Packages are VAT-inclusive and say so on every card; single services
+          are not. Stating each basis where it applies avoids the page-level
+          contradiction of one blanket claim over both. */}
+      {grouped.length > 0 && (
+        <p className="text-xs text-muted-foreground">{t("sbc.services.taxNote")}</p>
       )}
       {grouped.map(([category, rows]) => (
         <section key={category} className="space-y-3">
