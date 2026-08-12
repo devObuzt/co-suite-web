@@ -2160,6 +2160,18 @@ export function ConnectionsPanel({ suiteId }: { suiteId: string }) {
     }
   }
 
+  async function connectGoogle() {
+    setConnecting(true);
+    setConnectionError("");
+    try {
+      const { url } = await api.connections.googleAuthUrl(suiteId);
+      window.location.href = url;
+    } catch (e: unknown) {
+      setConnectionError(e instanceof Error ? e.message : "Failed to start Google Ads connection");
+      setConnecting(false);
+    }
+  }
+
   async function disconnect(platform: string) {
     await api.connections.disconnect(suiteId, platform);
     const updated = await api.connections.get(suiteId);
@@ -2279,9 +2291,36 @@ export function ConnectionsPanel({ suiteId }: { suiteId: string }) {
             <BarChart3 size={15} className="text-amber-400" /> Google Ads
           </div>
           <div className="space-y-1">
-            <p className="text-zinc-300 text-xs font-medium">Managed by OneShare</p>
             <p className="text-zinc-500 text-xs">Keyword Planner demand and competition data uses the platform account.</p>
           </div>
+          {connections.google_ads?.connected ? (
+            <div className="space-y-2">
+              <p className="text-emerald-400 text-xs font-medium">
+                {connections.google_ads.customer_name || connections.google_ads.customer_id}
+              </p>
+              {connections.google_ads.user_email ? (
+                <p className="text-zinc-500 text-xs" dir="ltr">{connections.google_ads.user_email}</p>
+              ) : null}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => disconnect("google_ads")}
+                className="w-full gap-1 text-xs h-7"
+              >
+                Disconnect
+              </Button>
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              onClick={connectGoogle}
+              disabled={connecting}
+              className="w-full bg-amber-600 hover:bg-amber-500 gap-1 text-xs h-7"
+            >
+              {connecting ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
+              Connect Google Ads
+            </Button>
+          )}
         </div>
 
         {/* TikTok (future) */}
