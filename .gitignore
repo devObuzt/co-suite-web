@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .gstack/
+
+# Local Remotion render scratch (frames/webm/audio) — regenerated per render
+public/remotion/inputs/

@@ -146,7 +146,7 @@ function AdminLeadsInner() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl space-y-6 p-6">
+    <main className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
       <header className="flex flex-col gap-3 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <Link href="/admin" className="mb-1 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">

@@ -176,7 +176,7 @@ export default function AdminServicesPage() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl space-y-6 p-6">
+    <main className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
       <header className="flex flex-col gap-3 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <Link href="/admin" className="mb-1 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
@@ -257,7 +257,7 @@ export default function AdminServicesPage() {
         <div className="rounded-lg border border-border bg-card p-4">
           <h2 className="mb-4 text-lg font-semibold">{form.id ? "Edit service" : "New service"}</h2>
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="grid gap-1 text-sm">
                 <span className="font-medium">Name (ar)</span>
                 <Input value={form.name_ar} onChange={(e) => setForm((f) => ({ ...f, name_ar: e.target.value }))} dir="rtl" />
@@ -267,7 +267,7 @@ export default function AdminServicesPage() {
                 <Input value={form.name_he} onChange={(e) => setForm((f) => ({ ...f, name_he: e.target.value }))} dir="rtl" />
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="grid gap-1 text-sm">
                 <span className="font-medium">Description (ar)</span>
                 <textarea
@@ -287,7 +287,7 @@ export default function AdminServicesPage() {
                 />
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="grid gap-1 text-sm">
                 <span className="font-medium">Category (ar)</span>
                 <Input value={form.category_ar} onChange={(e) => setForm((f) => ({ ...f, category_ar: e.target.value }))} dir="rtl" />
@@ -297,7 +297,7 @@ export default function AdminServicesPage() {
                 <Input value={form.category_he} onChange={(e) => setForm((f) => ({ ...f, category_he: e.target.value }))} dir="rtl" />
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="grid gap-1 text-sm">
                 <span className="font-medium">Billing cycle</span>
                 <select
@@ -313,7 +313,7 @@ export default function AdminServicesPage() {
                 <Input type="number" value={form.sort_order} onChange={(e) => setForm((f) => ({ ...f, sort_order: e.target.value }))} />
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="grid gap-1 text-sm">
                 <span className="font-medium">Price min (₪)</span>
                 <Input type="number" value={form.price_min} onChange={(e) => setForm((f) => ({ ...f, price_min: e.target.value }))} />
@@ -323,7 +323,7 @@ export default function AdminServicesPage() {
                 <Input type="number" value={form.price_max} onChange={(e) => setForm((f) => ({ ...f, price_max: e.target.value }))} />
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="grid gap-1 text-sm">
                 <span className="font-medium">Unit (ar, optional)</span>
                 <Input value={form.unit_ar} onChange={(e) => setForm((f) => ({ ...f, unit_ar: e.target.value }))} dir="rtl" placeholder="e.g. لكل منشور" />
