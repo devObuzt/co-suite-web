@@ -7,7 +7,7 @@ import { api, AdminUser } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, KeyRound, Loader2, Plus, Search, ShieldCheck, Trash2, UserPlus } from "lucide-react";
+import { ArrowLeft, KeyRound, Loader2, Plus, Search, ShieldAlert, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 
 const APPROVALS = ["approved", "frozen", "funnel"] as const;
 
@@ -128,6 +128,33 @@ export default function AdminUsersPage() {
       setNotice("User deactivated.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Deactivate failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  // Deactivation is the reversible default; this is the escape hatch for rows
+  // that must actually go away. Typing the email is the same guard the API
+  // enforces server-side — a confirm dialog alone is too easy to click through
+  // for something that cannot be undone.
+  async function hardDelete(user: AdminUser) {
+    const typed = window.prompt(
+      `Permanently delete ${user.email}?\n\nThis cannot be undone. Type the email to confirm:`,
+    );
+    if (typed === null) return;
+    if (typed.trim().toLowerCase() !== user.email.toLowerCase()) {
+      setError("Email did not match — nothing was deleted.");
+      return;
+    }
+    setBusyId(user.id);
+    setError(null);
+    setNotice(null);
+    try {
+      await api.admin.hardDeleteUser(user.id, user.email);
+      await load(query);
+      setNotice(`${user.email} permanently deleted.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Permanent delete failed");
     } finally {
       setBusyId(null);
     }
@@ -325,6 +352,9 @@ export default function AdminUsersPage() {
                           </Button>
                           <Button size="sm" variant="outline" className="gap-1" disabled={busyId === u.id || isSelf || !u.is_active} onClick={() => deactivate(u)}>
                             {busyId === u.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />} Deactivate
+                          </Button>
+                          <Button size="sm" variant="destructive" className="gap-1" disabled={busyId === u.id || isSelf} onClick={() => hardDelete(u)} title="Permanently delete — cannot be undone">
+                            <ShieldAlert size={13} /> Delete
                           </Button>
                         </div>
                       </td>
