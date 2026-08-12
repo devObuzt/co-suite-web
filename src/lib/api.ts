@@ -672,6 +672,13 @@ export const api = {
       request<{ ok: boolean }>(`/admin/users/${userId}/password`, { method: "POST", body: JSON.stringify({ password }) }),
     deactivateUser: (userId: string) =>
       request<{ ok: boolean; deactivated: boolean }>(`/admin/users/${userId}`, { method: "DELETE" }),
+    // Irreversible. The API refuses unless confirm_email matches the user's own
+    // email, and refuses outright while they still own suites.
+    hardDeleteUser: (userId: string, confirmEmail: string) =>
+      request<{ ok: boolean; deleted: boolean }>(
+        `/admin/users/${userId}/permanent?confirm_email=${encodeURIComponent(confirmEmail)}`,
+        { method: "DELETE" },
+      ),
     billingUsage: (period = "month") => request<AdminBillingUsageEvent[]>(`/admin/billing-usage?period=${period}`),
     auditLogs: (period = "month", opts: { action?: string; user_id?: string; limit?: number } = {}) => {
       const q = new URLSearchParams({ period });
