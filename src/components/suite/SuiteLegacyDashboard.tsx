@@ -12,7 +12,7 @@ import {
   Link2, Link2Off, CreditCard, Target, ChevronDown, Layers, Wand2, SlidersHorizontal,
   Clock3, Megaphone, Sparkles, Copy, Download, Pencil, PackageOpen,
   HelpCircle, Palette, UploadCloud, Plus, X,
-} from "lucide-react";
+ SquarePlay } from "lucide-react";
 
 const API_MEDIA = process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") || "http://localhost:8000";
 
@@ -2172,6 +2172,18 @@ export function ConnectionsPanel({ suiteId }: { suiteId: string }) {
     }
   }
 
+  async function connectYouTube() {
+    setConnecting(true);
+    setConnectionError("");
+    try {
+      const { url } = await api.connections.youtubeAuthUrl(suiteId);
+      window.location.href = url;
+    } catch (e) {
+      setConnectionError(e instanceof Error ? e.message : "Failed to start the YouTube connection");
+      setConnecting(false);
+    }
+  }
+
   async function disconnect(platform: string) {
     await api.connections.disconnect(suiteId, platform);
     const updated = await api.connections.get(suiteId);
@@ -2321,6 +2333,71 @@ export function ConnectionsPanel({ suiteId }: { suiteId: string }) {
               Connect Google Ads
             </Button>
           )}
+        </div>
+
+        {/* YouTube */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-zinc-300 text-sm font-medium">
+              <SquarePlay size={15} className="text-red-500" /> YouTube
+            </div>
+            <span className={`w-2 h-2 rounded-full ${connections.youtube?.connected ? "bg-emerald-400" : "bg-zinc-600"}`} />
+          </div>
+          {connections.youtube?.connected ? (
+            <div className="space-y-2">
+              <p className="text-emerald-400 text-xs font-medium">{connections.youtube.channel_title}</p>
+              <p className="text-zinc-500 text-xs" dir="ltr">{connections.youtube.channel_id}</p>
+              {connections.youtube.subscribers ? (
+                <p className="text-zinc-500 text-xs">
+                  {connections.youtube.subscribers} subscribers · {connections.youtube.videos} videos
+                </p>
+              ) : null}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => disconnect("youtube")}
+                className="w-full border-zinc-700 text-zinc-400 hover:text-red-400 hover:border-red-900 gap-1 text-xs h-7"
+              >
+                <Link2Off size={11} /> Disconnect
+              </Button>
+            </div>
+          ) : (
+            <>
+              <p className="text-zinc-500 text-xs">
+                Publish videos to a channel you own. You pick the channel in Google&apos;s own screen.
+              </p>
+              <Button
+                size="sm"
+                onClick={connectYouTube}
+                disabled={connecting}
+                className="w-full bg-red-700 hover:bg-red-600 gap-1 text-xs h-7"
+              >
+                {connecting ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
+                Connect YouTube
+              </Button>
+            </>
+          )}
+          {/* Required by the YouTube API Services Terms: the links must appear
+              where the feature lives, not only in the privacy policy. */}
+          <p className="text-zinc-600 text-[11px] leading-relaxed">
+            By connecting you agree to the{" "}
+            <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-zinc-400">
+              YouTube Terms of Service
+            </a>
+            . Google handles your data under the{" "}
+            <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-zinc-400">
+              Google Privacy Policy
+            </a>
+            . Revoke access any time in your{" "}
+            <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" className="underline hover:text-zinc-400">
+              Google security settings
+            </a>
+            . See our{" "}
+            <a href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-zinc-400">
+              privacy policy
+            </a>
+            .
+          </p>
         </div>
 
         {/* TikTok (future) */}

@@ -758,6 +758,7 @@ export const api = {
     get: (suiteId: string) => request<Connections>(`/connections/${suiteId}`),
     metaAuthUrl: (suiteId: string) => request<{ url: string }>(`/connections/${suiteId}/meta/auth-url`),
     googleAuthUrl: (suiteId: string) => request<{ url: string }>(`/connections/${suiteId}/google/auth-url`),
+    youtubeAuthUrl: (suiteId: string) => request<{ url: string }>(`/connections/${suiteId}/youtube/auth-url`),
     metaCallback: (suiteId: string, code: string) =>
       request<{ pages: MetaPage[]; ad_accounts: MetaAdAccount[] }>("/connections/meta/callback", {
         method: "POST",
@@ -765,6 +766,13 @@ export const api = {
       }),
     googleCallback: (suiteId: string, code: string) =>
       request<{ customers: GoogleAdsCustomer[] }>("/connections/google/callback", {
+        method: "POST",
+        body: JSON.stringify({ suite_id: suiteId, code }),
+      }),
+    // No select step, unlike Google Ads: the user already picked the channel in
+    // Google's own chooser, so the callback comes back with it decided.
+    youtubeCallback: (suiteId: string, code: string) =>
+      request<{ ok: boolean; channel: YouTubeChannel }>("/connections/youtube/callback", {
         method: "POST",
         body: JSON.stringify({ suite_id: suiteId, code }),
       }),
@@ -1573,11 +1581,21 @@ export interface CreativeAsset {
   updated_at: string;
 }
 
+export interface YouTubeChannel {
+  channel_id: string;
+  channel_title?: string;
+  custom_url?: string;
+  thumbnail?: string;
+  subscribers?: string;
+  videos?: string;
+}
+
 export interface Connections {
   facebook?: { connected: boolean; page_id: string; page_name: string };
   instagram?: { connected: boolean; ig_user_id: string; username: string };
   meta_ads?: { connected: boolean; ad_account_id: string; ad_account_name?: string; currency?: string };
   google_ads?: { connected: boolean; customer_id: string; customer_name?: string; user_email?: string; user_name?: string };
+  youtube?: YouTubeChannel & { connected: boolean };
   tiktok?: { connected: boolean; username: string };
 }
 
