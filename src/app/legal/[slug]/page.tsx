@@ -3,20 +3,26 @@ import { notFound } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { getLegalPolicy, legalPolicies, LEGAL_UPDATED_AT } from "@/lib/legal/policies";
 
+/** Next 16 hands `params` in as a promise — reading it synchronously yields
+ *  undefined, which sent every /legal/* page to notFound(). */
+type Props = { params: Promise<{ slug: string }> };
+
 export function generateStaticParams() {
   return legalPolicies.map((policy) => ({ slug: policy.slug }));
 }
 
-export function generateMetadata({ params }: { params: { slug: string } }) {
-  const policy = getLegalPolicy(params.slug);
+export async function generateMetadata({ params }: Props) {
+  const { slug } = await params;
+  const policy = getLegalPolicy(slug);
   return {
     title: policy ? `${policy.title} — co-Suite` : "Legal — co-Suite",
     description: policy?.subtitle,
   };
 }
 
-export default function LegalPolicyPage({ params }: { params: { slug: string } }) {
-  const policy = getLegalPolicy(params.slug);
+export default async function LegalPolicyPage({ params }: Props) {
+  const { slug } = await params;
+  const policy = getLegalPolicy(slug);
   if (!policy) notFound();
 
   return (
@@ -48,6 +54,22 @@ export default function LegalPolicyPage({ params }: { params: { slug: string } }
                   <ul className="mt-3 list-disc space-y-2 ps-5 text-muted-foreground">
                     {section.bullets.map((item) => (
                       <li key={item} className="leading-relaxed" dir="auto">{item}</li>
+                    ))}
+                  </ul>
+                )}
+                {section.links && (
+                  <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                    {section.links.map((link) => (
+                      <li key={link.href}>
+                        <a
+                          href={link.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-foreground underline underline-offset-4 hover:no-underline"
+                        >
+                          {link.label}
+                        </a>
+                      </li>
                     ))}
                   </ul>
                 )}

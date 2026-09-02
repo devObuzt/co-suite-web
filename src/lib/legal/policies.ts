@@ -1,7 +1,12 @@
+export type LegalLink = { label: string; href: string };
+
 export type LegalSection = {
   title: string;
   body?: string;
   bullets?: string[];
+  /** Rendered as real anchors. Google's OAuth review requires the YouTube
+   *  Terms of Service and Google Privacy Policy to be linked, not just named. */
+  links?: LegalLink[];
 };
 
 export type LegalPolicy = {
@@ -12,7 +17,13 @@ export type LegalPolicy = {
   sections: LegalSection[];
 };
 
-export const LEGAL_UPDATED_AT = "May 21, 2026";
+export const LEGAL_UPDATED_AT = "September 2, 2026";
+
+export const GOOGLE_LINKS: LegalLink[] = [
+  { label: "YouTube Terms of Service", href: "https://www.youtube.com/t/terms" },
+  { label: "Google Privacy Policy", href: "https://policies.google.com/privacy" },
+  { label: "Google security settings (revoke access)", href: "https://myaccount.google.com/permissions" },
+];
 export const LEGAL_CONTACT_EMAIL = "legal@cosuite.app";
 
 export const legalPolicies: LegalPolicy[] = [
@@ -31,7 +42,7 @@ export const legalPolicies: LegalPolicy[] = [
           "Account data such as name, email address, login credentials, language preference, and billing-related identifiers.",
           "Business profile data including business name, links, website content, social pages, brand assets, audience information, services, products, and strategy inputs.",
           "Generated content including prompts, captions, images, carousels, videos, hashtags, approvals, rejections, schedules, and publishing history.",
-          "Connected platform data from services the user chooses to connect, including Meta/Facebook/Instagram pages, ad accounts, analytics, and Google Ads account/campaign reporting data.",
+          "Connected platform data from services the user chooses to connect, including Meta/Facebook/Instagram pages, ad accounts, analytics, Google Ads account/campaign reporting data, and YouTube channel identity and publishing data.",
           "Technical data such as IP address, browser, device, logs, error reports, cookies, and usage events needed to secure and operate the service.",
         ],
       },
@@ -55,12 +66,33 @@ export const legalPolicies: LegalPolicy[] = [
         bullets: [
           "Meta platforms may be used for Facebook Pages, Instagram, Meta Ads, publishing, and analytics.",
           "Google Ads may be used for OAuth connection, account selection, and campaign/ad reporting.",
+          "YouTube API Services are used to publish videos to channels the user connects. See the dedicated section below.",
           "Cloud storage, hosting, database, payment, logging, and AI providers may process data as processors or service providers.",
         ],
       },
       {
+        title: "YouTube API Services",
+        body: "co-Suite uses YouTube API Services to publish videos to YouTube channels that a user explicitly connects. By connecting a channel, the user also agrees to be bound by the YouTube Terms of Service, and Google's Privacy Policy governs data handled by Google.",
+        bullets: [
+          "Scopes we request: youtube.upload to upload videos; youtube.readonly to confirm which channel an authorization actually belongs to before anything is published; youtube.force-ssl to attach caption tracks to videos we upload.",
+          "Data we store: the OAuth refresh token for the connected channel, the channel ID and title, and a record of what we published (title, description, tags, privacy setting, caption track, and timestamps).",
+          "We do not access watch history, subscriptions, private playlists, comments, messages, or channel analytics beyond confirming the target channel identity.",
+          "Google user data obtained through these scopes is never sold, never shared with third parties for their own purposes, never used for advertising or profiling, and never used to train AI models.",
+          "Stored YouTube authorized data is refreshed or deleted within 30 days, as required by the YouTube API Services Terms of Service.",
+          "Users can disconnect a channel inside co-Suite at any time, which deletes the stored authorization, or revoke access directly from their Google Account security settings.",
+        ],
+        links: GOOGLE_LINKS,
+      },
+      {
+        title: "Limited use of Google user data",
+        body: "co-Suite's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements. Google user data is used only to provide the features the user connected the account for, is not transferred except as needed to provide those features, with the user's explicit consent, or where required by law, and is not read by humans except with the user's consent, for security or abuse investigation, or where required by law.",
+        links: [
+          { label: "Google API Services User Data Policy", href: "https://developers.google.com/terms/api-services-user-data-policy" },
+        ],
+      },
+      {
         title: "Data retention and deletion",
-        body: "We keep information as long as needed to provide the service, comply with legal obligations, resolve disputes, maintain security, and operate billing records. Users may request access, correction, export, or deletion where applicable by contacting us.",
+        body: "We keep information as long as needed to provide the service, comply with legal obligations, resolve disputes, maintain security, and operate billing records. Users may request access, correction, export, or deletion where applicable by contacting us. Disconnecting a platform deletes the stored authorization for that platform.",
       },
       {
         title: "Contact",
@@ -102,6 +134,11 @@ export const legalPolicies: LegalPolicy[] = [
       {
         title: "Connected platforms",
         body: "When users connect Meta, Google Ads, Instagram, Facebook, or other third-party platforms, co-Suite acts according to permissions granted by the user. Platform APIs, availability, review requirements, rate limits, and permissions may change. co-Suite is not responsible for third-party outages, rejected ads, suspended accounts, or policy enforcement by external platforms.",
+      },
+      {
+        title: "YouTube API Services",
+        body: "Features that publish to YouTube are built on YouTube API Services. By using them, the user agrees to the YouTube Terms of Service and acknowledges that the Google Privacy Policy applies to data handled by Google. co-Suite does not control YouTube's daily API quota, content review, age or made-for-kids classification, monetization decisions, or channel enforcement, and is not responsible for videos that YouTube restricts, rejects, or removes.",
+        links: GOOGLE_LINKS,
       },
       {
         title: "Refunds and cancellations",
