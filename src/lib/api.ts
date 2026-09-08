@@ -1998,7 +1998,7 @@ export interface Brand {
   };
   audience_interests?: string[];
   delivery?: {
-    mode: "onsite" | "areas" | "nationwide" | "international";
+    mode: "onsite" | "areas" | "nationwide" | "international" | "digital";
     areas: string[];
     worldwide: boolean;
   };

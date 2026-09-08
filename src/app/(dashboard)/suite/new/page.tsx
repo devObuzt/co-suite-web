@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Loader2, Plus, X, CheckCircle2, ChevronRight, ChevronLeft,
   AtSign, AlertCircle, Building2, Info, MapPin, Users, Sparkles,
-  Store, Truck, Globe,
+  Store, Truck, Globe, Monitor,
 } from "lucide-react";
 
 type Step = "name" | "links" | "extracting"
@@ -22,7 +22,7 @@ type Step = "name" | "links" | "extracting"
 
 // How the business reaches its customers. Drives where we advertise and whether
 // the plan pushes "we deliver" or "visit us" messaging.
-type DeliveryMode = "onsite" | "areas" | "nationwide" | "international";
+type DeliveryMode = "onsite" | "areas" | "nationwide" | "international" | "digital";
 
 // ── Platform helpers ──────────────────────────────────────────────────────────
 
@@ -591,7 +591,7 @@ export default function NewSuitePage() {
     setDeliveryMode(mode);
     // Nationwide carries no list; drop anything typed for a previous mode so we
     // never persist areas that contradict the chosen reach.
-    if (mode === "nationwide") {
+    if (mode === "nationwide" || mode === "digital") {
       setDeliveryAreas([]);
       setDeliveryWorldwide(false);
     }
@@ -603,7 +603,7 @@ export default function NewSuitePage() {
       await saveStep("delivery", {
         delivery: {
           mode: deliveryMode,
-          areas: deliveryMode === "nationwide" ? [] : deliveryAreas,
+          areas: deliveryMode === "nationwide" || deliveryMode === "digital" ? [] : deliveryAreas,
           worldwide: deliveryMode === "international" ? deliveryWorldwide : false,
         },
       });
@@ -1790,6 +1790,15 @@ export default function NewSuitePage() {
                   title={t("suite.new.deliveryInternational")}
                   description={t("suite.new.deliveryInternationalDesc")}
                   onClick={() => pickDeliveryMode("international")}
+                />
+                {/* Last, and deliberately outside the geographic ladder above:
+                    a website or app has no delivery reach to state at all. */}
+                <TargetAreaCard
+                  selected={deliveryMode === "digital"}
+                  icon={<Monitor size={18} />}
+                  title={t("suite.new.deliveryDigital")}
+                  description={t("suite.new.deliveryDigitalDesc")}
+                  onClick={() => pickDeliveryMode("digital")}
                 />
               </div>
 
