@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { Moon, Sun } from "lucide-react";
 import { LANGUAGES, LangCode } from "@/lib/i18n/translations";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { langFromSearch } from "@/lib/i18n/urlLang";
 import { ThemeMode, useTheme } from "@/lib/accessibility/AccessibilityContext";
 import { BrandMark } from "@/components/BrandMark";
 
@@ -72,6 +73,15 @@ export function FirstTimeLanguagePicker() {
 
   useEffect(() => {
     if (pathname === "/" || step !== null) return;
+    // جاي برابط فيه `?lang=` (واتساب): اللغة محسومة، والمظهر الافتراضي بيتثبّت
+    // متل ما لو كبس «انطلق» بلا تغيير. بلا هيك شاشة المظهر بتطلعله بنص القمع،
+    // أول ما ينتقل لصفحة التسجيل — رابطها ما فيه `?lang=`.
+    // (هاد الـeffect بيرن قبل تبع LanguageProvider — الأولاد قبل الأهل — فما
+    // منقدر نعتمد على `co_suite_lang_set`، منقرا الرابط هون كمان.)
+    if (langFromSearch(window.location.search, LANGUAGES.map((l) => l.code))) {
+      setTheme(theme);
+      return;
+    }
     const langSet = localStorage.getItem("co_suite_lang_set");
     const themeSet =
       localStorage.getItem("oneshare_a11y_prefs") || localStorage.getItem("co_suite_theme");

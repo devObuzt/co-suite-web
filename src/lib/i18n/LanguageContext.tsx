@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { T, LANGUAGES, LangCode } from "./translations";
+import { langFromSearch } from "./urlLang";
 import { api } from "@/lib/api";
 
 interface LanguageCtx {
@@ -22,7 +23,11 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [overrides, setOverrides] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const saved = (localStorage.getItem("co_suite_lang") || "en") as LangCode;
+    // `?lang=ar` بالرابط بيغلب الذاكرة — رابط الواتساب لازم يفتح بلغة الزبون
+    // من أول ثانية، بلا ما يمرق على شاشة اختيار اللغة.
+    const fromUrl = langFromSearch(window.location.search, LANGUAGES.map((l) => l.code));
+    if (fromUrl) localStorage.setItem("co_suite_lang_set", "1");
+    const saved = (fromUrl || localStorage.getItem("co_suite_lang") || "en") as LangCode;
     applyLang(saved);
   }, []);
 
