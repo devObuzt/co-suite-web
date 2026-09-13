@@ -250,29 +250,22 @@ async function buildLocalLogoPreview(file: File): Promise<BrandLogo> {
 
 // ── Step indicator ────────────────────────────────────────────────────────────
 
+/**
+ * One progress system, not two. The old indicator stacked numbered circles
+ * (1..11) on top of the funnel's own 1..5 chips — two competing countdowns
+ * that both started at "1". This shows the current step name and a hairline,
+ * so the funnel chips stay the only numbered map.
+ */
 function StepIndicator({ current, steps }: { current: Step; steps: { key: Step; label: string }[] }) {
   const idx = steps.findIndex((s) => s.key === current);
-  const visible = steps
-    .map((s, i) => ({ ...s, index: i }))
-    .filter((s) => Math.abs(s.index - idx) <= 1 || s.index === 0 || s.index === steps.length - 1);
+  if (idx < 0) return null;
   return (
-    <div className="mb-8 rounded-2xl border border-border bg-card/70 p-3 shadow-sm">
-      <div className="flex items-center justify-between gap-2 overflow-hidden">
-        {visible.map((s, visibleIdx) => (
-          <div key={s.key} className="flex min-w-0 flex-1 items-center gap-2">
-            {visibleIdx > 0 && visible[visibleIdx - 1].index !== s.index - 1 && (
-              <span className="text-muted-foreground">...</span>
-            )}
-            <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold transition-colors ${
-              s.index < idx ? "bg-emerald-500 text-white" : s.index === idx ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
-            }`}>
-              {s.index < idx ? "✓" : s.index + 1}
-            </div>
-            <span className={`truncate text-xs ${s.index === idx ? "text-foreground font-medium" : "text-muted-foreground"}`}>{s.label}</span>
-          </div>
-        ))}
+    <div className="mb-6">
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <span className="truncate text-sm font-semibold text-foreground" dir="auto">{steps[idx].label}</span>
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{idx + 1}/{steps.length}</span>
       </div>
-      <div className="mt-3 h-1 rounded-full bg-muted">
+      <div className="h-1 rounded-full bg-muted">
         <div
           className="h-full rounded-full bg-gradient-to-r from-[#f8d84a] via-[#ff4fa3] to-[#2f80ff] transition-all"
           style={{ width: `${((idx + 1) / steps.length) * 100}%` }}
@@ -429,6 +422,8 @@ export default function NewSuitePage() {
   ];
 
   const [step, setStep] = useState<Step>("name");
+  // The entry screen is treated as its own layout: centered, chrome-free.
+  const isNameStep = step === "name";
   const [suiteName, setSuiteName] = useState("");
   const [suiteId, setSuiteId] = useState("");
   const [links, setLinks] = useState<{ platform: string; url: string }[]>([
@@ -783,6 +778,14 @@ export default function NewSuitePage() {
     setLinks((l) => l.map((item, idx) => idx === i ? { ...item, platform } : item));
   }
 
+  // A hurried user with no links still gets a suite: skip straight to the
+  // manual steps with the name they already typed, no extraction.
+  function handleSkipLinks() {
+    setError("");
+    setBizName(businessName || suiteName);
+    setStep("step-a");
+  }
+
   async function handleExtract(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -1060,8 +1063,23 @@ export default function NewSuitePage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div ref={topRef} className="mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-4xl items-start justify-center px-4 py-8" dir={dir}>
-      <div className="w-full max-w-3xl">
+    <div
+      ref={topRef}
+      className={`mx-auto flex w-full max-w-4xl justify-center px-4 ${
+        isNameStep
+          // Mobile sits the question near the top so the field is reachable
+          // without scrolling; desktop centres it in the viewport.
+          // Mobile stretches the column so the field and button can sit low,
+          // inside the one-handed thumb arc; desktop centres the block.
+          ? "min-h-[calc(100dvh-11rem)] items-stretch pt-6 pb-0 sm:items-center sm:pt-8 sm:pb-8"
+          : `min-h-[calc(100dvh-4rem)] items-start pt-8 ${isFunnelUser ? "pb-32" : "pb-8"}`
+      }`}
+      dir={dir}
+    >
+      <div className={`w-full ${isNameStep ? "flex max-w-xl flex-col" : "max-w-3xl"}`}>
+      {/* The first screen carries no chrome: the hurried user gets one question,
+          one field, one button. Everything below returns from step 2 onward. */}
+      {!isNameStep && (
       <div className="mb-6 rounded-3xl border border-border bg-card/70 p-5 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1079,8 +1097,9 @@ export default function NewSuitePage() {
           </div>
         </div>
       </div>
+      )}
 
-      <StepIndicator current={step} steps={STEPS} />
+      {!isNameStep && <StepIndicator current={step} steps={STEPS} />}
       {canGoBack && (
         <button
           type="button"
@@ -1093,34 +1112,49 @@ export default function NewSuitePage() {
 
       {/* ── Step 1: Name ── */}
       {step === "name" && (
-        <div className="space-y-4">
-          <Card className="border-border bg-card text-card-foreground shadow-sm">
-            <CardHeader>
-              <CardTitle>{t("suite.new.nameQuestion")}</CardTitle>
-              <CardDescription className="text-muted-foreground">{t("suite.new.nameHint")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCreateSuite} className="space-y-4">
-                <div className="space-y-2">
-                  <Label>{t("suite.new.nameLabel")}</Label>
-                  <Input
-                    value={suiteName}
-                    onChange={(e) => setSuiteName(e.target.value)}
-                    placeholder={t("suite.new.namePlaceholder")}
-                    required
-                    className="bg-background text-lg font-semibold"
-                    dir="auto"
-                  />
-                </div>
-                {error && <p className="text-destructive text-sm">{error}</p>}
-                <StepActions sticky={isFunnelUser}>
-                  <Button type="submit" className="bg-foreground text-background hover:bg-foreground/90 gap-2 w-full sm:w-auto">
-                    {t("suite.new.continue")} <ForwardIcon size={16} />
-                  </Button>
-                </StepActions>
-              </form>
-            </CardContent>
-          </Card>
+        <div className="flex flex-1 flex-col">
+          {/* One question, one field, one button. The question sits at the top
+              where it reads; the field and button drop into the lower third,
+              which is where a thumb actually rests when the phone is held in
+              one hand. Reaching the top of a 6" screen means regripping. */}
+          <div className="mt-auto">
+            <div className="mb-5 flex gap-1">
+              <span className="h-1.5 w-8 rounded-full bg-[#f8d84a]" />
+              <span className="h-1.5 w-8 rounded-full bg-[#ff4fa3]" />
+              <span className="h-1.5 w-8 rounded-full bg-[#2f80ff]" />
+            </div>
+            <h1 className="text-3xl font-black leading-tight tracking-normal text-foreground sm:text-4xl" dir="auto">
+              {t("suite.new.nameQuestionShort")}
+            </h1>
+            <p className="mt-3 text-base leading-relaxed text-muted-foreground" dir="auto">
+              {t("suite.new.nameSubShort")}
+            </p>
+          </div>
+
+          <form onSubmit={handleCreateSuite} className="space-y-3 pt-9 pb-[13vh] sm:pt-10 sm:pb-0">
+            <Input
+              value={suiteName}
+              onChange={(e) => setSuiteName(e.target.value)}
+              placeholder={t("suite.new.namePlaceholder")}
+              required
+              autoFocus
+              enterKeyHint="go"
+              autoComplete="organization"
+              className="h-14 bg-background px-4 text-lg font-semibold md:text-lg"
+              dir="auto"
+            />
+            {error && <p className="text-destructive text-sm" dir="auto">{error}</p>}
+            <Button
+              type="submit"
+              disabled={!suiteName.trim()}
+              className="h-13 w-full gap-2 bg-foreground text-base font-bold text-background hover:bg-foreground/90 disabled:opacity-40"
+            >
+              {t("suite.new.continue")} <ForwardIcon size={18} />
+            </Button>
+            <p className="text-center text-xs text-muted-foreground" dir="auto">
+              {t("suite.new.nameReassure")}
+            </p>
+          </form>
 
           {!isFunnelUser && (
           <button
@@ -1228,9 +1262,17 @@ export default function NewSuitePage() {
           )}
 
           <StepActions sticky={isFunnelUser}>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" className="bg-foreground text-background hover:bg-foreground/90 gap-2 flex-1 sm:flex-none">
               <AtSign size={15} /> {t("suite.new.researchBtn")}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleSkipLinks}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              {t("suite.new.linksSkip")}
             </Button>
             <Button
               type="button"
@@ -2444,16 +2486,19 @@ export default function NewSuitePage() {
   );
 }
 
-/** Funnel steps keep their confirm button fixed to the bottom of the screen. */
+/**
+ * Funnel steps keep their confirm button fixed to the bottom of the screen.
+ * The spacer that used to sit here rendered *inside* the surrounding Card,
+ * punching a visible empty box under the field; the page container carries
+ * the bottom padding instead. The safe-area inset keeps the button clear of
+ * the iOS home indicator and keyboard accessory bar.
+ */
 function StepActions({ sticky, children }: { sticky: boolean; children: React.ReactNode }) {
   if (!sticky) return <>{children}</>;
   return (
-    <>
-      <div className="h-20" aria-hidden />
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto max-w-3xl">{children}</div>
-      </div>
-    </>
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="mx-auto max-w-3xl">{children}</div>
+    </div>
   );
 }
 

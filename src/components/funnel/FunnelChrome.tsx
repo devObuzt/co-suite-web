@@ -64,8 +64,11 @@ export function FunnelChrome({ children }: { children: React.ReactNode }) {
               </li>
             ))}
           </ol>
-          {idx < STEP_KEYS.length - 1 && (
-            <Button size="sm" disabled={nextDisabled} onClick={() => router.push(hrefs[nextKey])}>
+          {/* A greyed-out "Next" is the first button-shaped thing the eye finds
+              on the first screen, and it does nothing — the real action lives
+              in the step itself. Render it only once it actually works. */}
+          {idx < STEP_KEYS.length - 1 && !nextDisabled && (
+            <Button size="sm" onClick={() => router.push(hrefs[nextKey])}>
               {t("funnel.next")}
             </Button>
           )}

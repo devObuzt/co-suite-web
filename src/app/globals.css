@@ -255,6 +255,20 @@
   }
 }
 
+/* An empty input with dir="auto" has no strong character to read, so the
+   browser falls back to LTR and parks the placeholder on the left even in
+   Arabic and Hebrew. While the placeholder is showing the field is empty by
+   definition, so follow the page direction; the moment the user types,
+   :placeholder-shown stops matching and dir="auto" takes over again — an
+   Arabic name stays RTL, a Latin one flips to LTR. Fields that declare their
+   own dir are left alone — the phone and OTP boxes on the register page are
+   deliberately LTR and must stay that way even while empty. */
+[dir="rtl"] input:placeholder-shown:not([dir="ltr"]):not([dir="rtl"]),
+[dir="rtl"] textarea:placeholder-shown:not([dir="ltr"]):not([dir="rtl"]) {
+  direction: rtl;
+  text-align: right;
+}
+
 /* RTL language font support */
 :root[lang="ar"],
 :root[lang="he"] {
