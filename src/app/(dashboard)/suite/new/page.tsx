@@ -1069,12 +1069,14 @@ export default function NewSuitePage() {
         isNameStep
           // Mobile sits the question near the top so the field is reachable
           // without scrolling; desktop centres it in the viewport.
-          ? "min-h-[60dvh] items-start pt-[7vh] pb-10 sm:min-h-[calc(100dvh-8rem)] sm:items-center sm:pt-8"
+          // Mobile stretches the column so the field and button can sit low,
+          // inside the one-handed thumb arc; desktop centres the block.
+          ? "min-h-[calc(100dvh-11rem)] items-stretch pt-6 pb-0 sm:items-center sm:pt-8 sm:pb-8"
           : `min-h-[calc(100dvh-4rem)] items-start pt-8 ${isFunnelUser ? "pb-32" : "pb-8"}`
       }`}
       dir={dir}
     >
-      <div className={`w-full ${isNameStep ? "max-w-xl" : "max-w-3xl"}`}>
+      <div className={`w-full ${isNameStep ? "flex max-w-xl flex-col" : "max-w-3xl"}`}>
       {/* The first screen carries no chrome: the hurried user gets one question,
           one field, one button. Everything below returns from step 2 onward. */}
       {!isNameStep && (
@@ -1110,12 +1112,12 @@ export default function NewSuitePage() {
 
       {/* ── Step 1: Name ── */}
       {step === "name" && (
-        <div className="space-y-8">
-          {/* One question, one field, one button — all above the fold on a
-              375x667 viewport. No card, no step map, no info pill: those used
-              to push the only interactive element past the middle of the
-              screen on mobile. */}
-          <div>
+        <div className="flex flex-1 flex-col">
+          {/* One question, one field, one button. The question sits at the top
+              where it reads; the field and button drop into the lower third,
+              which is where a thumb actually rests when the phone is held in
+              one hand. Reaching the top of a 6" screen means regripping. */}
+          <div className="mt-auto">
             <div className="mb-5 flex gap-1">
               <span className="h-1.5 w-8 rounded-full bg-[#f8d84a]" />
               <span className="h-1.5 w-8 rounded-full bg-[#ff4fa3]" />
@@ -1129,7 +1131,7 @@ export default function NewSuitePage() {
             </p>
           </div>
 
-          <form onSubmit={handleCreateSuite} className="space-y-3">
+          <form onSubmit={handleCreateSuite} className="space-y-3 pt-9 pb-[13vh] sm:pt-10 sm:pb-0">
             <Input
               value={suiteName}
               onChange={(e) => setSuiteName(e.target.value)}
