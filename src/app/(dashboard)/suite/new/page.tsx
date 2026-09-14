@@ -1065,7 +1065,7 @@ export default function NewSuitePage() {
   return (
     <div
       ref={topRef}
-      className={`mx-auto flex w-full max-w-4xl justify-center px-4 ${
+      className={`mx-auto flex w-full max-w-4xl scroll-mt-24 justify-center px-4 ${
         isNameStep
           // Mobile sits the question near the top so the field is reachable
           // without scrolling; desktop centres it in the viewport.
@@ -1079,23 +1079,19 @@ export default function NewSuitePage() {
       <div className={`w-full ${isNameStep ? "flex max-w-xl flex-col" : "max-w-3xl"}`}>
       {/* The first screen carries no chrome: the hurried user gets one question,
           one field, one button. Everything below returns from step 2 onward. */}
+      {/* This block repeated on all ten steps after the first: a title, a
+          subtitle and an info pill that all said the same thing, roughly
+          200px of chrome pushing the actual controls down every single time.
+          One compact line keeps the identity; the step name lives in the
+          indicator right below it. */}
       {!isNameStep && (
-      <div className="mb-6 rounded-3xl border border-border bg-card/70 p-5 shadow-sm">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="mb-3 flex gap-1">
-              <span className="h-1.5 w-8 rounded-full bg-[#f8d84a]" />
-              <span className="h-1.5 w-8 rounded-full bg-[#ff4fa3]" />
-              <span className="h-1.5 w-8 rounded-full bg-[#2f80ff]" />
-            </div>
-            <h1 className="text-2xl font-black tracking-normal text-foreground">{t("suite.new.title")}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{t("suite.new.subtitle")}</p>
-          </div>
-          <div className="flex items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-            <Info size={14} className="text-[#2f80ff]" />
-            <span>{t("suite.new.info")}</span>
-          </div>
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex shrink-0 gap-1">
+          <span className="h-1.5 w-5 rounded-full bg-[#f8d84a]" />
+          <span className="h-1.5 w-5 rounded-full bg-[#ff4fa3]" />
+          <span className="h-1.5 w-5 rounded-full bg-[#2f80ff]" />
         </div>
+        <h1 className="truncate text-base font-bold text-foreground" dir="auto">{t("suite.new.title")}</h1>
       </div>
       )}
 
@@ -1176,84 +1172,87 @@ export default function NewSuitePage() {
 
       {/* ── Step 2: Links ── */}
       {step === "links" && (
-        <form onSubmit={handleExtract} className="space-y-4">
-          <Card className="border-border bg-card text-card-foreground shadow-sm">
-            <CardHeader>
-              <CardTitle>{t("suite.new.addLinks")}</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                {t("suite.new.addLinksDesc")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {/* Business name override */}
-              <div className="space-y-1.5 rounded-2xl border border-border bg-background/60 p-4">
-                <Label className="text-muted-foreground text-xs">{t("suite.new.businessOverride")}</Label>
-                <Input
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  placeholder={suiteName}
-                  className="bg-background text-sm"
-                  dir="auto"
-                />
-              </div>
+        <form onSubmit={handleExtract} className="space-y-5">
+          {/* Same treatment as the name step: the question reads as a question,
+              the fields are the only things on screen, and the decoration is
+              gone. The platform badge row duplicated the dropdown options and
+              the card chrome added two borders around every field. */}
+          <div>
+            <h2 className="text-2xl font-black leading-tight text-foreground sm:text-3xl" dir="auto">
+              {t("suite.new.addLinks")}
+            </h2>
+            <p className="mt-2 text-base leading-relaxed text-muted-foreground" dir="auto">
+              {t("suite.new.addLinksDesc")}
+            </p>
+          </div>
 
-              {/* Link rows */}
-              <div className="space-y-2 rounded-2xl border border-border bg-background/60 p-4">
-                {links.map((link, i) => (
-                  <div key={i} className="flex gap-2 items-start">
-                    {/* Platform selector */}
-                    <select
-                      value={link.platform}
-                      onChange={(e) => setLinkPlatform(i, e.target.value)}
-                      className="bg-background border border-border text-foreground text-xs rounded-md px-2 py-2 h-9 shrink-0 focus:outline-none focus:ring-1 focus:ring-[#2f80ff]"
+          {/* Link rows. Each row stacks its picker above the URL on a phone so
+              both get a full-width, thumb-sized target instead of splitting
+              375px between a cramped select and a cramped input. */}
+          <div className="space-y-3">
+            {links.map((link, i) => (
+              <div key={i} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <select
+                  value={link.platform}
+                  onChange={(e) => setLinkPlatform(i, e.target.value)}
+                  className="h-11 shrink-0 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-36"
+                >
+                  {PLATFORMS.map((p) => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </select>
+
+                <div className="flex flex-1 items-center gap-2">
+                  {/* dir="auto" (not a forced rtl) so the Arabic placeholder
+                      sits right while empty, then a typed https://… renders
+                      left-to-right the way a URL has to. */}
+                  <Input
+                    value={link.url}
+                    onChange={(e) => setLinkUrl(i, e.target.value)}
+                    placeholder={platformPlaceholder(link.platform, lang)}
+                    className="h-11 flex-1 bg-background text-base md:text-sm"
+                    inputMode="url"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    dir="auto"
+                  />
+                  {links.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeLink(i)}
+                      aria-label={t("suite.new.removeLink")}
+                      className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:text-destructive"
                     >
-                      {PLATFORMS.map((p) => (
-                        <option key={p.id} value={p.id}>{p.label}</option>
-                      ))}
-                    </select>
-
-                    {/* URL input */}
-                    <Input
-                      value={link.url}
-                      onChange={(e) => setLinkUrl(i, e.target.value)}
-                      placeholder={platformPlaceholder(link.platform, lang)}
-                      className="bg-background text-sm flex-1"
-                      dir={isRtl ? "rtl" : "ltr"}
-                    />
-
-                    {/* Remove button */}
-                    {links.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeLink(i)}
-                        className="text-muted-foreground hover:text-destructive transition-colors mt-2"
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                ))}
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
               </div>
+            ))}
 
-              {/* Add link button */}
-              <button
-                type="button"
-                onClick={addLink}
-                className="flex items-center gap-1.5 text-[#2f80ff] hover:underline text-xs transition-colors"
-              >
-                <Plus size={13} /> {t("suite.new.addAnotherLink")}
-              </button>
+            <button
+              type="button"
+              onClick={addLink}
+              className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-[#2f80ff] transition-colors hover:underline"
+            >
+              <Plus size={15} /> {t("suite.new.addAnotherLink")}
+            </button>
+          </div>
 
-              {/* Platform badges hint */}
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {["Website", "Instagram", "Facebook", "TikTok", "LinkedIn"].map((p) => (
-                  <span key={p} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full border border-border">
-                    {p}
-                  </span>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Secondary: the name was already given on step 1, so this only
+              matters when the trading name differs. It sits after the links
+              rather than ahead of them. */}
+          <div className="space-y-1.5 border-t border-border pt-4">
+            <Label className="text-xs text-muted-foreground" dir="auto">{t("suite.new.businessOverride")}</Label>
+            <Input
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+              placeholder={suiteName}
+              className="h-11 bg-background text-base md:text-sm"
+              dir="auto"
+            />
+          </div>
 
           {error && (
             <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-2.5">
@@ -1261,26 +1260,23 @@ export default function NewSuitePage() {
             </div>
           )}
 
+          {/* One primary action and one way out. The third button here was a
+              second "back" — the step already renders one above the form — and
+              three buttons wrapped the sticky bar onto two rows. */}
           <StepActions sticky={isFunnelUser}>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" className="bg-foreground text-background hover:bg-foreground/90 gap-2 flex-1 sm:flex-none">
-              <AtSign size={15} /> {t("suite.new.researchBtn")}
+          {/* Side by side, the long Arabic label on the primary pushed the
+              skip button clean off a 375px screen. Stack on phones. */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <Button type="submit" className="h-12 w-full gap-2 bg-foreground text-base font-bold text-background hover:bg-foreground/90 sm:flex-1">
+              <AtSign size={16} /> {t("suite.new.researchBtn")}
             </Button>
             <Button
               type="button"
               variant="ghost"
               onClick={handleSkipLinks}
-              className="text-muted-foreground hover:text-foreground"
+              className="h-10 w-full text-sm text-muted-foreground hover:text-foreground sm:h-12 sm:w-auto sm:shrink-0"
             >
               {t("suite.new.linksSkip")}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setStep("name")}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <BackIcon size={15} /> {t("suite.new.back")}
             </Button>
           </div>
           </StepActions>
