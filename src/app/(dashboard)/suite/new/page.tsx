@@ -1072,7 +1072,12 @@ export default function NewSuitePage() {
           // Mobile stretches the column so the field and button can sit low,
           // inside the one-handed thumb arc; desktop centres the block.
           ? "min-h-[calc(100dvh-11rem)] items-stretch pt-6 pb-0 sm:items-center sm:pt-8 sm:pb-8"
-          : `min-h-[calc(100dvh-4rem)] items-start pt-8 ${isFunnelUser ? "pb-32" : "pb-8"}`
+          // The sticky bar's own height is 108px + max(12px, safe-area-inset),
+          // so a flat pb-32 left the last field behind it on phones with a
+          // home indicator. Reserve the inset here as well.
+          : `min-h-[calc(100dvh-4rem)] items-start pt-8 ${
+              isFunnelUser ? "pb-[calc(9rem+env(safe-area-inset-bottom))]" : "pb-8"
+            }`
       }`}
       dir={dir}
     >
@@ -1156,7 +1161,7 @@ export default function NewSuitePage() {
           <button
             type="button"
             onClick={() => router.push("/create")}
-            className="group flex w-full items-center justify-between gap-4 rounded-2xl border border-dashed border-[#2f80ff]/50 bg-[#2f80ff]/5 p-5 text-start transition hover:border-[#2f80ff] hover:bg-[#2f80ff]/10"
+            className="group mt-8 flex w-full items-center justify-between gap-4 rounded-2xl border border-dashed border-[#2f80ff]/50 bg-[#2f80ff]/5 p-5 text-start transition hover:border-[#2f80ff] hover:bg-[#2f80ff]/10"
           >
             <div className="min-w-0">
               <p className="text-base font-bold text-foreground" dir="auto">{quickCreateCopy.title}</p>
