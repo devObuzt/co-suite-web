@@ -78,6 +78,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
+    // كوكي المنظومة بيسافر مع الطلب: هو الهوية الجديدة. التوكن القديم بيضل
+    // شغّال جنبه طول الفترة الانتقالية.
+    credentials: "include",
     headers: buildHeaders(options, token),
   });
 
@@ -103,6 +106,7 @@ async function downloadFile(path: string, options: RequestInit = {}): Promise<{ 
   const token = getToken();
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
+    credentials: "include",
     headers: buildHeaders({ ...options, headers: { ...(options.headers || {}), Accept: "application/pdf" } }, token),
   });
 
@@ -179,6 +183,12 @@ export const api = {
     create: (data: { name: string; website_url?: string }) =>
       request<Suite>("/suites/", { method: "POST", body: JSON.stringify(data) }),
     get: (id: string) => request<Suite>(`/suites/${id}`),
+    /** بيربط السوت الوحيد غير المربوط ببزنس بالمنظومة. مرة وحدة وبتأكيد صريح. */
+    linkOrganization: (organizationId: string) =>
+      request<{ ok: boolean; suite_id: string }>("/suites/link-organization", {
+        method: "POST",
+        body: JSON.stringify({ organization_id: organizationId }),
+      }),
     remove: (suiteId: string) =>
       request<{ ok: boolean; deleted_suite_id: string }>(`/suites/${suiteId}`, { method: "DELETE" }),
     updateBrand: (suiteId: string, brand: Brand) =>
