@@ -13,6 +13,7 @@ import { SuiteNav } from "@/components/suite/SuiteNav";
 import { api, Suite } from "@/lib/api";
 import { FrozenScreen } from "@/components/FrozenScreen";
 import { FunnelChrome } from "@/components/funnel/FunnelChrome";
+import { manzumaSession } from "@/lib/manzumaSession";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, _hasHydrated, setUser } = useAuthStore();
@@ -20,6 +21,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const t = useT();
   const [mobileSuiteOpen, setMobileSuiteOpen] = useState(false);
+  // No local token no longer means "not signed in": the shared Manzuma cookie
+  // may be the identity, and finding that out takes a round trip.
+  const [checkingManzuma, setCheckingManzuma] = useState(false);
   const [suites, setSuites] = useState<Suite[]>([]);
   const suiteMatch = pathname.match(/^\/suite\/([^/]+)/);
   const activeSuiteId = suiteMatch?.[1] && suiteMatch[1] !== "new" ? suiteMatch[1] : null;
@@ -31,9 +35,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const mobileSuitesNavIcon = hasSuites ? <Layers size={17} /> : <Plus size={17} />;
 
   useEffect(() => {
-    // Wait for Zustand to finish reading localStorage before redirecting
-    if (_hasHydrated && !user) router.push("/login");
-  }, [_hasHydrated, user, router]);
+    // Wait for Zustand to finish reading localStorage before deciding.
+    if (!_hasHydrated || user) return;
+
+    let cancelled = false;
+    setCheckingManzuma(true);
+    (async () => {
+      const session = await manzumaSession();
+      if (cancelled) return;
+      if (!session) {
+        setCheckingManzuma(false);
+        router.push("/login");
+        return;
+      }
+      try {
+        // The API reads the same cookie, so this both proves the session and
+        // gives us the local account it resolves to.
+        const me = await api.auth.me();
+        if (!cancelled) setUser(me);
+      } catch {
+        if (!cancelled) router.push("/login");
+      } finally {
+        if (!cancelled) setCheckingManzuma(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [_hasHydrated, user, router, setUser]);
 
   useEffect(() => {
     if (!_hasHydrated || !user) return;
@@ -41,8 +71,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     api.suites.list().then(setSuites).catch(() => setSuites([]));
   }, [_hasHydrated, user?.id, setUser]);
 
-  // Show spinner while auth state is loading from localStorage
-  if (!_hasHydrated) {
+  // Show spinner while auth state is loading from localStorage, and while we
+  // are asking accounts whether this browser already carries an identity.
+  if (!_hasHydrated || checkingManzuma) {
     return (
       <div className="min-h-dvh bg-background flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-border border-t-indigo-500 rounded-full animate-spin" />
