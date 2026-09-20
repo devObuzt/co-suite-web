@@ -6,6 +6,7 @@ import {
   type MarketingPlanResponse,
   type SocialIdea,
   type SocialIdeaObjective,
+  type SocialIdeasPlan,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +68,26 @@ function monthOptions(current: string): Array<{ value: string; label: string }> 
 
 function assetLabel(type: string): string {
   return ASSET_LABELS[type] ?? type;
+}
+
+/**
+ * Worker phases, in the order they run. Measured on production: occasions is
+ * about 14s on a cache miss and the ideas call about 42s, so those two are
+ * most of what the user waits through and each gets its own line.
+ */
+function stageLabel(stage: SocialIdeasPlan["stage"], period?: string): string {
+  switch (stage) {
+    case "occasions":
+      return `عم نفحص مناسبات ${period || "الشهر"}…`;
+    case "market":
+      return "عم نقرأ أبحاث السوق والمنافسين…";
+    case "ideas":
+      return "عم نولّد الأفكار — هاي أطول خطوة…";
+    case "shaping":
+      return "عم نرتّب الأفكار ونجهّزها…";
+    default:
+      return `عم نجهّز أفكار ${period || "الشهر"}…`;
+  }
 }
 
 export function SocialIdeasGallery({
@@ -212,13 +233,23 @@ export function SocialIdeasGallery({
           </div>
           {generating ? (
             <div className="mt-4 space-y-3">
-              <div className="flex items-center gap-3 rounded-xl border border-border bg-background/60 p-4">
-                <Loader2 className="size-5 shrink-0 animate-spin text-primary" />
-                <div>
-                  <p className="text-sm font-semibold">عم نولّد أفكار {plan?.period} بالخلفية…</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    التوليد شغال عالسيرفر — فيك تتنقل أو تسكّر التطبيق وترجع، ما رح يقف.
-                  </p>
+              <div className="rounded-xl border border-border bg-background/60 p-4">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="size-5 shrink-0 animate-spin text-primary" />
+                  <div className="min-w-0">
+                    {/* The wait is ~56s. A single frozen sentence for all of it
+                        reads as a hang, so name the phase the worker reports. */}
+                    <p className="text-sm font-semibold" dir="auto">{stageLabel(plan?.stage, plan?.period)}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      التوليد شغال عالسيرفر — فيك تتنقل أو تسكّر التطبيق وترجع، ما رح يقف.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 h-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-700"
+                    style={{ width: `${Math.min(95, Math.max(5, plan?.progress ?? 5))}%` }}
+                  />
                 </div>
               </div>
               {stalled && (
