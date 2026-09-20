@@ -43,6 +43,27 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
   }, [id]);
 
   const paidPlan = response?.action_plan?.paid_content_plan;
+  const paidGenerating = paidPlan?.status === "generating";
+
+  // Resumes on any later visit: the flag lives on the server blob, not in
+  // component state, so reopening the page picks a running job back up.
+  useEffect(() => {
+    if (!paidGenerating) return;
+    const timer = window.setInterval(() => {
+      api.marketingPlans
+        .get(id)
+        .then((res) => {
+          setResponse(res);
+          const next = res.action_plan?.paid_content_plan;
+          if (next?.status === "ready") {
+            setSelectedPaidIds(next.selected_ids || []);
+            setNotice("تم توليد مرشحين لخطة التسويق الممول. اختر فكرة من كل مرحلة واحفظ.");
+          }
+        })
+        .catch(() => undefined);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [paidGenerating, id]);
   const selectedPaidSet = useMemo(() => new Set(selectedPaidIds), [selectedPaidIds]);
   const selectedPaidByStage = useMemo(() => {
     const map: Record<string, number> = {};
@@ -52,6 +73,9 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
     return map;
   }, [paidPlan, selectedPaidSet]);
 
+  // Generation is a durable server job now: this returns as soon as it is
+  // queued, so the result arrives through the poller below rather than from
+  // this call. Closing the tab no longer throws the run away.
   async function generatePaidPlan() {
     setGenerating("paid");
     setError("");
@@ -59,8 +83,6 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
     try {
       const res = await api.marketingPlans.generatePaidContentPlan(id, { language: lang });
       setResponse(res);
-      setSelectedPaidIds(res.action_plan?.paid_content_plan?.selected_ids || []);
-      setNotice("تم توليد مرشحين لخطة التسويق الممول. اختر فكرة من كل مرحلة واحفظ.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generate failed");
     } finally {
@@ -133,7 +155,7 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
             plan={paidPlan}
             selectedSet={selectedPaidSet}
             selectedByStage={selectedPaidByStage}
-            generating={generating === "paid"}
+            generating={generating === "paid" || paidGenerating}
             saving={saving}
             onGenerate={generatePaidPlan}
             onSave={savePaidSelection}
@@ -223,7 +245,19 @@ function PaidPlanPanel({
           )}
         </div>
       </div>
-      {!hasPlan && (
+      {!hasPlan && generating && (
+        <div className="mt-6 flex items-center gap-3 rounded-2xl border border-border bg-card/70 p-4">
+          <Loader2 className="size-5 shrink-0 animate-spin text-primary" />
+          <div>
+            <p className="text-sm font-semibold">عم نسأل مزوّدَين ونجمع الأفكار…</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              التوليد شغال عالسيرفر — فيك تتنقل أو تسكّر التطبيق وترجع، ما رح يقف.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!hasPlan && !generating && (
         <div className="mt-6 rounded-2xl border border-dashed border-border bg-card/70 p-6 text-center text-sm text-muted-foreground">
           لا توجد خطة للتسويق الممول بعد. اضغط توليد الخطة لاقتراح أفكار لكل مرحلة.
         </div>
