@@ -1117,6 +1117,9 @@ export interface SocialIdeasPlan {
   language?: string;
   period?: string;
   target_count?: number;
+  /** Which phase the worker is in. Machine key — the UI owns the wording. */
+  stage?: "starting" | "occasions" | "market" | "ideas" | "shaping";
+  progress?: number;
   occasions?: Array<{ title: string; date_or_window?: string; type?: string }>;
   candidates?: SocialIdea[];
   selected_ids?: string[];
