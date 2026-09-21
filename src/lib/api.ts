@@ -184,10 +184,10 @@ export const api = {
       request<Suite>("/suites/", { method: "POST", body: JSON.stringify(data) }),
     get: (id: string) => request<Suite>(`/suites/${id}`),
     /** بيربط السوت الوحيد غير المربوط ببزنس بالمنظومة. مرة وحدة وبتأكيد صريح. */
-    linkOrganization: (organizationId: string) =>
+    linkOrganization: (organizationId: string, suiteId: string) =>
       request<{ ok: boolean; suite_id: string }>("/suites/link-organization", {
         method: "POST",
-        body: JSON.stringify({ organization_id: organizationId }),
+        body: JSON.stringify({ organization_id: organizationId, suite_id: suiteId }),
       }),
     remove: (suiteId: string) =>
       request<{ ok: boolean; deleted_suite_id: string }>(`/suites/${suiteId}`, { method: "DELETE" }),
@@ -1740,6 +1740,8 @@ export interface Suite {
   status: "onboarding" | "active" | "suspended";
   brand: Brand | null;
   strategy: MarketingStrategy | null;
+  /** The Manzuma business this suite is, once it has one. */
+  organization_id?: string | null;
 }
 
 export interface StorageStatus {
