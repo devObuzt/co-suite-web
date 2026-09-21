@@ -1,16 +1,15 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { BadgeCheck, CheckCircle2, Image, Layers3, Loader2, Megaphone, PlaySquare, Save, Sparkles } from "lucide-react";
 import { api, ContentRule, MarketingPlanResponse, PaidContentIdea, PaidContentWorkPlan } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SuitePageShell } from "@/components/suite/SuitePageShell";
-import { SocialIdeasGallery } from "@/components/work-plans/SocialIdeasGallery";
+import { SocialIdeasGallery, nextMonth } from "@/components/work-plans/SocialIdeasGallery";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
-
-type Mode = "ideas" | "paid";
+import { useRouter } from "next/navigation";
 
 function paidItemsFor(plan: PaidContentWorkPlan | undefined, stage: string) {
   return plan?.candidates?.[stage] || [];
@@ -23,11 +22,14 @@ function paidRequiredFor(plan: PaidContentWorkPlan | undefined, stage: string) {
 export default function WorkPlansPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { lang, dir } = useLanguage();
-  const [mode, setMode] = useState<Mode>("ideas");
+  const router = useRouter();
+  // Both sections render stacked now. The two tabs read as a choice between
+  // them, so people generated one, pressed Next, and left the other empty.
+  const saveIdeasRef = useRef<(() => Promise<void>) | null>(null);
   const [response, setResponse] = useState<MarketingPlanResponse | null>(null);
   const [selectedPaidIds, setSelectedPaidIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState<Mode | null>(null);
+  const [startingRun, setStartingRun] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -43,7 +45,24 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
   }, [id]);
 
   const paidPlan = response?.action_plan?.paid_content_plan;
+  const ideasPlan = response?.action_plan?.social_ideas_plan;
   const paidGenerating = paidPlan?.status === "generating";
+  const ideasGenerating = ideasPlan?.status === "generating";
+  const anyGenerating = paidGenerating || ideasGenerating || startingRun;
+  // "Started" covers a run in flight as well as finished output, so a reload
+  // mid-run comes back to the progress view rather than the start card.
+  const anyPlanStarted = Boolean(
+    anyGenerating ||
+      ideasPlan?.candidates?.length ||
+      (paidPlan?.candidates && Object.values(paidPlan.candidates).some((g) => g.length > 0)),
+  );
+  const runLabel = ideasGenerating && paidGenerating
+    ? "عم نجهّز أفكار السوشيال والإعلانات مع بعض…"
+    : ideasGenerating
+      ? "عم نجهّز أفكار السوشيال…"
+      : paidGenerating
+        ? "عم نسأل مزوّدَين لأفكار الإعلانات…"
+        : "عم نبلّش…";
 
   // Resumes on any later visit: the flag lives on the server blob, not in
   // component state, so reopening the page picks a running job back up.
@@ -73,20 +92,49 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
     return map;
   }, [paidPlan, selectedPaidSet]);
 
-  // Generation is a durable server job now: this returns as soon as it is
-  // queued, so the result arrives through the poller below rather than from
-  // this call. Closing the tab no longer throws the run away.
-  async function generatePaidPlan() {
-    setGenerating("paid");
+  // Both generations are durable server jobs and nothing depends on the other,
+  // so start them together. Sequentially the user waited ~56s then ~23s; in
+  // parallel the wait is the longer of the two.
+  async function generateWorkPlan() {
+    setStartingRun(true);
     setError("");
     setNotice("");
+    const results = await Promise.allSettled([
+      api.marketingPlans.generateSocialIdeas(id, {
+        period: nextMonth(),
+        target_count: 12,
+        language: lang,
+      }),
+      api.marketingPlans.generatePaidContentPlan(id, { language: lang }),
+    ]);
+    if (results.every((r) => r.status === "rejected")) {
+      setError("تعذّر بدء التوليد. جرّب كمان مرة.");
+    }
     try {
-      const res = await api.marketingPlans.generatePaidContentPlan(id, { language: lang });
-      setResponse(res);
+      setResponse(await api.marketingPlans.get(id));
+    } catch {
+      /* the pollers pick it up */
+    }
+    setStartingRun(false);
+  }
+
+  // One Next: save both selections, then move on. Nothing is mandatory — the
+  // server preselects a balanced default for each, so a hurried visitor can
+  // accept and continue without choosing anything.
+  async function saveAllAndContinue() {
+    setSaving(true);
+    setError("");
+    try {
+      await Promise.all([
+        saveIdeasRef.current ? saveIdeasRef.current() : Promise.resolve(),
+        paidPlan?.candidates
+          ? api.marketingPlans.updatePaidContentPlanSelection(id, selectedPaidIds)
+          : Promise.resolve(),
+      ]);
+      router.push("/startbyconnec/services");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Generate failed");
-    } finally {
-      setGenerating(null);
+      setError(err instanceof Error ? err.message : "Save failed");
+      setSaving(false);
     }
   }
 
@@ -129,77 +177,75 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
 
         <TeachRulesBox suiteId={id} />
 
-        <section className="grid grid-cols-2 gap-2.5 sm:gap-3">
-          <ModeButton
-            active={mode === "ideas"}
-            title="أفكار السوشيال"
-            description="اعرض أفكار مع طريقة تطبيقها — افحص المناسبات واختر منها."
-            icon={<Sparkles size={22} />}
-            onClick={() => setMode("ideas")}
-          />
-          <ModeButton
-            active={mode === "paid"}
-            title="القناة الإعلانية/التسويقية"
-            description="أفكار إعلانات حسب مراحل الوعي، التفكير، والتحويل."
-            icon={<Megaphone size={22} />}
-            onClick={() => setMode("paid")}
-          />
-        </section>
-
         {loading ? (
           <div className="rounded-2xl border border-border bg-card p-6 text-muted-foreground">جار تحميل خطة العمل...</div>
-        ) : mode === "ideas" ? (
-          <SocialIdeasGallery suiteId={id} response={response} onResponse={setResponse} />
+        ) : !anyPlanStarted ? (
+          /* One button starts both runs. No month or count to decide: the
+             defaults are next month and 12 ideas, editable afterwards. */
+          <div className="rounded-3xl border border-border bg-card p-6 text-center">
+            <h2 className="text-xl font-bold">نجهّزلك خطة العمل؟</h2>
+            <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
+              بنولّد أفكار السوشيال وأفكار الإعلانات مع بعض، وبنختارلك أفضلها. بتقدر تغيّر أي إشي بعدين.
+            </p>
+            <Button
+              onClick={generateWorkPlan}
+              disabled={startingRun}
+              className="mt-5 h-12 gap-2 bg-foreground px-6 text-base font-bold text-background hover:bg-foreground/90"
+            >
+              {startingRun ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+              جهّز خطة العمل
+            </Button>
+          </div>
         ) : (
-          <PaidPlanPanel
-            plan={paidPlan}
-            selectedSet={selectedPaidSet}
-            selectedByStage={selectedPaidByStage}
-            generating={generating === "paid" || paidGenerating}
-            saving={saving}
-            onGenerate={generatePaidPlan}
-            onSave={savePaidSelection}
-            onToggleIdea={togglePaidIdea}
-          />
+          <>
+            {anyGenerating && (
+              <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4">
+                <Loader2 className="size-5 shrink-0 animate-spin text-primary" />
+                <div>
+                  <p className="text-sm font-semibold">{runLabel}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    التوليد شغال عالسيرفر — فيك تتنقل أو تسكّر التطبيق وترجع، ما رح يقف.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <SocialIdeasGallery
+              suiteId={id}
+              response={response}
+              onResponse={setResponse}
+              hideStartCard
+              hideSaveBar
+              saveHandle={saveIdeasRef}
+            />
+
+            <PaidPlanPanel
+              plan={paidPlan}
+              selectedSet={selectedPaidSet}
+              selectedByStage={selectedPaidByStage}
+              generating={paidGenerating}
+              saving={saving}
+              onGenerate={generateWorkPlan}
+              onSave={savePaidSelection}
+              onToggleIdea={togglePaidIdea}
+              hideOwnActions
+            />
+
+            {/* The single Next. Nothing above it is mandatory. */}
+            <div className="sticky bottom-0 -mx-4 border-t border-border bg-background/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+              <Button
+                onClick={saveAllAndContinue}
+                disabled={saving || anyGenerating}
+                className="h-12 w-full gap-2 bg-foreground text-base font-bold text-background hover:bg-foreground/90"
+              >
+                {saving ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                {anyGenerating ? "عم نجهّز…" : "حفظ ومتابعة"}
+              </Button>
+            </div>
+          </>
         )}
       </div>
     </SuitePageShell>
-  );
-}
-
-function ModeButton({
-  active,
-  title,
-  description,
-  icon,
-  onClick,
-}: {
-  active: boolean;
-  title: string;
-  description: string;
-  icon: ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "flex min-h-[22vh] flex-col rounded-3xl border p-3.5 text-start shadow-sm transition sm:min-h-[25vh] sm:p-5",
-        active
-          ? "border-[#2f80ff] bg-gradient-to-br from-[#2f80ff]/14 via-[#18b89d]/8 to-transparent"
-          : "border-border bg-card hover:border-[#2f80ff]/50",
-      ].join(" ")}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <span className={["rounded-2xl p-2.5 sm:p-3", active ? "bg-[#2f80ff] text-white" : "bg-muted text-foreground"].join(" ")}>
-          {icon}
-        </span>
-        {active && <CheckCircle2 size={20} className="shrink-0 text-[#18b89d]" />}
-      </div>
-      <h2 className="mt-3 text-base font-semibold leading-6 tracking-normal text-balance sm:mt-5 sm:text-2xl sm:leading-7">{title}</h2>
-      <p className="mt-1.5 text-xs leading-5 text-muted-foreground sm:mt-2 sm:text-sm sm:leading-6">{description}</p>
-    </button>
   );
 }
 
@@ -212,6 +258,7 @@ function PaidPlanPanel({
   onGenerate,
   onSave,
   onToggleIdea,
+  hideOwnActions = false,
 }: {
   plan?: PaidContentWorkPlan;
   selectedSet: Set<string>;
@@ -220,6 +267,7 @@ function PaidPlanPanel({
   saving: boolean;
   onGenerate: () => void;
   onSave: () => void;
+  hideOwnActions?: boolean;
   onToggleIdea: (idea: PaidContentIdea, stage: string) => void;
 }) {
   const hasPlan = Boolean(plan?.candidates && Object.values(plan.candidates).some((items) => items.length > 0));
@@ -232,18 +280,22 @@ function PaidPlanPanel({
             أفكار إعلانية حسب القناة والمرحلة: وعي، اهتمام، تحويل، ولاء، وتوصية. اختر فكرة واحدة من كل مرحلة.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={onGenerate} disabled={generating} className="gap-2 bg-foreground text-background hover:bg-foreground/90">
-            {generating ? <Loader2 size={16} className="animate-spin" /> : <Megaphone size={16} />}
-            {hasPlan ? "توليد من جديد" : "توليد الخطة"}
-          </Button>
-          {hasPlan && (
-            <Button onClick={onSave} disabled={saving} variant="outline" className="gap-2">
-              {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              حفظ الاختيارات
+        {/* The page owns a single generate and a single Next, so these only
+            appear when this panel is used on its own. */}
+        {!hideOwnActions && (
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={onGenerate} disabled={generating} className="gap-2 bg-foreground text-background hover:bg-foreground/90">
+              {generating ? <Loader2 size={16} className="animate-spin" /> : <Megaphone size={16} />}
+              {hasPlan ? "توليد من جديد" : "توليد الخطة"}
             </Button>
-          )}
-        </div>
+            {hasPlan && (
+              <Button onClick={onSave} disabled={saving} variant="outline" className="gap-2">
+                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                حفظ الاختيارات
+              </Button>
+            )}
+          </div>
+        )}
       </div>
       {!hasPlan && generating && (
         <div className="mt-6 flex items-center gap-3 rounded-2xl border border-border bg-card/70 p-4">

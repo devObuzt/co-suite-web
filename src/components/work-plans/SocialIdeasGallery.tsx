@@ -40,7 +40,7 @@ const FILTERS: Array<{ key: string; label: string }> = [
   { key: "occasions", label: "مناسبات" },
 ];
 
-function nextMonth(): string {
+export function nextMonth(): string {
   const d = new Date();
   d.setDate(1);
   d.setMonth(d.getMonth() + 1);
@@ -94,10 +94,19 @@ export function SocialIdeasGallery({
   suiteId,
   response,
   onResponse,
+  hideStartCard = false,
+  hideSaveBar = false,
+  saveHandle,
 }: {
   suiteId: string;
   response: MarketingPlanResponse | null;
   onResponse: (res: MarketingPlanResponse) => void;
+  /** The page owns a single combined generate + Next, so suppress the
+   *  gallery's own start card and save bar when it is driving. */
+  hideStartCard?: boolean;
+  hideSaveBar?: boolean;
+  /** Lets the page save this section's selection from its own Next button. */
+  saveHandle?: React.MutableRefObject<(() => Promise<void>) | null>;
 }) {
   const plan = response?.action_plan?.social_ideas_plan;
   const candidates = useMemo(() => plan?.candidates ?? [], [plan]);
@@ -187,6 +196,12 @@ export function SocialIdeasGallery({
     }
   }
 
+  // No dep array on purpose: keep the handle pointing at the current closure
+  // so the page's Next button always saves the latest selection.
+  useEffect(() => {
+    if (saveHandle) saveHandle.current = saveSelection;
+  });
+
   async function saveSelection() {
     setSaving(true);
     setError(null);
@@ -223,6 +238,9 @@ export function SocialIdeasGallery({
   }
 
   // ── Empty state: generate / generating / failed ────────────────────────
+  // When the page drives a combined run it renders its own start card and
+  // progress, so this section stays out of the way until it has ideas.
+  if (candidates.length === 0 && hideStartCard) return null;
   if (candidates.length === 0) {
     return (
       <div dir="rtl" className="space-y-4 text-right">
@@ -320,9 +338,11 @@ export function SocialIdeasGallery({
             اخترت {selected.size} / {target}
           </Badge>
         </div>
-        <Button size="sm" onClick={saveSelection} disabled={saving}>
-          {saving ? <Loader2 className="size-4 animate-spin" /> : "حفظ الاختيار"}
-        </Button>
+        {!hideSaveBar && (
+          <Button size="sm" onClick={saveSelection} disabled={saving}>
+            {saving ? <Loader2 className="size-4 animate-spin" /> : "حفظ الاختيار"}
+          </Button>
+        )}
       </div>
 
       {/* Filter chips */}
