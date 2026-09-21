@@ -4,6 +4,7 @@ import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n/LanguageContext";
 import { AccessibilityProvider } from "@/lib/accessibility/AccessibilityContext";
 import { GlobalChrome } from "@/components/GlobalChrome";
+import { ManzumaSessionBootstrap } from "@/components/ManzumaSessionBootstrap";
 
 // Runs before first paint to apply saved accessibility prefs (theme, font
 // scale, contrast, motion) with no flash. Mirrors applyPrefs() in
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: A11Y_INIT_SCRIPT }} />
         <AccessibilityProvider>
           <LanguageProvider>
+            <ManzumaSessionBootstrap />
             {children}
             <GlobalChrome />
           </LanguageProvider>

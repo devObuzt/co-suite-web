@@ -61,14 +61,16 @@ export default function LandingPage() {
   const router = useRouter();
   const t = useT();
   const { lang, dir } = useLanguage();
-  const { token, _hasHydrated } = useAuthStore();
+  const { token, user, _hasHydrated } = useAuthStore();
   const [prompt, setPrompt] = useState("");
   const [choice, setChoice] = useState<CreateChoice>(choices[0]);
   const [status, setStatus] = useState<GenerationStatus | null>(null);
   const [error, setError] = useState("");
   const [showAuthGate, setShowAuthGate] = useState(false);
 
-  const isLoggedIn = Boolean(_hasHydrated && token);
+  // A Manzuma session counts: someone signed in at accounts has no token here
+  // and was still being offered a login button.
+  const isLoggedIn = Boolean(_hasHydrated && (token || user));
   const isBusy = status?.status === "queued" || status?.status === "running" || status?.status === "retrying";
 
   const copy = useMemo(() => {
