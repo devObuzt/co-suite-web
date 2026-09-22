@@ -14,8 +14,10 @@ const ACCOUNTS = process.env.NEXT_PUBLIC_MANZUMA_ACCOUNTS_URL || "https://accoun
  * and campaigns live. Putting both lists on one screen made a two-part
  * decision look like a single button.
  *
- * Creating a business happens on Manzuma itself, on purpose: accounts refuses
- * writes that arrive from another host, and that refusal is load-bearing.
+ * A suite with no business yet gets one from here in a single press. The
+ * write still happens at accounts — co-Suite's server asks it with the user id
+ * from the verified session — so the browser never writes across hosts, which
+ * is the refusal that keeps other people's businesses out of reach.
  */
 export default function LinkSuite() {
   const [orgs, setOrgs] = useState<ManzumaOrg[]>([]);
@@ -24,6 +26,7 @@ export default function LinkSuite() {
   const [chosen, setChosen] = useState<Suite | null>(null);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState("");
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
 
@@ -66,6 +69,24 @@ export default function LinkSuite() {
     setChosen(null);
     setQuery("");
     setError("");
+  }
+
+  /** The common case for an agency: this suite is a client with no business yet. */
+  async function createAndLink() {
+    if (!chosen) return;
+    setCreating(true);
+    setError("");
+    try {
+      const res = await api.suites.createBusiness(chosen.id);
+      setDone(`انعمل بزنس «${res.organization.name}» وانربط فيه ${chosen.name}.`);
+      setChosen(null);
+      setQuery("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ما قدرنا نعمل البزنس");
+    } finally {
+      setCreating(false);
+    }
   }
 
   async function link(org: ManzumaOrg) {
@@ -133,7 +154,9 @@ export default function LinkSuite() {
           {chosen && (
             <section className="mt-4 grid gap-2">
               {orgMatches.length === 0 && (
-                <p className="text-sm text-zinc-500">ما في بزنس بهالاسم.</p>
+                <p className="text-sm text-zinc-500">
+                  {orgs.length === 0 ? "لسا ما عندك بزنسات." : "ما في بزنس بهالاسم."}
+                </p>
               )}
               {orgMatches.map((org) => {
                 const taken = takenOrgIds.has(org.id);
@@ -152,13 +175,21 @@ export default function LinkSuite() {
                 );
               })}
 
+              <button
+                disabled={creating || Boolean(busy)}
+                onClick={() => void createAndLink()}
+                className="mt-2 rounded-xl border border-dashed border-emerald-600 p-3 text-start text-sm text-emerald-400 transition hover:bg-emerald-500/10 disabled:opacity-40"
+              >
+                {creating ? "عم نعمل البزنس…" : `+ اعمل بزنس جديد باسم «${chosen.name}» واربطه`}
+              </button>
+
               <a
                 href={`${ACCOUNTS}/dashboard`}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-2 text-sm text-emerald-400 underline"
+                className="mt-1 text-xs text-zinc-500 underline"
               >
-                اعمل بزنس جديد بالمنظومة، وبعدها ارجع وحدّث الصفحة
+                أو اعمله بنفسك بالمنظومة وارجع حدّث الصفحة
               </a>
 
               <button onClick={back} className="mt-4 text-sm text-zinc-400 hover:text-zinc-200">

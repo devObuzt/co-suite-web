@@ -189,6 +189,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ organization_id: organizationId, suite_id: suiteId }),
       }),
+    createBusiness: (suiteId: string, name?: string) =>
+      request<{ ok: boolean; suite_id: string; organization: { id: string; name: string } }>(
+        `/suites/${suiteId}/create-business`,
+        { method: "POST", body: JSON.stringify({ name: name ?? null }) },
+      ),
     remove: (suiteId: string) =>
       request<{ ok: boolean; deleted_suite_id: string }>(`/suites/${suiteId}`, { method: "DELETE" }),
     updateBrand: (suiteId: string, brand: Brand) =>
