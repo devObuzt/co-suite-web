@@ -505,6 +505,12 @@ export const api = {
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan`),
     status: (suiteId: string) =>
       request<GenerationStatus>(`/suites/${suiteId}/marketing-plan/generation-status`),
+    // Records what the visitor chose in the "this takes a few minutes" dialog.
+    setNotify: (suiteId: string, data: { whatsapp: boolean; language?: string }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/notify`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     // Queues the whole stage chain as one server-side job. Safe to re-post:
     // a run already in flight is handed back instead of forked.
     generateFull: (suiteId: string, data?: { language?: string }) =>
@@ -1285,6 +1291,9 @@ export interface MarketingPlanResponse {
   visuals?: PlanVisual[];
   /** Which plan stages already hold data — the page resumes from this. */
   plan_stages?: Record<string, boolean>;
+  /** The waiting dialog offers the WhatsApp button only when the server says
+   *  a message can actually be sent — never promise what cannot be delivered. */
+  notify?: { whatsapp_available: boolean; whatsapp: boolean };
   generation_status?: GenerationStatus | null;
 }
 

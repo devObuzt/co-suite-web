@@ -2,7 +2,7 @@
 
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { BadgeCheck, CheckCircle2, Image, Layers3, Loader2, Megaphone, PlaySquare, Save, Sparkles } from "lucide-react";
+import { BadgeCheck, CheckCircle2, Image, Layers3, Loader2, Megaphone, MessageCircle, PlaySquare, Save, Sparkles } from "lucide-react";
 import { api, ContentRule, MarketingPlanResponse, PaidContentIdea, PaidContentWorkPlan } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +35,11 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // The run takes minutes. Rather than hold the visitor on a spinner, offer to
+  // message them. Derived, not stored: the dialog is simply "a run is in
+  // flight and this visitor has not answered yet" — which also means a reload
+  // mid-run asks again only if they never answered.
+  const [waitAnswered, setWaitAnswered] = useState(false);
 
   useEffect(() => {
     api.marketingPlans.get(id)
@@ -85,6 +90,20 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
     }, 4000);
     return () => window.clearInterval(timer);
   }, [paidGenerating, id]);
+  const notifyState = response?.notify;
+  // Already opted in on an earlier visit → never ask again.
+  const waitDialogOpen = !loading && anyGenerating && !waitAnswered && !notifyState?.whatsapp;
+
+  async function chooseNotify(whatsapp: boolean) {
+    setWaitAnswered(true);
+    setNotice(whatsapp ? text.waitNotifyOn : text.waitStaying);
+    try {
+      setResponse(await api.marketingPlans.setNotify(id, { whatsapp, language: lang }));
+    } catch {
+      // Losing the preference must not break the page; the plan is what matters.
+    }
+  }
+
   const selectedPaidSet = useMemo(() => new Set(selectedPaidIds), [selectedPaidIds]);
   const selectedPaidByStage = useMemo(() => {
     const map: Record<string, number> = {};
@@ -173,6 +192,15 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
           <p className="text-sm font-semibold text-muted-foreground">{text.kicker}</p>
           <h1 className="text-3xl font-semibold tracking-normal">{text.heading}</h1>
         </header>
+
+        {waitDialogOpen && (
+          <WaitDialog
+            text={text}
+            dir={dir}
+            whatsappAvailable={Boolean(notifyState?.whatsapp_available)}
+            onChoose={chooseNotify}
+          />
+        )}
 
         {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
         {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</div>}
@@ -520,5 +548,65 @@ function TeachRulesBox({ suiteId }: { suiteId: string }) {
         </div>
       )}
     </section>
+  );
+}
+
+
+/**
+ * "This takes a few minutes" — shown once, while the run is in flight.
+ *
+ * The WhatsApp button only appears when the server reports that a message can
+ * actually be sent. Offering a notification the system would silently drop is
+ * worse than not offering one at all.
+ */
+function WaitDialog({
+  text,
+  dir,
+  whatsappAvailable,
+  onChoose,
+}: {
+  text: WorkPlanLabels;
+  dir: string;
+  whatsappAvailable: boolean;
+  onChoose: (whatsapp: boolean) => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 backdrop-blur-sm sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="work-plan-wait-title"
+      dir={dir}
+    >
+      <div className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-xl">
+        <div className="flex items-start gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[color:var(--brand-accent)]/12 text-[color:var(--brand-accent)]">
+            <Loader2 size={20} className="animate-spin" />
+          </span>
+          <div className="min-w-0">
+            <h2 id="work-plan-wait-title" className="text-xl font-black text-foreground" dir="auto">
+              {text.waitTitle}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground" dir="auto">
+              {text.waitBody}
+            </p>
+          </div>
+        </div>
+        <div className="mt-6 flex flex-col gap-2">
+          {whatsappAvailable && (
+            <Button
+              onClick={() => onChoose(true)}
+              className="h-12 gap-2 bg-foreground text-base font-bold text-background hover:bg-foreground/90"
+            >
+              <MessageCircle size={18} />
+              {text.waitNotifyMe}
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => onChoose(false)} className="h-12 text-base font-semibold">
+            {text.waitIllCheck}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

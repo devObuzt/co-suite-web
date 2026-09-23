@@ -178,6 +178,15 @@ const workPlanLabelsEn = {
   saveCaption: "Save caption",
   copyCaption: "Copy caption",
   postGeneratedFetching: "The post was generated — fetching its details… If it does not appear, open the content page.",
+
+  // ── the "this takes a few minutes" dialog ──
+  waitTitle: "This takes a few minutes",
+  waitBody:
+    "Building the work plan usually takes between 3 and 15 minutes. You can stay on this page and watch it fill in, or leave — we will message you on WhatsApp the moment it is ready.",
+  waitNotifyMe: "Message me on WhatsApp",
+  waitIllCheck: "No need, I will check myself",
+  waitNotifyOn: "Done — we will message you on WhatsApp when the plan is ready.",
+  waitStaying: "Fine — the plan fills in on this page as each section finishes.",
 };
 
 const ar: WorkPlanLabels = {
@@ -333,6 +342,14 @@ const ar: WorkPlanLabels = {
   saveCaption: "حفظ الكابشن",
   copyCaption: "نسخ الكابشن",
   postGeneratedFetching: "البوست انولد — عم نجيب تفاصيله… إذا ما ظهر، افتح صفحة المحتوى.",
+
+  waitTitle: "هاي بتاخد كم دقيقة",
+  waitBody:
+    "بناء خطة العمل عادةً بياخد بين ٣ و١٥ دقيقة. فيك تضل هون وتتفرّج عليها وهي بتنبنى، أو تطلع — وإحنا منبلغك بالواتساب أول ما تجهز.",
+  waitNotifyMe: "بلغني بالواتساب",
+  waitIllCheck: "ما في داعي، بفحص لحالي",
+  waitNotifyOn: "تمام — منبعتلك واتساب أول ما الخطة تجهز.",
+  waitStaying: "تمام — الخطة بتنعبّى بالصفحة كل ما يخلص قسم.",
 };
 
 const he: WorkPlanLabels = {
@@ -489,6 +506,14 @@ const he: WorkPlanLabels = {
   saveCaption: "שמור כיתוב",
   copyCaption: "העתק כיתוב",
   postGeneratedFetching: "הפוסט נוצר — מביאים את הפרטים… אם הוא לא מופיע, פתחו את עמוד התוכן.",
+
+  waitTitle: "זה לוקח כמה דקות",
+  waitBody:
+    "בניית תכנית העבודה לוקחת בדרך כלל בין 3 ל-15 דקות. אפשר להישאר בעמוד ולראות אותה נבנית, או לצאת — ואנחנו נשלח לכם הודעה בוואטסאפ ברגע שהיא מוכנה.",
+  waitNotifyMe: "שלחו לי הודעה בוואטסאפ",
+  waitIllCheck: "לא צריך, אבדוק בעצמי",
+  waitNotifyOn: "מצוין — נשלח לכם וואטסאפ ברגע שהתכנית מוכנה.",
+  waitStaying: "בסדר — התכנית מתמלאת בעמוד הזה ככל שכל חלק מסתיים.",
 };
 
 const fr: WorkPlanLabels = {
@@ -604,6 +629,14 @@ const fr: WorkPlanLabels = {
   theVideo: "la vidéo", theImage: "l’image", imageN: "image",
   caption: "Légende", saveCaption: "Enregistrer la légende", copyCaption: "Copier la légende",
   postGeneratedFetching: "La publication est générée — nous récupérons ses détails… Si elle n’apparaît pas, ouvrez la page contenu.",
+
+  waitTitle: "Cela prend quelques minutes",
+  waitBody:
+    "La création du plan de travail prend généralement entre 3 et 15 minutes. Vous pouvez rester sur cette page et la voir se remplir, ou partir — nous vous enverrons un message WhatsApp dès qu’elle sera prête.",
+  waitNotifyMe: "Prévenez-moi sur WhatsApp",
+  waitIllCheck: "Pas besoin, je vérifierai moi-même",
+  waitNotifyOn: "Parfait — nous vous écrirons sur WhatsApp dès que le plan sera prêt.",
+  waitStaying: "D’accord — le plan se remplit sur cette page à mesure que chaque section se termine.",
 };
 
 const es: WorkPlanLabels = {
@@ -719,6 +752,14 @@ const es: WorkPlanLabels = {
   theVideo: "el vídeo", theImage: "la imagen", imageN: "imagen",
   caption: "Texto", saveCaption: "Guardar texto", copyCaption: "Copiar texto",
   postGeneratedFetching: "La publicación se generó — estamos trayendo sus detalles… Si no aparece, abre la página de contenido.",
+
+  waitTitle: "Esto tarda unos minutos",
+  waitBody:
+    "Crear el plan de trabajo suele tardar entre 3 y 15 minutos. Puedes quedarte en esta página y verlo completarse, o irte — te escribiremos por WhatsApp en cuanto esté listo.",
+  waitNotifyMe: "Avísame por WhatsApp",
+  waitIllCheck: "No hace falta, lo miro yo",
+  waitNotifyOn: "Listo — te escribiremos por WhatsApp cuando el plan esté preparado.",
+  waitStaying: "De acuerdo — el plan se va completando en esta página según termina cada sección.",
 };
 
 const tr: WorkPlanLabels = {
@@ -834,6 +875,14 @@ const tr: WorkPlanLabels = {
   theVideo: "videoyu", theImage: "görseli", imageN: "görsel",
   caption: "Açıklama", saveCaption: "Açıklamayı kaydet", copyCaption: "Açıklamayı kopyala",
   postGeneratedFetching: "Gönderi üretildi — detayları getiriyoruz… Görünmezse içerik sayfasını açın.",
+
+  waitTitle: "Bu birkaç dakika sürer",
+  waitBody:
+    "Çalışma planının oluşturulması genellikle 3 ila 15 dakika sürer. Bu sayfada kalıp dolmasını izleyebilir ya da ayrılabilirsiniz — hazır olduğu anda size WhatsApp’tan yazarız.",
+  waitNotifyMe: "WhatsApp’tan haber ver",
+  waitIllCheck: "Gerek yok, kendim bakarım",
+  waitNotifyOn: "Tamam — plan hazır olunca size WhatsApp’tan yazacağız.",
+  waitStaying: "Tamam — her bölüm bittikçe plan bu sayfada doluyor.",
 };
 
 const ru: WorkPlanLabels = {
@@ -949,6 +998,14 @@ const ru: WorkPlanLabels = {
   theVideo: "видео", theImage: "изображение", imageN: "изображение",
   caption: "Подпись", saveCaption: "Сохранить подпись", copyCaption: "Копировать подпись",
   postGeneratedFetching: "Пост создан — получаем его детали… Если он не появился, откройте страницу контента.",
+
+  waitTitle: "Это займёт несколько минут",
+  waitBody:
+    "Создание рабочего плана обычно занимает от 3 до 15 минут. Можно остаться на этой странице и смотреть, как он заполняется, или уйти — мы напишем вам в WhatsApp, как только он будет готов.",
+  waitNotifyMe: "Сообщить мне в WhatsApp",
+  waitIllCheck: "Не нужно, я сам проверю",
+  waitNotifyOn: "Готово — напишем вам в WhatsApp, когда план будет готов.",
+  waitStaying: "Хорошо — план заполняется на этой странице по мере готовности каждого раздела.",
 };
 
 const zh: WorkPlanLabels = {
@@ -1060,6 +1117,13 @@ const zh: WorkPlanLabels = {
   theVideo: "视频", theImage: "图片", imageN: "图片",
   caption: "文案", saveCaption: "保存文案", copyCaption: "复制文案",
   postGeneratedFetching: "帖子已生成——正在获取详情…如果没有出现，请打开内容页面。",
+
+  waitTitle: "这需要几分钟",
+  waitBody: "生成工作计划通常需要 3 到 15 分钟。你可以留在本页看它逐步完成，也可以离开——准备好后我们会通过 WhatsApp 通知你。",
+  waitNotifyMe: "用 WhatsApp 通知我",
+  waitIllCheck: "不用了，我自己查看",
+  waitNotifyOn: "好的——计划准备好后我们会用 WhatsApp 通知你。",
+  waitStaying: "好的——每完成一个板块，计划就会在本页显示。",
 };
 
 const BY_LANG: Record<LangCode, WorkPlanLabels> = {
