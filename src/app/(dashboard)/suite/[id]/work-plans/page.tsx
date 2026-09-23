@@ -99,8 +99,13 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
     setNotice(whatsapp ? text.waitNotifyOn : text.waitStaying);
     try {
       setResponse(await api.marketingPlans.setNotify(id, { whatsapp, language: lang }));
-    } catch {
-      // Losing the preference must not break the page; the plan is what matters.
+    } catch (e) {
+      // This used to be swallowed. When a stale write erased the saved choice
+      // the only symptom was the dialog quietly reappearing after a refresh,
+      // and there was nothing anywhere saying why. Say it out loud instead —
+      // the plan itself is unaffected either way.
+      setNotice("");
+      setError(e instanceof Error ? e.message : text.saveFailed);
     }
   }
 
