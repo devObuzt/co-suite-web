@@ -10,8 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SuitePageShell } from "@/components/suite/SuitePageShell";
 import {
   ChevronDown, ChevronUp, ExternalLink, ImagePlus, Loader2, Palette, Pencil, Plus,
-  Save, Sparkles, Tag, Type, Undo2, UserPlus, Users, Wand2, X,
+  Save, Sparkles, Tag, Trash2, Type, Undo2, UserPlus, Users, Wand2, X,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 // List-shaped fields are edited as chips, so they live as arrays in the form and
 // only collapse to brand arrays on save.
@@ -885,6 +886,8 @@ export default function BusinessProfilePage({ params }: { params: Promise<{ id: 
             </button>
           </div>
         )}
+
+        <DangerZone suiteId={id} suiteName={form.name || suite?.name || ""} />
       </div>
     </SuitePageShell>
   );
@@ -1608,5 +1611,69 @@ function LogoPreview({
         </button>
       )}
     </div>
+  );
+}
+
+/**
+ * Deleting the suite, kept at the bottom and behind a second press.
+ *
+ * Same endpoint the funnel's "start over" uses: for a funnel visitor the
+ * server also resets their lead, so deleting really means starting again
+ * rather than being stranded on a suite that no longer exists.
+ */
+function DangerZone({ suiteId, suiteName }: { suiteId: string; suiteName: string }) {
+  const t = useT();
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function remove() {
+    setBusy(true);
+    setError("");
+    try {
+      await api.suites.remove(suiteId);
+      router.push("/suites");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Delete failed");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="mt-10 rounded-2xl border border-red-500/30 bg-red-500/5 p-5">
+      <h2 className="text-base font-black text-red-700 dark:text-red-300" dir="auto">
+        {t("suite.danger.title")}
+      </h2>
+      <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground" dir="auto">
+        {t("suite.danger.body")}
+      </p>
+      {error && <p className="mt-3 text-sm text-red-600" dir="auto">{error}</p>}
+      {!confirming ? (
+        <Button
+          variant="outline"
+          onClick={() => setConfirming(true)}
+          className="mt-4 gap-2 border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-300"
+        >
+          <Trash2 size={15} /> {t("suite.danger.cta")}
+        </Button>
+      ) : (
+        <div className="mt-4 rounded-xl border border-red-500/40 bg-background p-4">
+          <p className="text-sm font-bold text-foreground" dir="auto">
+            {t("suite.danger.confirm").replace("{name}", suiteName)}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground" dir="auto">{t("suite.danger.confirmBody")}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button onClick={remove} disabled={busy} className="gap-2 bg-red-600 text-white hover:bg-red-700">
+              {busy ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+              {busy ? t("suite.danger.deleting") : t("suite.danger.yes")}
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirming(false)} disabled={busy}>
+              {t("suite.danger.cancel")}
+            </Button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
