@@ -18,6 +18,8 @@ import {
   Target,
   X,
 } from "lucide-react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { workPlanText, type WorkPlanLabels } from "@/lib/i18n/workPlans";
 import {
   api,
   MarketingPlanResponse,
@@ -30,21 +32,29 @@ import { Badge } from "@/components/ui/badge";
 
 type PlanType = "weekly" | "monthly";
 
-const TYPE_META: Record<string, { label: string; dot: string }> = {
-  attraction: { label: "جذب", dot: "bg-[#2f80ff]" },
-  trust: { label: "ثقة", dot: "bg-[#8b5cf6]" },
-  sales: { label: "مبيعات", dot: "bg-[#ff4fa3]" },
+const TYPE_DOT: Record<string, string> = {
+  attraction: "bg-[#2f80ff]",
+  trust: "bg-[#8b5cf6]",
+  sales: "bg-[#ff4fa3]",
 };
 
-const WEEKDAYS_AR = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+function typeMeta(text: WorkPlanLabels): Record<string, { label: string; dot: string }> {
+  return {
+    attraction: { label: text.goalAttraction, dot: TYPE_DOT.attraction },
+    trust: { label: text.goalTrust, dot: TYPE_DOT.trust },
+    sales: { label: text.goalSales, dot: TYPE_DOT.sales },
+  };
+}
 
-const ASSET_LABELS: Record<string, string> = {
-  human_video: "فيديو لشخص حقيقي",
-  location_video: "فيديو من الموقع",
-  product_photos: "صور المنتجات",
-  product_video: "فيديو منتج",
-  client_asset: "ملف من عندك",
-};
+function assetLabels(text: WorkPlanLabels): Record<string, string> {
+  return {
+    human_video: text.assetHumanVideo,
+    location_video: text.assetLocationVideo,
+    product_photos: text.assetProductPhotos,
+    product_video: text.assetProductVideo,
+    client_asset: text.assetClientAsset,
+  };
+}
 
 function planCountBounds(planType: PlanType): { min: number; max: number; def: number } {
   return planType === "weekly" ? { min: 1, max: 14, def: 4 } : { min: 1, max: 31, def: 15 };
@@ -57,11 +67,12 @@ function formatIcon(format?: string, size = 13) {
   return <ImageIcon size={size} />;
 }
 
-function dayLabel(dateIso: string): { weekday: string; day: string } {
+function dayLabel(dateIso: string, lang: string): { weekday: string; day: string } {
   const parsed = new Date(`${dateIso}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return { weekday: "", day: dateIso };
   return {
-    weekday: WEEKDAYS_AR[parsed.getDay()] || "",
+    // The weekday used to come from a hard-coded Arabic array.
+    weekday: new Intl.DateTimeFormat(lang || "en", { weekday: "long" }).format(parsed),
     day: `${parsed.getDate()}/${parsed.getMonth() + 1}`,
   };
 }
@@ -79,6 +90,8 @@ export function SocialPlanCalendar({
   response: MarketingPlanResponse | null;
   onResponse: (res: MarketingPlanResponse) => void;
 }) {
+  const { lang } = useLanguage();
+  const text = workPlanText(lang);
   const plan: SocialContentWorkPlan | undefined = response?.action_plan?.social_content_plan;
   const hasSchedule = Boolean(plan?.schedule?.days?.length);
 
@@ -156,7 +169,7 @@ export function SocialPlanCalendar({
   }, [pendingGeneration, suiteId, onResponse, refreshPosts]);
 
   async function generatePlan() {
-    if (hasSchedule && !window.confirm("توليد خطة جديدة رح يستبدل الخطة الحالية. نكمل؟")) return;
+    if (hasSchedule && !window.confirm(text.replaceWarning)) return;
     setGeneratingPlan(true);
     setError("");
     setNotice("");
@@ -166,7 +179,7 @@ export function SocialPlanCalendar({
         plan_type: planType,
       });
       onResponse(res);
-      setNotice("انولدت الخطة وتوزعت الأفكار على الأيام. اضغط على أي فكرة للتفاصيل والتوليد.");
+      setNotice(text.planGenerated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generate failed");
     } finally {
@@ -183,9 +196,9 @@ export function SocialPlanCalendar({
       onResponse(res);
       const queued = res.queued_job_ids?.length || 0;
       const needsUser = (res.skipped || []).filter((entry) => entry.reason === "user_assets_required").length;
-      const parts = [`انضاف ${queued} فكرة للتوليد.`];
-      if (needsUser) parts.push(`${needsUser} أفكار بحاجة تصويرك.`);
-      if (res.payment_required) parts.push("رصيد التوليد خلص قبل ما نكمل الكل.");
+      const parts = [`${queued} ${text.queuedForGeneration}`];
+      if (needsUser) parts.push(`${needsUser} ${text.needFilming}`);
+      if (res.payment_required) parts.push(text.creditsRanOut);
       setNotice(parts.join(" "));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generate failed");
@@ -202,9 +215,9 @@ export function SocialPlanCalendar({
     <section className="rounded-3xl border border-[#2f80ff]/25 bg-gradient-to-br from-[#2f80ff]/8 via-background to-[#18b89d]/6 p-4 shadow-sm sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">خطة محتوى السوشيال ميديا</h2>
+          <h2 className="text-2xl font-semibold">{text.calendarTitle}</h2>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            اختر نوع الخطة والعدد، ولّد الخطة، وبتتوزع الأفكار على الأيام. كل فكرة بتنفتح بتفاصيلها وبتتولد لحالها أو الكل مرة وحدة.
+            {text.calendarIntro}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -222,7 +235,7 @@ export function SocialPlanCalendar({
                   planType === type ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
                 ].join(" ")}
               >
-                {type === "weekly" ? "أسبوعية" : "شهرية"}
+                {type === "weekly" ? text.weekly : text.monthly}
               </button>
             ))}
           </div>
@@ -230,18 +243,18 @@ export function SocialPlanCalendar({
             <Button type="button" variant="outline" size="sm" onClick={() => setCount(Math.max(bounds.min, count - 1))}>-</Button>
             <div className="min-w-20 text-center">
               <div className="text-xl font-semibold">{count}</div>
-              <div className="text-[11px] text-muted-foreground">{planType === "weekly" ? "بوست/أسبوع" : "بوست/شهر"}</div>
+              <div className="text-[11px] text-muted-foreground">{planType === "weekly" ? text.postsPerWeek : text.postsPerMonth}</div>
             </div>
             <Button type="button" variant="outline" size="sm" onClick={() => setCount(Math.min(bounds.max, count + 1))}>+</Button>
           </div>
           <Button onClick={generatePlan} disabled={generatingPlan} className="gap-2 bg-foreground text-background hover:bg-foreground/90">
             {generatingPlan ? <Loader2 size={16} className="animate-spin" /> : <Target size={16} />}
-            {hasSchedule ? "توليد خطة جديدة" : "توليد الخطة"}
+            {hasSchedule ? text.newPlan : text.generatePlan}
           </Button>
           {hasSchedule && (
             <Button onClick={generateAll} disabled={batchBusy || pendingGeneration} variant="outline" className="gap-2">
               {batchBusy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-              توليد كل الخطة
+              {text.generateWholePlan}
             </Button>
           )}
         </div>
@@ -255,17 +268,17 @@ export function SocialPlanCalendar({
 
       {!hasSchedule && !generatingPlan && (
         <div className="mt-6 rounded-2xl border border-dashed border-border bg-card/70 p-6 text-center text-sm leading-6 text-muted-foreground">
-          لا توجد خطة بعد، أو الخطة الحالية من نسخة قديمة. اختر النوع والعدد ثم اضغط توليد الخطة.
+          {text.calendarEmpty}
         </div>
       )}
 
       {hasSchedule && (
         <>
           <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1"><Sparkles size={12} className="text-[#18b89d]" /> توليد بالذكاء الاصطناعي</span>
-            <span className="inline-flex items-center gap-1"><Camera size={12} className="text-amber-600" /> بحاجة تصويرك</span>
-            <span className="inline-flex items-center gap-1"><CheckCircle2 size={12} className="text-emerald-600" /> جاهز</span>
-            {Object.entries(TYPE_META).map(([key, meta]) => (
+            <span className="inline-flex items-center gap-1"><Sparkles size={12} className="text-[#18b89d]" /> {text.legendAi}</span>
+            <span className="inline-flex items-center gap-1"><Camera size={12} className="text-amber-600" /> {text.legendNeedsYou}</span>
+            <span className="inline-flex items-center gap-1"><CheckCircle2 size={12} className="text-emerald-600" /> {text.legendReady}</span>
+            {Object.entries(typeMeta(text)).map(([key, meta]) => (
               <span key={key} className="inline-flex items-center gap-1">
                 <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
                 {meta.label}
@@ -275,7 +288,7 @@ export function SocialPlanCalendar({
 
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
             {days.map((day) => {
-              const label = dayLabel(day.date);
+              const label = dayLabel(day.date, lang);
               const dayItems = (day.item_ids || []).map((id) => itemById.get(id)).filter(Boolean) as SocialContentIdea[];
               return (
                 <div
@@ -302,7 +315,7 @@ export function SocialPlanCalendar({
           <div className="mt-5 flex justify-center">
             <Button onClick={generateAll} disabled={batchBusy || pendingGeneration} variant="outline" className="gap-2">
               {batchBusy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-              توليد كل الخطة
+              {text.generateWholePlan}
             </Button>
           </div>
         </>
@@ -328,8 +341,10 @@ export function SocialPlanCalendar({
 }
 
 function IdeaChip({ idea, onClick }: { idea: SocialContentIdea; onClick: () => void }) {
+  const { lang } = useLanguage();
+  const text = workPlanText(lang);
   const status = generationState(idea);
-  const meta = TYPE_META[idea.type] || TYPE_META.attraction;
+  const meta = typeMeta(text)[idea.type] || typeMeta(text).attraction;
   return (
     <button
       type="button"
@@ -376,6 +391,8 @@ function IdeaModal({
 }) {
   // The parent remounts this modal via `key` when the idea/post identity changes,
   // so initializing state from props here is safe.
+  const { lang } = useLanguage();
+  const text = workPlanText(lang);
   const [title, setTitle] = useState(idea.title || "");
   const [ideaText, setIdeaText] = useState(idea.idea || "");
   const [script, setScript] = useState(idea.script || "");
@@ -405,7 +422,7 @@ function IdeaModal({
         cta,
       });
       onResponse(res);
-      setMessage("انحفظت التعديلات.");
+      setMessage(text.changesSaved);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -420,7 +437,7 @@ function IdeaModal({
       await api.marketingPlans.generateSocialContentItem(suiteId, idea.id);
       const res = await api.marketingPlans.get(suiteId);
       onResponse(res);
-      setMessage("انضافت للتوليد — بتقدر تسكر النافذة، النتيجة بتظهر على الفكرة.");
+      setMessage(text.queuedOne);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Generate failed");
     } finally {
@@ -449,7 +466,7 @@ function IdeaModal({
     try {
       await api.content.update(suiteId, post.id, { caption });
       onPostsRefresh();
-      setMessage("انحفظ الكابشن.");
+      setMessage(text.captionSaved);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -457,12 +474,12 @@ function IdeaModal({
     }
   }
 
-  async function copyText(text: string) {
+  async function copyText(value: string) {
     try {
-      await navigator.clipboard.writeText(text);
-      setMessage("انسخ النص.");
+      await navigator.clipboard.writeText(value);
+      setMessage(text.copied);
     } catch {
-      setMessage("ما قدرنا ننسخ تلقائيًا — انسخ يدويًا.");
+      setMessage(text.copyFailed);
     }
   }
 
@@ -482,24 +499,24 @@ function IdeaModal({
               {formatIcon(idea.format)}
               {idea.format || "post"}
             </Badge>
-            <Badge variant="outline">{TYPE_META[idea.type]?.label || idea.type}</Badge>
-            {idea.scheduled_date && <Badge variant="outline">{dayLabel(idea.scheduled_date).weekday} {dayLabel(idea.scheduled_date).day}</Badge>}
+            <Badge variant="outline">{typeMeta(text)[idea.type]?.label || idea.type}</Badge>
+            {idea.scheduled_date && <Badge variant="outline">{dayLabel(idea.scheduled_date, lang).weekday} {dayLabel(idea.scheduled_date, lang).day}</Badge>}
             {capability === "ai" && <Badge className="gap-1 bg-[#18b89d] text-white"><Sparkles size={12} /> AI</Badge>}
-            {capability === "user_recommended" && <Badge variant="outline" className="gap-1 text-amber-700"><Camera size={12} /> الأفضل تصويرك</Badge>}
-            {capability === "user_required" && <Badge className="gap-1 bg-amber-500 text-white"><Camera size={12} /> بحاجة تصويرك</Badge>}
+            {capability === "user_recommended" && <Badge variant="outline" className="gap-1 text-amber-700"><Camera size={12} /> {text.recommendedForYou}</Badge>}
+            {capability === "user_required" && <Badge className="gap-1 bg-amber-500 text-white"><Camera size={12} /> {text.legendNeedsYou}</Badge>}
             {(capability !== "ai" || idea.user_intervention) && (
               <button
                 type="button"
                 onClick={() => setShowIntervention((current) => !current)}
                 className="rounded-full p-1 text-muted-foreground transition hover:bg-accent hover:text-foreground"
-                aria-label="شو المطلوب مني؟"
-                title="شو المطلوب مني؟"
+                aria-label={text.whatIsAskedOfMe}
+                title={text.whatIsAskedOfMe}
               >
                 <Info size={15} />
               </button>
             )}
           </div>
-          <button type="button" onClick={onClose} className="rounded-full p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="إغلاق">
+          <button type="button" onClick={onClose} className="rounded-full p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label={text.close}>
             <X size={18} />
           </button>
         </div>
@@ -511,11 +528,11 @@ function IdeaModal({
             {(idea.user_intervention.required_assets || []).length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {(idea.user_intervention.required_assets || []).map((asset) => (
-                  <Badge key={asset} variant="outline" className="border-amber-400 text-amber-800">{ASSET_LABELS[asset] || asset}</Badge>
+                  <Badge key={asset} variant="outline" className="border-amber-400 text-amber-800">{assetLabels(text)[asset] || asset}</Badge>
                 ))}
               </div>
             )}
-            <p className="mt-2 text-xs text-amber-700">قريبًا: رفع الملفات من هون مباشرة، وبعدها بنولّد نص البوست.</p>
+            <p className="mt-2 text-xs text-amber-700">{text.uploadSoon}</p>
           </div>
         )}
 
@@ -523,7 +540,7 @@ function IdeaModal({
 
         <div className="mt-4 space-y-3">
           <label className="block space-y-1">
-            <span className="text-xs font-semibold text-muted-foreground">الفكرة</span>
+            <span className="text-xs font-semibold text-muted-foreground">{text.theIdea}</span>
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
@@ -532,7 +549,7 @@ function IdeaModal({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-semibold text-muted-foreground">وصف الفكرة</span>
+            <span className="text-xs font-semibold text-muted-foreground">{text.ideaDescription}</span>
             <textarea
               value={ideaText}
               onChange={(event) => setIdeaText(event.target.value)}
@@ -542,7 +559,7 @@ function IdeaModal({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-semibold text-muted-foreground">الصيغة / النص المقترح</span>
+            <span className="text-xs font-semibold text-muted-foreground">{text.suggestedCopy}</span>
             <textarea
               value={script}
               onChange={(event) => setScript(event.target.value)}
@@ -552,7 +569,7 @@ function IdeaModal({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-semibold text-muted-foreground">الدعوة للفعل</span>
+            <span className="text-xs font-semibold text-muted-foreground">{text.callToAction}</span>
             <input
               value={cta}
               onChange={(event) => setCta(event.target.value)}
@@ -566,7 +583,7 @@ function IdeaModal({
           {dirty && (
             <Button onClick={saveEdits} disabled={busy === "save"} variant="outline" className="gap-2">
               {busy === "save" ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-              حفظ التعديلات
+              {text.saveChanges}
             </Button>
           )}
           {capability !== "user_required" && status !== "ready" && (
@@ -577,24 +594,24 @@ function IdeaModal({
                 <Sparkles size={14} />
               )}
               {status === "queued" || status === "generating"
-                ? "عم يتولد..."
+                ? text.generatingIdea
                 : status === "failed"
-                  ? "جرب التوليد من جديد"
+                  ? text.retryGeneration
                   : capability === "user_recommended"
-                    ? "ولّد بالAI رغم التوصية"
-                    : "توليد الفكرة"}
+                    ? text.generateAnyway
+                    : text.generateIdea}
             </Button>
           )}
           {status === "ready" && (
             <Button onClick={generate} disabled={busy === "generate"} variant="outline" className="gap-2">
               {busy === "generate" ? <Loader2 size={14} className="animate-spin" /> : <RefreshCcw size={14} />}
-              إعادة التوليد
+              {text.regenerateIdea}
             </Button>
           )}
           {alternatives.length > 0 && (
             <Button onClick={() => setShowAlternatives((current) => !current)} variant="ghost" className="gap-2">
               <RefreshCcw size={14} />
-              استبدال الفكرة ({alternatives.length})
+              {text.replaceIdea} ({alternatives.length})
             </Button>
           )}
         </div>
@@ -605,7 +622,7 @@ function IdeaModal({
 
         {showAlternatives && (
           <div className="mt-4 space-y-2 rounded-2xl border border-border bg-card/60 p-3">
-            <p className="text-xs font-semibold text-muted-foreground">بدائل من نفس النوع — اختيار بديل بستبدل هالفكرة بالخطة</p>
+            <p className="text-xs font-semibold text-muted-foreground">{text.alternativesNote}</p>
             {alternatives.map((candidate) => (
               <button
                 key={candidate.id}
@@ -624,7 +641,7 @@ function IdeaModal({
         {status === "ready" && post && (
           <div className="mt-5 space-y-3 rounded-2xl border border-emerald-300/60 bg-emerald-50/40 p-3">
             <p className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
-              <CheckCircle2 size={16} /> البوست جاهز
+              <CheckCircle2 size={16} /> {text.postReady}
             </p>
 
             {mediaUrls.length > 0 && (
@@ -648,7 +665,7 @@ function IdeaModal({
                       className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium transition hover:bg-accent"
                     >
                       <Download size={13} />
-                      تحميل {post.format === "video" ? "الفيديو" : mediaUrls.length > 1 ? `صورة ${index + 1}` : "الصورة"}
+                      {text.download} {post.format === "video" ? text.theVideo : mediaUrls.length > 1 ? `${text.imageN} ${index + 1}` : text.theImage}
                     </a>
                   ))}
                 </div>
@@ -656,7 +673,7 @@ function IdeaModal({
             )}
 
             <label className="block space-y-1">
-              <span className="text-xs font-semibold text-muted-foreground">الكابشن</span>
+              <span className="text-xs font-semibold text-muted-foreground">{text.caption}</span>
               <textarea
                 value={caption}
                 onChange={(event) => setCaption(event.target.value)}
@@ -668,11 +685,11 @@ function IdeaModal({
             <div className="flex flex-wrap gap-2">
               <Button onClick={saveCaption} disabled={busy === "caption" || caption === (post.caption || "")} variant="outline" size="sm" className="gap-1.5">
                 {busy === "caption" ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                حفظ الكابشن
+                {text.saveCaption}
               </Button>
               <Button onClick={() => copyText([caption, hashtags.join(" ")].filter(Boolean).join("\n\n"))} variant="outline" size="sm" className="gap-1.5">
                 <Copy size={13} />
-                نسخ الكابشن
+                {text.copyCaption}
               </Button>
             </div>
             {hashtags.length > 0 && (
@@ -687,7 +704,7 @@ function IdeaModal({
 
         {status === "ready" && !post && (
           <div className="mt-4 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-            البوست انولد — عم نجيب تفاصيله... إذا ما ظهر، افتح صفحة المحتوى.
+            {text.postGeneratedFetching}
           </div>
         )}
       </div>

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { SuitePageShell } from "@/components/suite/SuitePageShell";
 import { SocialIdeasGallery, nextMonth } from "@/components/work-plans/SocialIdeasGallery";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { workPlanText, type WorkPlanLabels } from "@/lib/i18n/workPlans";
 import { useRouter } from "next/navigation";
 
 function paidItemsFor(plan: PaidContentWorkPlan | undefined, stage: string) {
@@ -22,6 +23,7 @@ function paidRequiredFor(plan: PaidContentWorkPlan | undefined, stage: string) {
 export default function WorkPlansPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { lang, dir } = useLanguage();
+  const text = workPlanText(lang);
   const router = useRouter();
   // Both sections render stacked now. The two tabs read as a choice between
   // them, so people generated one, pressed Next, and left the other empty.
@@ -40,7 +42,7 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
         setResponse(res);
         setSelectedPaidIds(res.action_plan?.paid_content_plan?.selected_ids || []);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Load failed"))
+      .catch((err) => setError(err instanceof Error ? err.message : text.loading))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -57,12 +59,12 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
       (paidPlan?.candidates && Object.values(paidPlan.candidates).some((g) => g.length > 0)),
   );
   const runLabel = ideasGenerating && paidGenerating
-    ? "عم نجهّز أفكار السوشيال والإعلانات مع بعض…"
+    ? text.runBoth
     : ideasGenerating
-      ? "عم نجهّز أفكار السوشيال…"
+      ? text.runIdeas
       : paidGenerating
-        ? "عم نسأل مزوّدَين لأفكار الإعلانات…"
-        : "عم نبلّش…";
+        ? text.runPaid
+        : text.runStarting;
 
   // Resumes on any later visit: the flag lives on the server blob, not in
   // component state, so reopening the page picks a running job back up.
@@ -76,7 +78,7 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
           const next = res.action_plan?.paid_content_plan;
           if (next?.status === "ready") {
             setSelectedPaidIds(next.selected_ids || []);
-            setNotice("تم توليد مرشحين لخطة التسويق الممول. اختر فكرة من كل مرحلة واحفظ.");
+            setNotice(text.paidReady);
           }
         })
         .catch(() => undefined);
@@ -108,7 +110,7 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
       api.marketingPlans.generatePaidContentPlan(id, { language: lang }),
     ]);
     if (results.every((r) => r.status === "rejected")) {
-      setError("تعذّر بدء التوليد. جرّب كمان مرة.");
+      setError(text.startFailed);
     }
     try {
       setResponse(await api.marketingPlans.get(id));
@@ -133,7 +135,7 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
       ]);
       router.push("/startbyconnec/services");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : text.saveFailed);
       setSaving(false);
     }
   }
@@ -146,9 +148,9 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
       const res = await api.marketingPlans.updatePaidContentPlanSelection(id, selectedPaidIds);
       setResponse(res);
       setSelectedPaidIds(res.action_plan?.paid_content_plan?.selected_ids || selectedPaidIds);
-      setNotice("تم حفظ اختيارات خطة التسويق الممول.");
+      setNotice(text.paidSaved);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : text.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -165,11 +167,11 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
   }
 
   return (
-    <SuitePageShell title="الاستراتيجية">
+    <SuitePageShell title={text.pageTitle}>
       <div className="mx-auto w-full max-w-6xl space-y-5 px-4 py-4" dir={dir}>
         <header className="space-y-2">
-          <p className="text-sm font-semibold text-muted-foreground">خطط العمل المولدة</p>
-          <h1 className="text-3xl font-semibold tracking-normal">خطة العمل</h1>
+          <p className="text-sm font-semibold text-muted-foreground">{text.kicker}</p>
+          <h1 className="text-3xl font-semibold tracking-normal">{text.heading}</h1>
         </header>
 
         {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
@@ -178,14 +180,14 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
         <TeachRulesBox suiteId={id} />
 
         {loading ? (
-          <div className="rounded-2xl border border-border bg-card p-6 text-muted-foreground">جار تحميل خطة العمل...</div>
+          <div className="rounded-2xl border border-border bg-card p-6 text-muted-foreground">{text.loading}</div>
         ) : !anyPlanStarted ? (
           /* One button starts both runs. No month or count to decide: the
              defaults are next month and 12 ideas, editable afterwards. */
           <div className="rounded-3xl border border-border bg-card p-6 text-center">
-            <h2 className="text-xl font-bold">نجهّزلك خطة العمل؟</h2>
+            <h2 className="text-xl font-bold">{text.startTitle}</h2>
             <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
-              بنولّد أفكار السوشيال وأفكار الإعلانات مع بعض، وبنختارلك أفضلها. بتقدر تغيّر أي إشي بعدين.
+              {text.startBody}
             </p>
             <Button
               onClick={generateWorkPlan}
@@ -193,7 +195,7 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
               className="mt-5 h-12 gap-2 bg-foreground px-6 text-base font-bold text-background hover:bg-foreground/90"
             >
               {startingRun ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-              جهّز خطة العمل
+              {text.startCta}
             </Button>
           </div>
         ) : (
@@ -204,7 +206,7 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
                 <div>
                   <p className="text-sm font-semibold">{runLabel}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    التوليد شغال عالسيرفر — فيك تتنقل أو تسكّر التطبيق وترجع، ما رح يقف.
+                    {text.runsOnServer}
                   </p>
                 </div>
               </div>
@@ -216,7 +218,7 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
               onResponse={setResponse}
               hideStartCard
               hideSaveBar
-              saveHandle={saveIdeasRef}
+              saveHandleRef={saveIdeasRef}
             />
 
             <PaidPlanPanel
@@ -239,7 +241,7 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
                 className="h-12 w-full gap-2 bg-foreground text-base font-bold text-background hover:bg-foreground/90"
               >
                 {saving ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-                {anyGenerating ? "عم نجهّز…" : "حفظ ومتابعة"}
+                {anyGenerating ? text.preparing : text.saveContinue}
               </Button>
             </div>
           </>
@@ -270,14 +272,16 @@ function PaidPlanPanel({
   hideOwnActions?: boolean;
   onToggleIdea: (idea: PaidContentIdea, stage: string) => void;
 }) {
+  const { lang } = useLanguage();
+  const text = workPlanText(lang);
   const hasPlan = Boolean(plan?.candidates && Object.values(plan.candidates).some((items) => items.length > 0));
   return (
     <section className="rounded-3xl border border-[#ff4fa3]/25 bg-gradient-to-br from-[#ff4fa3]/8 via-background to-[#f8d84a]/10 p-4 shadow-sm sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">خطة محتوى للتسويق الممول</h2>
+          <h2 className="text-2xl font-semibold">{text.paidTitle}</h2>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            أفكار إعلانية حسب القناة والمرحلة: وعي، اهتمام، تحويل، ولاء، وتوصية. اختر فكرة واحدة من كل مرحلة.
+            {text.paidDesc}
           </p>
         </div>
         {/* The page owns a single generate and a single Next, so these only
@@ -286,12 +290,12 @@ function PaidPlanPanel({
           <div className="flex flex-wrap gap-2">
             <Button onClick={onGenerate} disabled={generating} className="gap-2 bg-foreground text-background hover:bg-foreground/90">
               {generating ? <Loader2 size={16} className="animate-spin" /> : <Megaphone size={16} />}
-              {hasPlan ? "توليد من جديد" : "توليد الخطة"}
+              {hasPlan ? text.regenerate : text.generatePlan}
             </Button>
             {hasPlan && (
               <Button onClick={onSave} disabled={saving} variant="outline" className="gap-2">
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                حفظ الاختيارات
+                {text.saveChoices}
               </Button>
             )}
           </div>
@@ -301,9 +305,9 @@ function PaidPlanPanel({
         <div className="mt-6 flex items-center gap-3 rounded-2xl border border-border bg-card/70 p-4">
           <Loader2 className="size-5 shrink-0 animate-spin text-primary" />
           <div>
-            <p className="text-sm font-semibold">عم نسأل مزوّدَين ونجمع الأفكار…</p>
+            <p className="text-sm font-semibold">{text.paidGenerating}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              التوليد شغال عالسيرفر — فيك تتنقل أو تسكّر التطبيق وترجع، ما رح يقف.
+              {text.runsOnServer}
             </p>
           </div>
         </div>
@@ -311,7 +315,7 @@ function PaidPlanPanel({
 
       {!hasPlan && !generating && (
         <div className="mt-6 rounded-2xl border border-dashed border-border bg-card/70 p-6 text-center text-sm text-muted-foreground">
-          لا توجد خطة للتسويق الممول بعد. اضغط توليد الخطة لاقتراح أفكار لكل مرحلة.
+          {text.paidEmpty}
         </div>
       )}
 
@@ -331,8 +335,8 @@ function PaidPlanPanel({
                       <h3 className="text-xl font-semibold">{stage.label}</h3>
                       <Badge variant="outline">{stage.stage}</Badge>
                     </div>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">هدف المرحلة: {stage.goal}</p>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">الفكرة: {stage.idea}</p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">{text.stageGoal}: {stage.goal}</p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">{text.stageIdea}: {stage.idea}</p>
                     {stage.activities && stage.activities.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {stage.activities.map((activity) => <Badge key={activity} variant="secondary">{activity}</Badge>)}
@@ -362,6 +366,8 @@ function PaidPlanPanel({
 }
 
 function PaidIdeaCard({ idea, selected, disabled, onClick }: { idea: PaidContentIdea; selected: boolean; disabled: boolean; onClick: () => void }) {
+  const { lang } = useLanguage();
+  const text = workPlanText(lang);
   const recommendedFormat = idea.recommended_format || idea.ad_format || "video";
   const description = idea.description || idea.visual_idea || idea.rationale || "";
   const FormatIcon = recommendedFormat === "carousel"
@@ -384,7 +390,7 @@ function PaidIdeaCard({ idea, selected, disabled, onClick }: { idea: PaidContent
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary" className="gap-1">
               <FormatIcon size={13} />
-              {formatLabel(recommendedFormat)}
+              {formatLabel(recommendedFormat, text)}
             </Badge>
             {idea.channel && <Badge variant="outline">{idea.channel}</Badge>}
             {idea.provider && <Badge variant="outline">{idea.provider}</Badge>}
@@ -407,21 +413,23 @@ function PaidIdeaCard({ idea, selected, disabled, onClick }: { idea: PaidContent
           ].join(" ")}
         >
           {selected ? <BadgeCheck size={16} /> : <Sparkles size={16} />}
-          {selected ? "مضافة" : "أضف الفكرة"}
+          {selected ? text.added : text.addIdea}
         </button>
       </div>
     </article>
   );
 }
 
-function formatLabel(format?: string) {
-  if (format === "image_banner") return "صورة / بانر";
-  if (format === "carousel") return "كاروسيل";
-  if (format === "ai_video") return "فيديو AI";
-  return "فيديو";
+function formatLabel(format: string | undefined, text: WorkPlanLabels) {
+  if (format === "image_banner") return text.fmtImageBanner;
+  if (format === "carousel") return text.fmtCarousel;
+  if (format === "ai_video") return text.fmtAiVideo;
+  return text.fmtVideo;
 }
 
 function TeachRulesBox({ suiteId }: { suiteId: string }) {
+  const { lang } = useLanguage();
+  const label = workPlanText(lang);
   const [feedback, setFeedback] = useState("");
   const [suggestions, setSuggestions] = useState<ContentRule[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -435,9 +443,9 @@ function TeachRulesBox({ suiteId }: { suiteId: string }) {
     try {
       const res = await api.suites.teachContentRules(suiteId, { feedback: text });
       setSuggestions(res.suggestions || []);
-      if (!res.suggestions?.length) setMessage("ما لقينا قاعدة قابلة للتعميم. جرب صيغة ثانية.");
+      if (!res.suggestions?.length) setMessage(label.teachNoRule);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Teach failed");
+      setMessage(err instanceof Error ? err.message : label.teachFailed);
     } finally {
       setBusy(null);
     }
@@ -454,9 +462,9 @@ function TeachRulesBox({ suiteId }: { suiteId: string }) {
       );
       setSuggestions((current) => current.filter((item) => item.id !== rule.id));
       setFeedback("");
-      setMessage("انحفظت القاعدة — رح تنطبق على كل توليد جاي.");
+      setMessage(label.teachSaved);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Save failed");
+      setMessage(err instanceof Error ? err.message : label.saveFailed);
     } finally {
       setBusy(null);
     }
@@ -465,20 +473,20 @@ function TeachRulesBox({ suiteId }: { suiteId: string }) {
   return (
     <section className="rounded-2xl border border-border bg-card/60 p-3">
       <p className="text-xs font-semibold text-muted-foreground">
-        علّم النظام — ملاحظة على المحتوى بتتحول لقاعدة دائمة (مثلًا: بدل شيقل اكتب شيكل)
+        {label.teachLabel}
       </p>
       <div className="mt-2 flex gap-2">
         <input
           value={feedback}
           onChange={(e) => setFeedback(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && teach()}
-          placeholder="اكتب ملاحظتك هون..."
+          placeholder={label.teachPlaceholder}
           className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
           dir="auto"
         />
         <Button type="button" onClick={teach} disabled={busy === "teach" || !feedback.trim()} variant="outline" className="shrink-0 gap-2">
           {busy === "teach" ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-          علّم النظام
+          {label.teachCta}
         </Button>
       </div>
       {message && <p className="mt-2 text-xs text-muted-foreground" dir="auto">{message}</p>}
@@ -488,7 +496,7 @@ function TeachRulesBox({ suiteId }: { suiteId: string }) {
             <div key={rule.id} className="flex items-center justify-between gap-2 rounded-md border border-border bg-background p-2">
               <div className="flex min-w-0 items-center gap-2">
                 <Badge variant={rule.type === "replace" ? "default" : "secondary"}>
-                  {rule.type === "replace" ? "استبدال" : "تعليمة"}
+                  {rule.type === "replace" ? label.ruleReplace : label.ruleGuideline}
                 </Badge>
                 <span className="truncate text-sm" dir="auto">
                   {rule.type === "replace" ? `"${rule.from}" ← "${rule.to}"` : rule.text}
@@ -496,7 +504,7 @@ function TeachRulesBox({ suiteId }: { suiteId: string }) {
               </div>
               <div className="flex shrink-0 gap-1">
                 <Button type="button" size="sm" onClick={() => confirm(rule)} disabled={busy === `confirm-${rule.id}`}>
-                  {busy === `confirm-${rule.id}` ? <Loader2 size={13} className="animate-spin" /> : "احفظ"}
+                  {busy === `confirm-${rule.id}` ? <Loader2 size={13} className="animate-spin" /> : label.save}
                 </Button>
                 <Button
                   type="button"
@@ -504,7 +512,7 @@ function TeachRulesBox({ suiteId }: { suiteId: string }) {
                   variant="ghost"
                   onClick={() => setSuggestions((current) => current.filter((item) => item.id !== rule.id))}
                 >
-                  تجاهل
+                  {label.dismiss}
                 </Button>
               </div>
             </div>

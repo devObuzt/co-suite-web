@@ -11,34 +11,46 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BadgeCheck, Loader2, Plus, Sparkles } from "lucide-react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { workPlanText, type WorkPlanLabels } from "@/lib/i18n/workPlans";
 
-const OBJECTIVE: Record<SocialIdeaObjective, { label: string; dot: string }> = {
-  attraction: { label: "جذب", dot: "#2f80ff" },
-  trust: { label: "ثقة", dot: "#18b89d" },
-  sales: { label: "مبيعات", dot: "#ff4fa3" },
+const OBJECTIVE_DOT: Record<SocialIdeaObjective, string> = {
+  attraction: "#2f80ff",
+  trust: "#18b89d",
+  sales: "#ff4fa3",
 };
 
-const ASSET_LABELS: Record<string, string> = {
-  ugc: "يو جي سي",
-  talking_head: "فيديو شخص يحكي",
-  image: "صورة",
-  banner: "بانر",
-  carousel: "كاروسيل",
-  ai_video: "فيديو AI",
-  landing_page: "صفحة هبوط",
-  webinar: "ويبنار",
-  website: "موقع",
-  app: "تطبيق",
-  digital_asset_other: "أصل رقمي آخر",
-};
+function objectiveLabel(type: SocialIdeaObjective, text: WorkPlanLabels): string {
+  if (type === "trust") return text.goalTrust;
+  if (type === "sales") return text.goalSales;
+  return text.goalAttraction;
+}
 
-const FILTERS: Array<{ key: string; label: string }> = [
-  { key: "all", label: "الكل" },
-  { key: "attraction", label: "جذب" },
-  { key: "trust", label: "ثقة" },
-  { key: "sales", label: "مبيعات" },
-  { key: "occasions", label: "مناسبات" },
-];
+function assetLabels(text: WorkPlanLabels): Record<string, string> {
+  return {
+    ugc: text.assetUgc,
+    talking_head: text.assetTalkingHead,
+    image: text.assetImage,
+    banner: text.assetBanner,
+    carousel: text.assetCarousel,
+    ai_video: text.assetAiVideo,
+    landing_page: text.assetLandingPage,
+    webinar: text.assetWebinar,
+    website: text.assetWebsite,
+    app: text.assetApp,
+    digital_asset_other: text.assetDigitalOther,
+  };
+}
+
+function filters(text: WorkPlanLabels): Array<{ key: string; label: string }> {
+  return [
+    { key: "all", label: text.goalAll },
+    { key: "attraction", label: text.goalAttraction },
+    { key: "trust", label: text.goalTrust },
+    { key: "sales", label: text.goalSales },
+    { key: "occasions", label: text.goalOccasions },
+  ];
+}
 
 export function nextMonth(): string {
   const d = new Date();
@@ -49,8 +61,8 @@ export function nextMonth(): string {
 
 // A plain select, identical on mobile and desktop — no native month/calendar
 // widget differences between platforms.
-function monthOptions(current: string): Array<{ value: string; label: string }> {
-  const fmt = new Intl.DateTimeFormat("ar", { month: "long", year: "numeric" });
+function monthOptions(current: string, lang: string): Array<{ value: string; label: string }> {
+  const fmt = new Intl.DateTimeFormat(lang || "en", { month: "long", year: "numeric" });
   const list: Array<{ value: string; label: string }> = [];
   const d = new Date();
   d.setDate(1);
@@ -66,8 +78,8 @@ function monthOptions(current: string): Array<{ value: string; label: string }> 
   return list;
 }
 
-function assetLabel(type: string): string {
-  return ASSET_LABELS[type] ?? type;
+function assetLabel(type: string, text: WorkPlanLabels): string {
+  return assetLabels(text)[type] ?? type;
 }
 
 /**
@@ -75,18 +87,19 @@ function assetLabel(type: string): string {
  * about 14s on a cache miss and the ideas call about 42s, so those two are
  * most of what the user waits through and each gets its own line.
  */
-function stageLabel(stage: SocialIdeasPlan["stage"], period?: string): string {
+function stageLabel(stage: SocialIdeasPlan["stage"], period: string | undefined, text: WorkPlanLabels): string {
+  const when = period || text.thisMonth;
   switch (stage) {
     case "occasions":
-      return `عم نفحص مناسبات ${period || "الشهر"}…`;
+      return `${text.stageOccasions} ${when}…`;
     case "market":
-      return "عم نقرأ أبحاث السوق والمنافسين…";
+      return text.stageMarket;
     case "ideas":
-      return "عم نولّد الأفكار — هاي أطول خطوة…";
+      return text.stageIdeas;
     case "shaping":
-      return "عم نرتّب الأفكار ونجهّزها…";
+      return text.stageShaping;
     default:
-      return `عم نجهّز أفكار ${period || "الشهر"}…`;
+      return `${text.stageDefault} ${when}…`;
   }
 }
 
@@ -96,7 +109,7 @@ export function SocialIdeasGallery({
   onResponse,
   hideStartCard = false,
   hideSaveBar = false,
-  saveHandle,
+  saveHandleRef,
 }: {
   suiteId: string;
   response: MarketingPlanResponse | null;
@@ -106,8 +119,10 @@ export function SocialIdeasGallery({
   hideStartCard?: boolean;
   hideSaveBar?: boolean;
   /** Lets the page save this section's selection from its own Next button. */
-  saveHandle?: React.MutableRefObject<(() => Promise<void>) | null>;
+  saveHandleRef?: React.MutableRefObject<(() => Promise<void>) | null>;
 }) {
+  const { lang, dir } = useLanguage();
+  const text = workPlanText(lang);
   const plan = response?.action_plan?.social_ideas_plan;
   const candidates = useMemo(() => plan?.candidates ?? [], [plan]);
   const target = plan?.target_count ?? 12;
@@ -190,17 +205,11 @@ export function SocialIdeasGallery({
       genStartRef.current = Date.now();
       setStalled(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "تعذّر توليد الأفكار");
+      setError(e instanceof Error ? e.message : text.ideasFailed);
     } finally {
       setBusy(false);
     }
   }
-
-  // No dep array on purpose: keep the handle pointing at the current closure
-  // so the page's Next button always saves the latest selection.
-  useEffect(() => {
-    if (saveHandle) saveHandle.current = saveSelection;
-  });
 
   async function saveSelection() {
     setSaving(true);
@@ -213,11 +222,17 @@ export function SocialIdeasGallery({
       });
       onResponse(res);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "تعذّر حفظ الاختيار");
+      setError(e instanceof Error ? e.message : text.saveChoiceFailed);
     } finally {
       setSaving(false);
     }
   }
+
+  // No dep array on purpose: keep the handle pointing at the current closure
+  // so the page's Next button always saves the latest selection.
+  useEffect(() => {
+    if (saveHandleRef) saveHandleRef.current = saveSelection;
+  });
 
   function toggleSelected(id: string) {
     setSelected((prev) => {
@@ -243,11 +258,11 @@ export function SocialIdeasGallery({
   if (candidates.length === 0 && hideStartCard) return null;
   if (candidates.length === 0) {
     return (
-      <div dir="rtl" className="space-y-4 text-right">
+      <div dir={dir} className="space-y-4 text-start">
         <div className="rounded-2xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             <Sparkles className="size-5 text-primary" />
-            <h3 className="text-lg font-semibold">أفكار السوشيال</h3>
+            <h3 className="text-lg font-semibold">{text.ideasTitle}</h3>
           </div>
           {generating ? (
             <div className="mt-4 space-y-3">
@@ -257,9 +272,9 @@ export function SocialIdeasGallery({
                   <div className="min-w-0">
                     {/* The wait is ~56s. A single frozen sentence for all of it
                         reads as a hang, so name the phase the worker reports. */}
-                    <p className="text-sm font-semibold" dir="auto">{stageLabel(plan?.stage, plan?.period)}</p>
+                    <p className="text-sm font-semibold" dir="auto">{stageLabel(plan?.stage, plan?.period, text)}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      التوليد شغال عالسيرفر — فيك تتنقل أو تسكّر التطبيق وترجع، ما رح يقف.
+                      {text.runsOnServer}
                     </p>
                   </div>
                 </div>
@@ -272,10 +287,10 @@ export function SocialIdeasGallery({
               </div>
               {stalled && (
                 <div className="flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
-                  <span>أخذ وقت أطول من المعتاد. إذا ما ظهرت الأفكار، جرّب إعادة المحاولة.</span>
+                  <span>{text.ideasSlow}</span>
                   <Button onClick={generate} disabled={busy} size="sm" variant="outline" className="gap-2 self-start">
                     {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                    إعادة المحاولة
+                    {text.retry}
                   </Button>
                 </div>
               )}
@@ -283,28 +298,28 @@ export function SocialIdeasGallery({
           ) : (
             <>
               <p className="mt-1 text-sm text-muted-foreground">
-                بنفحص المناسبات وأبحاث السوق، وبنقترح ضعف العدد أفكار — إنت بتختار.
+                {text.ideasIntro}
               </p>
               {plan?.status === "failed" && (
                 <p className="mt-3 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                  تعذّر التوليد المرة الماضية — جرّب كمان مرة.
+                  {text.lastRunFailed}
                 </p>
               )}
               <div className="mt-4 flex flex-wrap items-end gap-3">
                 <label className="text-sm">
-                  <span className="mb-1 block text-muted-foreground">الشهر</span>
+                  <span className="mb-1 block text-muted-foreground">{text.monthLabel}</span>
                   <select
                     value={period}
                     onChange={(e) => setPeriod(e.target.value)}
                     className="min-h-10 rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   >
-                    {monthOptions(period).map((o) => (
+                    {monthOptions(period, lang).map((o) => (
                       <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                   </select>
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-muted-foreground">عدد الأفكار (الوتيرة)</span>
+                  <span className="mb-1 block text-muted-foreground">{text.countLabel}</span>
                   <input
                     type="number"
                     min={1}
@@ -316,7 +331,7 @@ export function SocialIdeasGallery({
                 </label>
                 <Button onClick={generate} disabled={busy}>
                   {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                  {busy ? "عم نولّد…" : "ولّد أفكار"}
+                  {busy ? text.generating : text.generateIdeas}
                 </Button>
               </div>
               {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
@@ -329,25 +344,25 @@ export function SocialIdeasGallery({
 
   // ── Gallery ────────────────────────────────────────────────────────────
   return (
-    <div dir="rtl" className="space-y-3 text-right">
+    <div dir={dir} className="space-y-3 text-start">
       {/* Sticky counter + save */}
       <div className="sticky top-0 z-10 -mx-1 flex items-center justify-between gap-2 rounded-xl border border-border bg-card/95 px-4 py-2.5 backdrop-blur">
         <div className="flex items-center gap-2 text-sm">
-          <span className="font-semibold">أفكار {plan?.period}</span>
+          <span className="font-semibold">{text.ideasFor} {plan?.period}</span>
           <Badge variant="secondary">
-            اخترت {selected.size} / {target}
+            {text.chosen} {selected.size} / {target}
           </Badge>
         </div>
         {!hideSaveBar && (
           <Button size="sm" onClick={saveSelection} disabled={saving}>
-            {saving ? <Loader2 className="size-4 animate-spin" /> : "حفظ الاختيار"}
+            {saving ? <Loader2 className="size-4 animate-spin" /> : text.saveChoice}
           </Button>
         )}
       </div>
 
       {/* Filter chips */}
       <div className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
+        {filters(text).map((f) => (
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
@@ -383,7 +398,7 @@ export function SocialIdeasGallery({
       <div className="pt-1">
         <Button variant="outline" size="sm" onClick={generate} disabled={busy || generating}>
           {busy || generating ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-          {generating ? "عم نولّد بالخلفية…" : "إعادة توليد"}
+          {generating ? text.generatingBackground : text.regenerateIdeas}
         </Button>
       </div>
     </div>
@@ -407,7 +422,9 @@ function IdeaCard({
   onToggleAsset: (assetType: string) => void;
   onNote: (value: string) => void;
 }) {
-  const obj = OBJECTIVE[idea.objective_type];
+  const { lang } = useLanguage();
+  const text = workPlanText(lang);
+  const obj = { label: objectiveLabel(idea.objective_type, text), dot: OBJECTIVE_DOT[idea.objective_type] };
   return (
     <div
       className={`rounded-2xl border bg-card p-3.5 transition ${
@@ -443,7 +460,7 @@ function IdeaCard({
           }`}
         >
           {selected ? <BadgeCheck className="size-4" /> : <Plus className="size-4" />}
-          {selected ? "مضافة" : "أضف الفكرة"}
+          {selected ? text.added : text.addIdea}
         </button>
       </div>
 
@@ -452,7 +469,7 @@ function IdeaCard({
         {(idea.client_story.text || idea.client_story.example) && (
           <div>
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              قصة عميل — مثال توضيحي حالياً
+              {text.clientStoryNote}
             </div>
             {idea.client_story.text && (
               <p className="mt-1 text-sm" dir="auto">
@@ -469,7 +486,7 @@ function IdeaCard({
 
         <div>
           <div className="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-            كيفية التطبيق — المقترح (الوسط) مختار مسبقاً
+            {text.howToApply}
           </div>
           <div className="flex flex-wrap gap-1.5">
             {idea.apply_assets.map((a) => {
@@ -485,7 +502,7 @@ function IdeaCard({
                   }`}
                 >
                   {on ? "✓ " : "+ "}
-                  {assetLabel(a.asset_type)}
+                  {assetLabel(a.asset_type, text)}
                 </button>
               );
             })}
@@ -493,11 +510,11 @@ function IdeaCard({
         </div>
 
         <div>
-          <div className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">ملاحظاتك</div>
+          <div className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">{text.yourNotes}</div>
           <textarea
             value={note}
             onChange={(e) => onNote(e.target.value)}
-            placeholder="دوّن ملاحظاتك على الفكرة…"
+            placeholder={text.notesPlaceholder}
             rows={2}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
             dir="auto"
