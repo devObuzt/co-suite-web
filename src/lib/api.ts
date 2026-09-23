@@ -505,6 +505,13 @@ export const api = {
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan`),
     status: (suiteId: string) =>
       request<GenerationStatus>(`/suites/${suiteId}/marketing-plan/generation-status`),
+    // Queues the whole stage chain as one server-side job. Safe to re-post:
+    // a run already in flight is handed back instead of forked.
+    generateFull: (suiteId: string, data?: { language?: string }) =>
+      request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/full/generate`, {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }),
     generate: (suiteId: string, data?: { language?: string; near_term_focus?: string; upcoming_campaigns?: string[]; planning_notes?: string }) =>
       request<MarketingPlanResponse>(`/suites/${suiteId}/marketing-plan/generate`, {
         method: "POST",
@@ -1276,6 +1283,8 @@ export interface MarketingPlanResponse {
   intelligence?: MarketingIntelligence;
   action_plan?: MarketingActionPlan;
   visuals?: PlanVisual[];
+  /** Which plan stages already hold data — the page resumes from this. */
+  plan_stages?: Record<string, boolean>;
   generation_status?: GenerationStatus | null;
 }
 

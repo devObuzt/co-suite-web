@@ -77,7 +77,12 @@ export function FunnelChrome({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className="flex-1">{children}</main>
-      <FunnelFooter />
+      {/* A wizard step with a bottom-pinned confirm button publishes its height
+          on the body; without this reservation that fixed bar sits on top of
+          the sign-out link and the link cannot be tapped on a phone. */}
+      <div style={{ paddingBottom: "var(--funnel-sticky-action, 0px)" }}>
+        <FunnelFooter />
+      </div>
     </div>
   );
 }

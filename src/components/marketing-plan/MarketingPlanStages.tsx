@@ -30,7 +30,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { ApiError, api, Brand, MarketingCompetitor, MarketingIntelligence, MarketingKeyword, MarketingPersona, MarketingPlanResponse, PlanVisual, Suite } from "@/lib/api";
+import { ApiError, api, Brand, GenerationStatus, MarketingCompetitor, MarketingIntelligence, MarketingKeyword, MarketingPersona, MarketingPlanResponse, PlanVisual, Suite } from "@/lib/api";
 import { useAuthStore } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1318,6 +1318,15 @@ function CompetitorAvatar({ competitor }: { competitor: MarketingCompetitor }) {
   );
 }
 
+// The worker names its stages the way the plan does, bar one underscore.
+const JOB_STAGE_TO_SLUG: Record<string, StageSlug> = {
+  keywords: "keywords",
+  competitors: "competitors",
+  demand_supply: "demand-supply",
+  personas: "personas",
+  message: "message",
+};
+
 export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage?: StageSlug }) {
   const { lang, dir, t } = useLanguage();
   const isFunnelUser = useAuthStore((s) => s.user?.approval_status === "funnel");
@@ -1330,9 +1339,12 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
   const [error, setError] = useState("");
   const [showIntro, setShowIntro] = useState(false);
   const visualsRequested = useRef(false);
-  const [autoStage, setAutoStage] = useState<StageSlug | null>(null);
   const [visualsSettled, setVisualsSettled] = useState(false);
   const autoStarted = useRef(false);
+  // The plan is built by a server-side job now. This is the only thing that
+  // knows which stage is running — a refresh re-reads it and picks the run
+  // back up, because the run never lived in this tab.
+  const [generation, setGeneration] = useState<GenerationStatus | null>(null);
 
   const load = useCallback(async () => {
     setError("");
@@ -1340,6 +1352,11 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     setSuite(suiteRes);
     setIntelligence(planRes.intelligence || null);
     setVisuals(planRes.visuals || []);
+    const job = planRes.generation_status || null;
+    setGeneration(job);
+    // A run that died on the server has to say so here — otherwise the page
+    // just sits on a missing section with no explanation.
+    if (job && !job.is_active && job.safe_error) setError(job.safe_error);
   }, [suiteId]);
 
   const hasPlanContent = Boolean(
@@ -1593,48 +1610,21 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     }
   }
 
-  async function runStageSafe(slug: StageSlug, fn: () => Promise<MarketingPlanResponse>): Promise<boolean> {
-    setAutoStage(slug);
-    setBusy(slug);
-    try {
-      applyPlanResponse(await fn());
-      return true;
-    } catch {
-      const fresh = await resyncPlan();
-      // If the request died but the server persisted the section, it's a success.
-      if (slug === "keywords") return (fresh?.keywords || []).length > 0;
-      if (slug === "competitors") return (fresh?.competitors || []).length > 0;
-      if (slug === "demand-supply") return Boolean(fresh?.demand_supply) || (fresh?.demand_signals || []).length > 0;
-      return false;
-    }
-  }
-
+  // One press (or one arrival) queues the whole chain on the server: keywords,
+  // competitors, demand & supply, personas, then the message. The browser only
+  // watches — closing the tab or reloading no longer abandons a half-built plan.
   async function generateFullPlan() {
     setError("");
-    const failed: string[] = [];
     try {
-      // One failing section never blocks the rest of the chain.
-      if (!(await runStageSafe("keywords", () => api.marketingPlans.generateKeywords(suiteId, { language: lang })))) failed.push(text.keywordsTitle);
-      if (!(await runStageSafe("competitors", () => api.marketingPlans.generateCompetitors(suiteId, { language: lang })))) failed.push(text.competitorsTitle);
-      if (!(await runStageSafe("demand-supply", () => api.marketingPlans.generateDemandSupply(suiteId, { language: lang })))) failed.push(text.demandTitle);
-      setAutoStage("personas");
-      setBusy(null);
-      try {
-        await generatePersonasInitial();
-      } catch {
-        await resyncPlan();
-      }
-      // The marketing message closes the plan: generated last, from everything above.
-      if (!marketingMessage) {
-        setAutoStage("message");
-        await generateMessage();
-      }
-    } finally {
-      setAutoStage(null);
-      setBusy(null);
-    }
-    if (failed.length > 0) {
-      setError(`${text.stageFailed}: ${failed.join(" · ")}`);
+      const res = await api.marketingPlans.generateFull(suiteId, { language: lang });
+      applyPlanResponse(res);
+      setGeneration(res.generation_status || null);
+    } catch (e) {
+      // A funnel lead who already spent their automatic runs is not an error
+      // state — they keep the plan they have and the per-stage buttons.
+      const spent =
+        e instanceof ApiError && (e.detail === "funnel_call_limit" || e.detail === "funnel_regeneration_blocked");
+      if (!spent) setError(friendlyError(e));
     }
   }
 
@@ -1650,17 +1640,48 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     message: Boolean(marketingMessage),
   };
   const hasAnyPlanData = stageReady.keywords || stageReady.competitors || stageReady["demand-supply"] || stageReady.personas;
+  // Half a plan is not a plan: the page used to treat "some data exists" as
+  // done, so a refresh mid-run left the rest unbuilt forever.
+  const planComplete =
+    stageReady.keywords &&
+    stageReady.competitors &&
+    stageReady["demand-supply"] &&
+    stageReady.personas &&
+    stageReady.message;
 
-  // No plan yet → generation starts by itself, no button press needed.
+  const jobActive = Boolean(generation?.is_active);
+  const firstPendingStage: StageSlug | null =
+    (["keywords", "competitors", "demand-supply", "personas", "message"] as StageSlug[]).find(
+      (slug) => !stageReady[slug]
+    ) ?? null;
+  // The running stage comes from the job row, so it survives a reload. A job
+  // still queued has no stage of its own yet — name the next missing one so
+  // the page never reads as "nothing is happening" while work is pending.
+  const autoStage: StageSlug | null = jobActive
+    ? (JOB_STAGE_TO_SLUG[String(generation?.stage || "")] ?? firstPendingStage)
+    : null;
+
+  // Incomplete plan and nothing running → queue the server job. Posting this
+  // twice is harmless: the API hands back the run already in flight.
   useEffect(() => {
     if (autoStarted.current || !suite || stage) return;
-    if (!hasAnyPlanData && busy === null && autoStage === null) {
+    if (!planComplete && !jobActive && busy === null) {
       autoStarted.current = true;
       const timer = window.setTimeout(() => void generateFullPlan(), 0);
       return () => window.clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suite, hasAnyPlanData]);
+  }, [suite, planComplete, jobActive]);
+
+  // Watch the run: each poll pulls in whatever stage just landed, so sections
+  // appear one by one exactly as they did before — just driven by the server.
+  useEffect(() => {
+    if (!jobActive) return;
+    const timer = window.setInterval(() => {
+      void load().catch(() => undefined);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [jobActive, load]);
   // Progressive reveal while the full-plan run is in flight: a section only
   // appears once it is COMPLETE — never half-filled (a lone competitor while
   // more are coming reads as weak output). The in-flight stage shows as a

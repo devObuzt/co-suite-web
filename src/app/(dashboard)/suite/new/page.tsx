@@ -113,10 +113,21 @@ const LANG_TO_DIALECT: Record<string, string> = {
 // descriptions in the field.
 const ARAB_48_DIALECT = "عربي - عرب الـ48";
 
-function suggestedDialect(extracted: string, langs: string[], countriesText: string) {
-  const arabicAudience = (langs[0] || "") === "ar" || /arab|عرب|فلسطين|palestin/i.test(extracted);
-  const inIsrael = /israel|إسرائيل|ישראל/i.test(countriesText);
-  return arabicAudience && inIsrael ? ARAB_48_DIALECT : extracted;
+// The Arab-48 suggestion is for Arabic-speaking suites run from Israel only:
+// the UI language must be Arabic AND the audience's first language must be
+// Arabic AND the audience must be in Israel. A Hebrew UI or a Hebrew-first
+// audience never sees it — an AI-extracted dialect string that merely mentions
+// "عرب" is NOT enough (owner decision 2026-09-23).
+function arab48Eligible(uiLang: string, langs: string[], countriesText: string) {
+  if (uiLang !== "ar") return false;
+  if ((langs[0] || "") !== "ar") return false;
+  return /israel|إسرائيل|اسرائيل|ישראל/i.test(countriesText);
+}
+
+function suggestedDialect(extracted: string, langs: string[], countriesText: string, uiLang: string) {
+  if (arab48Eligible(uiLang, langs, countriesText)) return ARAB_48_DIALECT;
+  // Never carry the Arab-48 label into a suite that is not eligible for it.
+  return extracted.trim() === ARAB_48_DIALECT ? "" : extracted;
 }
 
 // The custom-country field holds ONLY a clean country name: no parenthetical
@@ -483,15 +494,21 @@ export default function NewSuitePage() {
 
   // Adjust-during-render (no setState-in-effect): prefill the country on the
   // audience step, and suggest the Arab-48 dialect for Israeli Arabic suites.
-  const ipPrefillKey = `${step}|${ipCountry}|${orderedLangs[0] || ""}`;
+  const ipPrefillKey = `${step}|${ipCountry}|${orderedLangs[0] || ""}|${lang}`;
   const [prevIpPrefillKey, setPrevIpPrefillKey] = useState(ipPrefillKey);
   if (ipPrefillKey !== prevIpPrefillKey) {
     setPrevIpPrefillKey(ipPrefillKey);
     if (step === "step-e" && !customCountries && ipCountry) {
       setCustomCountries(cleanCountryPrefill(ipCountry, lang));
     }
-    if (!audienceDialect && (orderedLangs[0] || "") === "ar" && /israel|إسرائيل|ישראל/i.test(ipCountry)) {
+    const arab48Ok = arab48Eligible(lang, orderedLangs, ipCountry);
+    if (!audienceDialect && arab48Ok) {
       setAudienceDialect(ARAB_48_DIALECT);
+    }
+    // The audience language can change after the suggestion was filled in —
+    // drop a stale Arab-48 label instead of leaving it on a Hebrew suite.
+    if (audienceDialect.trim() === ARAB_48_DIALECT && !arab48Ok) {
+      setAudienceDialect("");
     }
   }
 
@@ -827,7 +844,7 @@ export default function NewSuitePage() {
         ipCountry,
       ].join(", ");
       setAudienceDialect(
-        suggestedDialect(res.brand?.dialect || "", res.brand?.audience_languages || [], dialectContextCountries)
+        suggestedDialect(res.brand?.dialect || "", res.brand?.audience_languages || [], dialectContextCountries, lang)
       );
       setAudienceNotes(res.brand?.audience_notes || "");
       const audienceLocation = res.brand?.audience_location;
@@ -2493,11 +2510,37 @@ export default function NewSuitePage() {
  * punching a visible empty box under the field; the page container carries
  * the bottom padding instead. The safe-area inset keeps the button clear of
  * the iOS home indicator and keyboard accessory bar.
+ *
+ * Being fixed, the bar also lands on top of whatever the funnel chrome renders
+ * BELOW this page — the footer with the sign-out link, which the page's own
+ * bottom padding cannot reach. So the bar publishes its measured height on the
+ * body as `--funnel-sticky-action`, and the chrome clears that much room. The
+ * height is measured rather than hard-coded: it changes with the safe-area
+ * inset, with a wrapped button label, and with the user's font size.
  */
 function StepActions({ sticky, children }: { sticky: boolean; children: React.ReactNode }) {
+  const barRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const node = barRef.current;
+    if (!sticky || !node) return;
+    const publish = () =>
+      document.body.style.setProperty("--funnel-sticky-action", `${node.offsetHeight}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      document.body.style.removeProperty("--funnel-sticky-action");
+    };
+  }, [sticky]);
+
   if (!sticky) return <>{children}</>;
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+    <div
+      ref={barRef}
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur"
+    >
       <div className="mx-auto max-w-3xl">{children}</div>
     </div>
   );
