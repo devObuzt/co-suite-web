@@ -6,6 +6,14 @@ import { useAuthStore } from "@/store/auth";
 import { useT, useLanguage } from "@/lib/i18n/LanguageContext";
 import { LANGUAGES, LangCode } from "@/lib/i18n/translations";
 import { getSuggestions, findNicheIndex, getEnglishNiche } from "@/lib/i18n/suggestions";
+import {
+  ARAB_48_DIALECT,
+  arab48Eligible,
+  aiText,
+  cleanCountryPrefill,
+  splitLocationPrefill,
+  suggestedDialect,
+} from "@/lib/suite/audiencePrefill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -108,40 +116,6 @@ const LANG_TO_DIALECT: Record<string, string> = {
   "ar": "Palestinian Arabic", "he": "Hebrew", "en": "English",
   "ru": "Russian", "fr": "French", "es": "Spanish", "tr": "Turkish", "zh": "Chinese",
 };
-
-// Arabs in Israel get exactly this dialect suggestion — no long AI-extracted
-// descriptions in the field.
-const ARAB_48_DIALECT = "عربي - عرب الـ48";
-
-// The Arab-48 suggestion is for Arabic-speaking suites run from Israel only:
-// the UI language must be Arabic AND the audience's first language must be
-// Arabic AND the audience must be in Israel. A Hebrew UI or a Hebrew-first
-// audience never sees it — an AI-extracted dialect string that merely mentions
-// "عرب" is NOT enough (owner decision 2026-09-23).
-function arab48Eligible(uiLang: string, langs: string[], countriesText: string) {
-  if (uiLang !== "ar") return false;
-  if ((langs[0] || "") !== "ar") return false;
-  return /israel|إسرائيل|اسرائيل|ישראל/i.test(countriesText);
-}
-
-function suggestedDialect(extracted: string, langs: string[], countriesText: string, uiLang: string) {
-  if (arab48Eligible(uiLang, langs, countriesText)) return ARAB_48_DIALECT;
-  // Never carry the Arab-48 label into a suite that is not eligible for it.
-  return extracted.trim() === ARAB_48_DIALECT ? "" : extracted;
-}
-
-// The custom-country field holds ONLY a clean country name: no parenthetical
-// AI notes, no leading city fragments. Israel-area audiences always get
-// "إسرائيل" (localized) — never "فلسطين" or mixed forms (owner decision).
-function cleanCountryPrefill(raw: string, uiLang: string): string {
-  const stripped = raw.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim().replace(/[،,\s]+$/, "");
-  if (!stripped) return "";
-  if (/إسرائيل|israel|ישראל|فلسطين|palestin/i.test(stripped)) {
-    return uiLang === "ar" ? "إسرائيل" : uiLang === "he" ? "ישראל" : "Israel";
-  }
-  const parts = stripped.split(/[،,/]+/).map((part) => part.trim()).filter(Boolean);
-  return parts.length > 1 ? parts[parts.length - 1] : stripped;
-}
 
 const META_INTERESTS: Record<string, string[]> = {
   marketing: ["Meta Ads", "Instagram Business", "Small business", "Entrepreneurship", "Digital marketing"],
@@ -850,13 +824,20 @@ export default function NewSuitePage() {
       const audienceLocation = res.brand?.audience_location;
       setLocationScope("Custom");
       // Country field keeps ONLY the country — any city in the extracted
-      // location string moves to the cities field.
+      // location string moves to the cities field. The extractor now answers
+      // location_city / location_country separately; the comma split is only
+      // the fallback for the old free-text `location`.
+      const brandRecord = (res.brand || {}) as Record<string, unknown>;
       const extractedLocation = String(res.brand?.location || "");
-      const locationParts = extractedLocation.split(",").map((part) => part.trim()).filter(Boolean);
-      const extractedCountry = locationParts.length > 1 ? locationParts[locationParts.length - 1] : extractedLocation;
-      const extractedCity = locationParts.length > 1 ? locationParts.slice(0, -1).join(", ") : "";
-      setCustomCountries(cleanCountryPrefill((audienceLocation?.countries || []).join(", ") || extractedCountry || "", lang));
-      setCustomCities((audienceLocation?.cities || []).join(", ") || extractedCity);
+      const split = splitLocationPrefill(
+        (audienceLocation?.countries || []).join(", ") || aiText(brandRecord.location_country),
+        (audienceLocation?.cities || []).join(", ") || aiText(brandRecord.location_city),
+        extractedLocation,
+        ipCountry,
+        lang,
+      );
+      setCustomCountries(split.country);
+      setCustomCities(split.city);
       setSelectedInterests(res.brand?.audience_interests || []);
       setSelectedBehaviors(res.brand?.audience_behaviors || []);
       setSelectedStatuses(res.brand?.audience_social_statuses || []);

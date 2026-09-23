@@ -1941,6 +1941,10 @@ export interface GenerationStatus {
   updated_at?: string;
   finished_at?: string;
   stages?: Array<{ id: string; label?: string; status?: string; progress?: number }>;
+  /** Full marketing-plan runs only: which plan stages the worker has FINISHED.
+   *  Data presence lies mid-stage (one competitor on disk, nine still coming),
+   *  so the page reveals a section off this map, not off the payload. */
+  plan_stages?: Record<string, boolean> | null;
   partial?: Record<string, unknown> | null;
   // Trimmed job input, only returned by list endpoints (e.g. video montage jobs).
   input?: {

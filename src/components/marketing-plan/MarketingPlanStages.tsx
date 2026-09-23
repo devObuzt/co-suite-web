@@ -1088,7 +1088,9 @@ function competitorScore(competitor: MarketingCompetitor) {
   return countScore + priorityScore;
 }
 
-const competitorSourceOrder = ["google_organic", "instagram", "maps", "facebook", "tiktok", "google_sponsored", "sponsored", "other"];
+// Instagram first: it is where this audience actually compares businesses,
+// and the first tab is also the one that opens by default.
+const competitorSourceOrder = ["instagram", "google_organic", "maps", "facebook", "tiktok", "google_sponsored", "sponsored", "other"];
 
 const competitorSourceLabels: Record<string, string> = {
   google_organic: "Google Organic",
@@ -1323,6 +1325,13 @@ const JOB_STAGE_TO_SLUG: Record<string, StageSlug> = {
   keywords: "keywords",
   competitors: "competitors",
   demand_supply: "demand-supply",
+  personas: "personas",
+  message: "message",
+};
+const SLUG_TO_JOB_STAGE: Partial<Record<StageSlug, string>> = {
+  keywords: "keywords",
+  competitors: "competitors",
+  "demand-supply": "demand_supply",
   personas: "personas",
   message: "message",
 };
@@ -1687,12 +1696,17 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
   // more are coming reads as weak output). The in-flight stage shows as a
   // dedicated generating card instead.
   const revealing = autoStage !== null;
-  const showStage = (slug: StageSlug) => !revealing || stageReady[slug];
+  // Data presence is not completion: one competitor is on disk while nine are
+  // still coming, and two personas out of ten look like a finished list. While
+  // a run is in flight only the worker knows a stage is DONE, so the reveal
+  // reads its map — a section appears whole or not at all.
+  const jobStages = generation?.plan_stages || null;
+  const stageComplete = (slug: StageSlug) =>
+    revealing ? Boolean(jobStages?.[SLUG_TO_JOB_STAGE[slug] ?? slug]) : Boolean(stageReady[slug]);
+  const showStage = (slug: StageSlug) => !revealing || stageComplete(slug);
 
   const visualByKind = (kind: string) => visuals.find((item) => item.kind === kind)?.url || "";
 
-  // While the auto-run generates a section, its box sits under a translucent
-  // veil with a loader naming exactly what is being generated right now.
   const stageTitleBySlug: Partial<Record<StageSlug, string>> = {
     keywords: text.keywordsTitle,
     competitors: text.competitorsTitle,
@@ -1700,36 +1714,12 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
     personas: text.personasTitle,
     message: text.messageTitle,
   };
-  // Unmistakable "still generating" state: a solid veil, a pulsing brand ring
-  // around the whole box, a labelled chip and a moving progress bar — the
-  // faint translucent spinner read as "maybe stuck / maybe done".
-  const generatingVeil = (slug: StageSlug) =>
-    autoStage === slug && !stageReady[slug] ? (
-      <>
-        <div className="pointer-events-none absolute inset-0 z-20 animate-pulse rounded-3xl ring-2 ring-[color:var(--deck-accent,var(--brand-accent))]" />
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-3xl bg-background/92 backdrop-blur-[3px]">
-          <span className="inline-flex items-center gap-2 rounded-full bg-[color:var(--deck-accent,var(--brand-accent))] px-4 py-1.5 text-xs font-black text-white shadow-lg">
-            <Loader2 size={15} className="animate-spin" />
-            {text.generatingNow}
-          </span>
-          <p className="px-4 text-center text-lg font-black text-foreground" dir="auto">
-            {stageTitleBySlug[slug]}
-          </p>
-          <div className="h-1.5 w-40 overflow-hidden rounded-full bg-muted">
-            <div className="h-full w-1/3 animate-[deckSweep_1.4s_ease-in-out_infinite] rounded-full bg-[color:var(--deck-accent,var(--brand-accent))]" />
-          </div>
-          <p className="px-6 text-center text-xs text-muted-foreground" dir="auto">
-            {text.generatingHint}
-          </p>
-        </div>
-      </>
-    ) : null;
 
   const allStages = (
     <div className="w-full min-w-0 overflow-x-hidden space-y-4" dir={dir}>
       {visualByKind("services") && <VisualDivider url={visualByKind("services")} />}
       <ServicesStage text={text} suiteId={suiteId} services={services} saving={busy === "save-services"} onSave={saveServices} />
-      {showStage("keywords") && <div className="relative">{generatingVeil("keywords")}<KeywordsStage
+      {showStage("keywords") && <div className="relative"><KeywordsStage
         text={text}
         suiteId={suiteId}
         keywords={intelligence?.keywords || []}
@@ -1740,7 +1730,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         onMore={() => run("keywords-more", () => api.marketingPlans.generateMoreKeywords(suiteId, { language: lang, existing_values: (intelligence?.keywords || []).map((k) => k.text) }))}
         onSave={saveKeywords}
       /></div>}
-      {showStage("competitors") && <div className="relative">{generatingVeil("competitors")}<CompetitorsStage
+      {showStage("competitors") && <div className="relative"><CompetitorsStage
         text={text}
         suiteId={suiteId}
         competitors={intelligence?.competitors || []}
@@ -1753,7 +1743,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         onTagsChange={(competitorId, tags) => run("competitors", () => api.marketingPlans.updateCompetitor(suiteId, competitorId, { classification_tags: tags }))}
         onSave={saveCompetitors}
       /></div>}
-      {showStage("demand-supply") && <div className="relative">{generatingVeil("demand-supply")}<DemandSupplyStage
+      {showStage("demand-supply") && <div className="relative"><DemandSupplyStage
         text={text}
         suiteId={suiteId}
         intelligence={intelligence}
@@ -1763,7 +1753,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         onMore={() => run("demand-supply-more", () => api.marketingPlans.generateMoreDemandSupply(suiteId, { language: lang }))}
       /></div>}
       {showStage("personas") && visualByKind("audience") && <VisualDivider url={visualByKind("audience")} />}
-      {showStage("personas") && <div className="relative">{generatingVeil("personas")}<PersonasStage
+      {showStage("personas") && <div className="relative"><PersonasStage
         text={text}
         suiteId={suiteId}
         personas={intelligence?.personas || []}
@@ -1772,7 +1762,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         onGenerate={generatePersonasInitial}
         onMore={generateMorePersonas}
       /></div>}
-      {showStage("message") && <div className="relative">{generatingVeil("message")}<MarketingMessageStage
+      {showStage("message") && <div className="relative"><MarketingMessageStage
         text={text}
         message={marketingMessage}
         loading={busy === "message"}
@@ -1782,7 +1772,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
         // One-shot journey: once the message exists, funnel visitors don't regenerate.
         canRegenerate={!isFunnelUser}
       /></div>}
-      {revealing && autoStage && !stageReady[autoStage] && (
+      {revealing && autoStage && !stageComplete(autoStage) && (
         <section className="flex items-center justify-center gap-3 rounded-3xl border border-dashed border-[color:var(--brand-accent)]/40 bg-card/60 p-8">
           <Loader2 size={24} className="animate-spin text-[color:var(--deck-accent,var(--brand-accent))]" />
           <p className="text-sm font-bold text-foreground" dir="auto">
@@ -1790,7 +1780,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
           </p>
         </section>
       )}
-      {(!revealing || stageReady.personas) && <MarketingPdfStage
+      {(!revealing || stageComplete("personas")) && <MarketingPdfStage
         text={text}
         suiteId={suiteId}
         ready={(intelligence?.personas || []).length > 0}
@@ -1833,7 +1823,7 @@ export function MarketingPlanStages({ suiteId, stage }: { suiteId: string; stage
 
   // Reveal gate: during the initial auto-run keep the loader up until the
   // first section AND its field images are in; existing plans show instantly.
-  const initialGenerating = revealing && (!stageReady.keywords || !visualsReady);
+  const initialGenerating = revealing && (!stageComplete("keywords") || !visualsReady);
 
   if (!suite && !error) {
     return <div className="rounded-2xl border border-border bg-card p-10 text-center text-muted-foreground"><Loader2 className="mx-auto animate-spin" /></div>;
@@ -2264,7 +2254,7 @@ function CompetitorsStage({
   }
 
   return (
-    <StageBox title={text.competitorsTitle} description={text.competitorsDesc} icon={<Search size={18} />} suiteId={suiteId} slug="competitors" detail={detail} expand={{ show: text.showAll, hide: text.collapseAll }}>
+    <StageBox title={text.competitorsTitle} description={text.competitorsDesc} icon={<Search size={18} />} suiteId={suiteId} slug="competitors" detail={detail}>
       <div className="flex min-w-0 flex-wrap gap-2">
         <Button onClick={onGenerate} disabled={isBusy} className="gap-2">{loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}{text.generate}</Button>
         {competitors.length > 0 && <Button variant="outline" onClick={onMore} disabled={isBusy} className="gap-2">{loadingMore ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}{text.generateMore}</Button>}
