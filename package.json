@@ -10,7 +10,7 @@
     "video:studio": "remotion studio src/remotion/index.ts",
     "video:render": "remotion render src/remotion/index.ts AiMontage ../reports/video-bg-removal/ai-montage-poc.mp4",
     "test": "node --test tests/*.test.mjs",
-    "prebuild": "npm test"
+    "prebuild": "node --test tests/languageLeak.test.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",

@@ -1,5 +1,9 @@
-// تستات بلا أي حزمة: Node بيقرا TypeScript لحاله (type stripping).
+// تستات بلا أي حزمة.
 //   node --test tests/
+//
+// ⚠️ هاد الفحص **ما بيستورد أي ملف .ts** بالمقصود — بيقرا الملفات كنصّ.
+//    Railway بتبني على Node 20 اللي ما بيقرا TypeScript، فأي فحص بيستورد
+//    .ts بيسقط عندها وبيكسر النشر. لهيك هاد لحاله هو اللي مربوط بـprebuild.
 //
 // A user who picked Hebrew must never be shown Arabic, and the reverse. On
 // 2026-09-23 step 3 of the funnel (خطة العمل) was written in Arabic only, so a
