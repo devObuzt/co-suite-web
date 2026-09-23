@@ -2040,7 +2040,12 @@ export interface Brand {
   };
   audience_interests?: string[];
   delivery?: {
+    /** First selected mode. Kept so anything reading the old single-choice
+     *  shape still works; `modes` is the real answer. */
     mode: "onsite" | "areas" | "nationwide" | "international" | "digital";
+    /** A business can both host customers and deliver — the question is not
+     *  either/or, so the answer is a list. */
+    modes?: Array<"onsite" | "areas" | "nationwide" | "international" | "digital">;
     areas: string[];
     worldwide: boolean;
   };

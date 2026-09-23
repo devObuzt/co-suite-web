@@ -556,15 +556,21 @@ export default function NewSuitePage() {
     setStep("step-delivery");
   }
 
-  // Step Delivery: reach — on-site only, limited areas, nationwide, or abroad.
-  // Only the modes that need a list ask for one; nationwide needs nothing.
-  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode | "">("");
+  // Step Delivery: reach — on-site, limited areas, nationwide, abroad.
+  // These are NOT mutually exclusive: a restaurant has a dining room AND
+  // delivers, a shop sells in store AND ships nationwide. Forcing one answer
+  // made businesses describe themselves as less than they are.
+  const [deliveryModes, setDeliveryModes] = useState<DeliveryMode[]>([]);
   const [deliveryAreas, setDeliveryAreas] = useState<string[]>([]);
   const [deliveryAreaInput, setDeliveryAreaInput] = useState("");
   const [deliveryWorldwide, setDeliveryWorldwide] = useState(false);
+  const branchesRef = useRef<HTMLDivElement | null>(null);
 
-  const deliveryNeedsAreas = deliveryMode === "onsite" || deliveryMode === "areas"
-    || (deliveryMode === "international" && !deliveryWorldwide);
+  const hasDeliveryMode = (mode: DeliveryMode) => deliveryModes.includes(mode);
+  const deliveryNeedsAreas =
+    hasDeliveryMode("onsite") ||
+    hasDeliveryMode("areas") ||
+    (hasDeliveryMode("international") && !deliveryWorldwide);
 
   function addDeliveryArea(value: string) {
     const entry = value.trim();
@@ -574,23 +580,49 @@ export default function NewSuitePage() {
   }
 
   function pickDeliveryMode(mode: DeliveryMode) {
-    setDeliveryMode(mode);
-    // Nationwide carries no list; drop anything typed for a previous mode so we
-    // never persist areas that contradict the chosen reach.
-    if (mode === "nationwide" || mode === "digital") {
-      setDeliveryAreas([]);
-      setDeliveryWorldwide(false);
-    }
-    if (mode !== "international") setDeliveryWorldwide(false);
+    setDeliveryModes((current) => {
+      // "A website or app — no deliveries" says so in its own words, so it
+      // cannot sit beside a delivery answer. Everything else combines freely.
+      if (mode === "digital") {
+        return current.includes("digital") ? [] : ["digital"];
+      }
+      const withoutDigital = current.filter((item) => item !== "digital");
+      const next = withoutDigital.includes(mode)
+        ? withoutDigital.filter((item) => item !== mode)
+        : [...withoutDigital, mode];
+      // Never persist a list that contradicts the answer: drop the places once
+      // nothing left in the selection asks for them.
+      const stillNeedsAreas =
+        next.includes("onsite") || next.includes("areas") || next.includes("international");
+      if (!stillNeedsAreas) setDeliveryAreas([]);
+      if (!next.includes("international")) setDeliveryWorldwide(false);
+      return next;
+    });
   }
 
+  // On a phone the cards fill the screen and the places box lands below the
+  // fold, so people pressed Continue without ever seeing it. Bring it up the
+  // first time it appears — once, so later toggles do not yank the page.
+  const branchesRevealed = useRef(false);
+  useEffect(() => {
+    if (!deliveryNeedsAreas) return;
+    if (branchesRevealed.current) return;
+    branchesRevealed.current = true;
+    const timer = window.setTimeout(() => {
+      branchesRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [deliveryNeedsAreas]);
+
   async function saveDeliveryStep() {
-    if (deliveryMode) {
+    if (deliveryModes.length > 0) {
       await saveStep("delivery", {
         delivery: {
-          mode: deliveryMode,
-          areas: deliveryMode === "nationwide" || deliveryMode === "digital" ? [] : deliveryAreas,
-          worldwide: deliveryMode === "international" ? deliveryWorldwide : false,
+          // `mode` stays for anything still reading the single-choice shape.
+          mode: deliveryModes[0],
+          modes: deliveryModes,
+          areas: deliveryNeedsAreas ? deliveryAreas : [],
+          worldwide: hasDeliveryMode("international") ? deliveryWorldwide : false,
         },
       });
     }
@@ -1801,32 +1833,35 @@ export default function NewSuitePage() {
               <p className="mt-1 text-sm leading-6 text-muted-foreground" dir="auto">
                 {t("suite.new.deliverySubtitle")}
               </p>
+              <p className="mt-1 text-sm font-semibold text-[color:var(--brand-accent)]" dir="auto">
+                {t("suite.new.deliveryMulti")}
+              </p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <TargetAreaCard
-                  selected={deliveryMode === "onsite"}
+                  selected={hasDeliveryMode("onsite")}
                   icon={<Store size={18} />}
                   title={t("suite.new.deliveryOnsite")}
                   description={t("suite.new.deliveryOnsiteDesc")}
                   onClick={() => pickDeliveryMode("onsite")}
                 />
                 <TargetAreaCard
-                  selected={deliveryMode === "areas"}
+                  selected={hasDeliveryMode("areas")}
                   icon={<MapPin size={18} />}
                   title={t("suite.new.deliveryAreas")}
                   description={t("suite.new.deliveryAreasDesc")}
                   onClick={() => pickDeliveryMode("areas")}
                 />
                 <TargetAreaCard
-                  selected={deliveryMode === "nationwide"}
+                  selected={hasDeliveryMode("nationwide")}
                   icon={<Truck size={18} />}
                   title={t("suite.new.deliveryNationwide")}
                   description={t("suite.new.deliveryNationwideDesc")}
                   onClick={() => pickDeliveryMode("nationwide")}
                 />
                 <TargetAreaCard
-                  selected={deliveryMode === "international"}
+                  selected={hasDeliveryMode("international")}
                   icon={<Globe size={18} />}
                   title={t("suite.new.deliveryInternational")}
                   description={t("suite.new.deliveryInternationalDesc")}
@@ -1835,7 +1870,7 @@ export default function NewSuitePage() {
                 {/* Last, and deliberately outside the geographic ladder above:
                     a website or app has no delivery reach to state at all. */}
                 <TargetAreaCard
-                  selected={deliveryMode === "digital"}
+                  selected={hasDeliveryMode("digital")}
                   icon={<Monitor size={18} />}
                   title={t("suite.new.deliveryDigital")}
                   description={t("suite.new.deliveryDigitalDesc")}
@@ -1843,7 +1878,7 @@ export default function NewSuitePage() {
                 />
               </div>
 
-              {deliveryMode === "international" && (
+              {hasDeliveryMode("international") && (
                 <label className="flex cursor-pointer items-center gap-2.5 rounded-2xl border border-border bg-background/60 p-4">
                   <input
                     type="checkbox"
@@ -1858,14 +1893,37 @@ export default function NewSuitePage() {
               )}
 
               {deliveryNeedsAreas && (
-                <div className="space-y-2.5 rounded-2xl border border-border bg-background/60 p-4">
-                  <Label className="text-foreground" dir="auto">
-                    {deliveryMode === "onsite"
-                      ? t("suite.new.deliveryOnsitePrompt")
-                      : deliveryMode === "areas"
-                        ? t("suite.new.deliveryAreasPrompt")
-                        : t("suite.new.deliveryInternationalPrompt")}
-                  </Label>
+                // Loud on purpose. This was a quiet grey box under the cards
+                // and people walked past it, so the suite was saved with no
+                // branches and nothing downstream knew where the business is.
+                <div
+                  ref={branchesRef}
+                  className="space-y-3 rounded-2xl border-2 border-[color:var(--brand-accent)] bg-[color:var(--brand-accent)]/8 p-4 shadow-sm ring-4 ring-[color:var(--brand-accent)]/10"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[color:var(--brand-accent)] text-white">
+                      <MapPin size={16} />
+                    </span>
+                    <div className="min-w-0 space-y-0.5">
+                      {/* Every selected mode that needs places states its own
+                          question — one combined list answers them all. */}
+                      {hasDeliveryMode("onsite") && (
+                        <Label className="block text-base font-black text-foreground" dir="auto">
+                          {t("suite.new.deliveryOnsitePrompt")}
+                        </Label>
+                      )}
+                      {hasDeliveryMode("areas") && (
+                        <Label className="block text-base font-black text-foreground" dir="auto">
+                          {t("suite.new.deliveryAreasPrompt")}
+                        </Label>
+                      )}
+                      {hasDeliveryMode("international") && !deliveryWorldwide && (
+                        <Label className="block text-base font-black text-foreground" dir="auto">
+                          {t("suite.new.deliveryInternationalPrompt")}
+                        </Label>
+                      )}
+                    </div>
+                  </div>
                   {deliveryAreas.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {deliveryAreas.map((area) => (
@@ -1898,7 +1956,7 @@ export default function NewSuitePage() {
                         }
                       }}
                       placeholder={
-                        deliveryMode === "onsite"
+                        hasDeliveryMode("onsite")
                           ? t("suite.new.deliveryOnsitePlaceholder")
                           : t("suite.new.deliveryAreaPlaceholder")
                       }
@@ -1923,7 +1981,7 @@ export default function NewSuitePage() {
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
               <Button
                 onClick={saveDeliveryStep}
-                disabled={!deliveryMode}
+                disabled={deliveryModes.length === 0}
                 className="w-full justify-center gap-2 bg-foreground text-background hover:bg-foreground/90 sm:w-auto"
               >
                 <ForwardIcon size={15} /> {t("suite.new.continue")}
