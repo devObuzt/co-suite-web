@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut, Loader2, Trash2 } from "lucide-react";
-import { api, FunnelState } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { useAuthStore } from "@/store/auth";
 
@@ -30,12 +30,13 @@ export function FunnelFooter() {
     if (!window.confirm(t("funnel.restartConfirm"))) return;
     setBusy(true);
     try {
-      // The suite id lives on the funnel state, not in this component.
-      const state: FunnelState = await api.funnel.state();
-      if (state?.suite_id) await api.suites.remove(state.suite_id);
+      // One call. Deleting the suite was not enough — and with no suite linked
+      // it deleted nothing at all, so pressing this did visibly nothing while
+      // the lead stayed marked as finished and login kept landing on /done.
+      await api.funnel.restart();
     } catch {
-      // Nothing to delete, or it is already gone — either way the point of
-      // pressing this was to start clean, so sign out regardless.
+      // Already clean, or the call failed — the point of pressing this was to
+      // start over, so sign out either way.
     } finally {
       signOut();
     }

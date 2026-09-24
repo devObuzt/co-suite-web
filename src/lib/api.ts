@@ -144,6 +144,12 @@ export const api = {
   },
 
   funnel: {
+    // Erase what the visitor built and put their lead back at the start —
+    // works whether or not a suite is linked.
+    restart: () =>
+      request<{ ok: boolean; suites_erased: number; lead_reset: boolean }>(`/funnel/restart`, {
+        method: "POST",
+      }),
     register: (data: { email: string; password: string; full_name: string; phone: string }) =>
       request<{ access_token: string; user: import("@/store/auth").AuthUser; lead_id: string }>(
         "/funnel/register", { method: "POST", body: JSON.stringify(data) }),
