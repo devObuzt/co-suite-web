@@ -85,6 +85,7 @@ const labels = {
     keywordsDesc: "نولّد كلمات ملائمة بناءً على فئة البزنس والخدمات واللغة.",
     competitorsTitle: "عينة من المنافسين",
     competitorsDesc: "نبحث حسب المصدر ونفصل النتائج بين Google Organic وMaps والمنصات الاجتماعية.",
+    competitorsBySource: "المنافسين حسب المصدر",
     demandTitle: "العرض والطلب",
     demandDesc: "نقرأ الطلب والمنافسة من Google Ads Keyword Planner حسب البلد واللغة والكلمات.",
     personasTitle: "عينة شخصيات محتملة من العملاء",
@@ -213,6 +214,7 @@ const labels = {
     keywordsDesc: "Generate suitable keywords from the business category, services, and language.",
     competitorsTitle: "A Sample of Competitors",
     competitorsDesc: "Search by source and split results across Google Organic, Maps, and social platforms.",
+    competitorsBySource: "Competitors by source",
     demandTitle: "Demand and Supply",
     demandDesc: "Read demand and competition from Google Ads Keyword Planner by country, language, and keywords.",
     personasTitle: "Sample Potential Customer Personas",
@@ -341,6 +343,7 @@ const labels = {
     keywordsDesc: "יצירת מילות מפתח לפי קטגוריית העסק, השירותים והשפה.",
     competitorsTitle: "מדגם מתחרים",
     competitorsDesc: "חיפוש לפי מקור והפרדה בין Google Organic, Maps ופלטפורמות חברתיות.",
+    competitorsBySource: "מתחרים לפי מקור",
     demandTitle: "ביקוש והיצע",
     demandDesc: "קריאת ביקוש ותחרות מ-Google Ads Keyword Planner לפי מדינה, שפה ומילות מפתח.",
     personasTitle: "דוגמת פרסונות לקוחות פוטנציאליים",
@@ -469,6 +472,7 @@ const labels = {
     keywordsDesc: "Создайте подходящие ключевые слова на основе категории бизнеса, услуг и языка.",
     competitorsTitle: "Выборка конкурентов",
     competitorsDesc: "Поиск по источникам с разделением результатов: Google Organic, Карты и соцсети.",
+    competitorsBySource: "Конкуренты по источнику",
     demandTitle: "Спрос и предложение",
     demandDesc: "Оценка спроса и конкуренции по Google Ads Keyword Planner: страна, язык, ключевые слова.",
     personasTitle: "Портреты потенциальных клиентов",
@@ -597,6 +601,7 @@ const labels = {
     keywordsDesc: "Générez des mots-clés adaptés à partir de la catégorie, des services et de la langue.",
     competitorsTitle: "Un échantillon de concurrents",
     competitorsDesc: "Recherche par source avec répartition des résultats : Google Organic, Maps et réseaux sociaux.",
+    competitorsBySource: "Concurrents par source",
     demandTitle: "Offre et demande",
     demandDesc: "Lecture de la demande et de la concurrence via Google Ads Keyword Planner : pays, langue, mots-clés.",
     personasTitle: "Échantillon de personas clients potentiels",
@@ -725,6 +730,7 @@ const labels = {
     keywordsDesc: "Genera palabras clave adecuadas según la categoría del negocio, los servicios y el idioma.",
     competitorsTitle: "Una muestra de competidores",
     competitorsDesc: "Busca por fuente y divide los resultados entre Google Organic, Maps y redes sociales.",
+    competitorsBySource: "Competidores por fuente",
     demandTitle: "Oferta y demanda",
     demandDesc: "Lee la demanda y la competencia desde Google Ads Keyword Planner por país, idioma y palabras clave.",
     personasTitle: "Muestra de perfiles de clientes potenciales",
@@ -853,6 +859,7 @@ const labels = {
     keywordsDesc: "İş kategorisi, hizmetler ve dile göre uygun anahtar kelimeler oluşturun.",
     competitorsTitle: "Rakiplerden bir örneklem",
     competitorsDesc: "Kaynağa göre arayın ve sonuçları Google Organic, Haritalar ve sosyal platformlara ayırın.",
+    competitorsBySource: "Kaynağa göre rakipler",
     demandTitle: "Arz ve talep",
     demandDesc: "Google Ads Anahtar Kelime Planlayıcı'dan ülke, dil ve anahtar kelimelere göre talep ve rekabeti okuyun.",
     personasTitle: "Potansiyel müşteri personaları örneklemi",
@@ -981,6 +988,7 @@ const labels = {
     keywordsDesc: "根据业务类别、服务和语言生成合适的关键词。",
     competitorsTitle: "竞争对手样本",
     competitorsDesc: "按来源搜索，并将结果分为 Google 自然搜索、地图和社交平台。",
+    competitorsBySource: "按来源查看竞争对手",
     demandTitle: "供需分析",
     demandDesc: "通过 Google Ads 关键词规划师，按国家、语言和关键词解读需求与竞争。",
     personasTitle: "潜在客户画像样本",
@@ -2271,28 +2279,47 @@ function CompetitorsStage({
           <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{text.noCompetitors}</p>
         ) : (
           <>
-            {/* Source tabs — one horizontal, scrollable bar */}
-            <div className="os-scroll-x -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
-              {tabSources.map(([source, items]) => (
-                <button
-                  key={source}
-                  type="button"
-                  onClick={() => setActiveSource(source)}
-                  className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-sm font-semibold transition-colors ${
-                    resolvedSource === source
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-border bg-card text-muted-foreground hover:border-zinc-500 hover:text-foreground"
-                  }`}
-                >
-                  <SourceGlyph source={source} />
-                  {competitorSourceLabels[source] || source}
-                  {items.length > 0 && (
-                    <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${
-                      resolvedSource === source ? "bg-background/25 text-background" : "bg-muted text-muted-foreground"
-                    }`}>{items.length}</span>
-                  )}
-                </button>
-              ))}
+            {/* Source tabs. These read as decorative chips at pill size, and
+                people missed that the list changes underneath them — so they
+                are sized and coloured as the control they actually are, on the
+                stage's own amber, with the count always visible. */}
+            <div>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground" dir="auto">
+                {text.competitorsBySource}
+              </p>
+              <div
+                role="tablist"
+                aria-label={text.competitorsBySource}
+                className="os-scroll-x -mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
+              >
+                {tabSources.map(([source, items]) => {
+                  const active = resolvedSource === source;
+                  return (
+                    <button
+                      key={source}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setActiveSource(source)}
+                      className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-2xl border-2 px-4 py-2.5 text-base font-bold transition ${
+                        active
+                          ? "border-amber-500 bg-amber-500 text-white shadow-md ring-4 ring-amber-500/20"
+                          : "border-border bg-background text-foreground hover:border-amber-500/60 hover:bg-amber-500/5"
+                      }`}
+                    >
+                      <SourceGlyph source={source} />
+                      {competitorSourceLabels[source] || source}
+                      <span
+                        className={`min-w-6 rounded-full px-2 py-0.5 text-sm font-black tabular-nums ${
+                          active ? "bg-white/25 text-white" : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {items.length}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {resolvedSource && (

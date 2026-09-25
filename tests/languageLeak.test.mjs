@@ -61,7 +61,7 @@ const BUDGET = {
   "src/remotion/AiMontage.tsx": [1, 0],
 
   // ✅ components carrying their own complete per-language label maps
-  "src/components/marketing-plan/MarketingPlanStages.tsx": [2105, 1893],
+  "src/components/marketing-plan/MarketingPlanStages.tsx": [2123, 1906],
   "src/app/(dashboard)/suite/new/page.tsx": [1004, 984],
   "src/app/(dashboard)/suite/[id]/page.tsx": [598, 486],
   "src/app/page.tsx": [547, 517],
