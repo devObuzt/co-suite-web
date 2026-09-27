@@ -40,6 +40,10 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
   // flight and this visitor has not answered yet" — which also means a reload
   // mid-run asks again only if they never answered.
   const [waitAnswered, setWaitAnswered] = useState(false);
+  // Asked on the START button, not during the run. The dialog was racing the
+  // thing it asks about: the work plan took 51 seconds, and if the visitor did
+  // not press inside that window it vanished and never came back.
+  const [notifyOnReady, setNotifyOnReady] = useState(true);
 
   useEffect(() => {
     api.marketingPlans.get(id)
@@ -125,6 +129,15 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
     setStartingRun(true);
     setError("");
     setNotice("");
+    // Record the choice BEFORE the jobs start, so a fast run cannot finish
+    // before the preference is saved.
+    try {
+      const saved = await api.marketingPlans.setNotify(id, { whatsapp: notifyOnReady, language: lang });
+      setResponse(saved);
+      setWaitAnswered(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : text.saveFailed);
+    }
     const results = await Promise.allSettled([
       api.marketingPlans.generateSocialIdeas(id, {
         period: nextMonth(),
@@ -222,6 +235,24 @@ export default function WorkPlansPage({ params }: { params: Promise<{ id: string
             <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
               {text.startBody}
             </p>
+            {notifyState?.whatsapp_available && (
+              <label className="mx-auto mt-5 flex max-w-md cursor-pointer items-start gap-3 rounded-2xl border border-border bg-background/60 p-3 text-start">
+                <input
+                  type="checkbox"
+                  checked={notifyOnReady}
+                  onChange={(e) => setNotifyOnReady(e.target.checked)}
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-[#2f80ff]"
+                />
+                <span className="min-w-0">
+                  <span className="flex items-center gap-1.5 text-sm font-bold text-foreground" dir="auto">
+                    <MessageCircle size={15} /> {text.notifyOnReady}
+                  </span>
+                  <span className="mt-0.5 block text-xs leading-5 text-muted-foreground" dir="auto">
+                    {text.notifyOnReadyHint}
+                  </span>
+                </span>
+              </label>
+            )}
             <Button
               onClick={generateWorkPlan}
               disabled={startingRun}

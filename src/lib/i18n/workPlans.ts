@@ -187,6 +187,8 @@ const workPlanLabelsEn = {
   waitIllCheck: "No need, I will check myself",
   waitNotifyOn: "Done — we will message you on WhatsApp when the plan is ready.",
   waitStaying: "Fine — the plan fills in on this page as each section finishes.",
+  notifyOnReady: "Message me on WhatsApp when it is ready",
+  notifyOnReadyHint: "It takes a few minutes — you do not have to wait here.",
 };
 
 const ar: WorkPlanLabels = {
@@ -350,6 +352,8 @@ const ar: WorkPlanLabels = {
   waitIllCheck: "ما في داعي، بفحص لحالي",
   waitNotifyOn: "تمام — منبعتلك واتساب أول ما الخطة تجهز.",
   waitStaying: "تمام — الخطة بتنعبّى بالصفحة كل ما يخلص قسم.",
+  notifyOnReady: "بلّغني بالواتساب لما تجهز",
+  notifyOnReadyHint: "بتاخد كم دقيقة — مش لازم تستنى هون.",
 };
 
 const he: WorkPlanLabels = {
@@ -514,6 +518,8 @@ const he: WorkPlanLabels = {
   waitIllCheck: "לא צריך, אבדוק בעצמי",
   waitNotifyOn: "מצוין — נשלח לכם וואטסאפ ברגע שהתכנית מוכנה.",
   waitStaying: "בסדר — התכנית מתמלאת בעמוד הזה ככל שכל חלק מסתיים.",
+  notifyOnReady: "שלחו לי הודעה בוואטסאפ כשזה מוכן",
+  notifyOnReadyHint: "זה לוקח כמה דקות — אין צורך לחכות כאן.",
 };
 
 const fr: WorkPlanLabels = {
@@ -637,6 +643,8 @@ const fr: WorkPlanLabels = {
   waitIllCheck: "Pas besoin, je vérifierai moi-même",
   waitNotifyOn: "Parfait — nous vous écrirons sur WhatsApp dès que le plan sera prêt.",
   waitStaying: "D’accord — le plan se remplit sur cette page à mesure que chaque section se termine.",
+  notifyOnReady: "Prévenez-moi sur WhatsApp quand c’est prêt",
+  notifyOnReadyHint: "Cela prend quelques minutes — inutile d’attendre ici.",
 };
 
 const es: WorkPlanLabels = {
@@ -760,6 +768,8 @@ const es: WorkPlanLabels = {
   waitIllCheck: "No hace falta, lo miro yo",
   waitNotifyOn: "Listo — te escribiremos por WhatsApp cuando el plan esté preparado.",
   waitStaying: "De acuerdo — el plan se va completando en esta página según termina cada sección.",
+  notifyOnReady: "Avísame por WhatsApp cuando esté listo",
+  notifyOnReadyHint: "Tarda unos minutos — no hace falta esperar aquí.",
 };
 
 const tr: WorkPlanLabels = {
@@ -883,6 +893,8 @@ const tr: WorkPlanLabels = {
   waitIllCheck: "Gerek yok, kendim bakarım",
   waitNotifyOn: "Tamam — plan hazır olunca size WhatsApp’tan yazacağız.",
   waitStaying: "Tamam — her bölüm bittikçe plan bu sayfada doluyor.",
+  notifyOnReady: "Hazır olunca WhatsApp’tan haber ver",
+  notifyOnReadyHint: "Birkaç dakika sürer — burada beklemeniz gerekmez.",
 };
 
 const ru: WorkPlanLabels = {
@@ -1006,6 +1018,8 @@ const ru: WorkPlanLabels = {
   waitIllCheck: "Не нужно, я сам проверю",
   waitNotifyOn: "Готово — напишем вам в WhatsApp, когда план будет готов.",
   waitStaying: "Хорошо — план заполняется на этой странице по мере готовности каждого раздела.",
+  notifyOnReady: "Сообщить в WhatsApp, когда будет готово",
+  notifyOnReadyHint: "Это займёт несколько минут — ждать здесь не нужно.",
 };
 
 const zh: WorkPlanLabels = {
@@ -1124,6 +1138,8 @@ const zh: WorkPlanLabels = {
   waitIllCheck: "不用了，我自己查看",
   waitNotifyOn: "好的——计划准备好后我们会用 WhatsApp 通知你。",
   waitStaying: "好的——每完成一个板块，计划就会在本页显示。",
+  notifyOnReady: "准备好后用 WhatsApp 通知我",
+  notifyOnReadyHint: "需要几分钟——不必在这里等待。",
 };
 
 const BY_LANG: Record<LangCode, WorkPlanLabels> = {
