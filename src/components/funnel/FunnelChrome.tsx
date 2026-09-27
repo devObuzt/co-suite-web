@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/BrandMark";
-import { FunnelFooter } from "@/components/funnel/FunnelFooter";
+import { FunnelAccountMenu } from "@/components/funnel/FunnelAccountMenu";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { api, FunnelState } from "@/lib/api";
 
@@ -49,7 +49,7 @@ export function FunnelChrome({ children }: { children: React.ReactNode }) {
           scrolled underneath, so the step title collided with the wordmark. */}
       <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <BrandMark size="sm" />
+          <FunnelAccountMenu />
           <ol className="hidden md:flex items-center gap-2 text-xs">
             {STEP_KEYS.map((key, i) => (
               <li
@@ -76,13 +76,11 @@ export function FunnelChrome({ children }: { children: React.ReactNode }) {
           )}
         </div>
       </header>
+      {/* No footer. Sign-out and "delete and start over" moved behind the
+          wordmark — parking a wipe-everything link under every screen of the
+          journey was an accident waiting to happen, and it was also what the
+          pinned confirm button kept landing on. */}
       <main className="flex-1">{children}</main>
-      {/* A wizard step with a bottom-pinned confirm button publishes its height
-          on the body; without this reservation that fixed bar sits on top of
-          the sign-out link and the link cannot be tapped on a phone. */}
-      <div style={{ paddingBottom: "var(--funnel-sticky-action, 0px)" }}>
-        <FunnelFooter />
-      </div>
     </div>
   );
 }

@@ -768,11 +768,18 @@ export default function NewSuitePage() {
       }
       setStep("links");
     } catch (err: unknown) {
+      // 409 means this visitor already has a suite — which is exactly what
+      // happens when they step back to the name and press continue again.
+      // This used to jump them to the marketing plan, skipping every
+      // remaining wizard step and auto-starting generation on a brand with
+      // nothing in it. Adopt the existing suite and carry on to step 2.
       if (err instanceof ApiError && err.status === 409) {
         try {
           const state = await api.funnel.state();
           if (state.suite_id) {
-            router.push(`/suite/${state.suite_id}/marketing-plan`);
+            setSuiteId(state.suite_id);
+            setBusinessName(suiteName);
+            setStep("links");
             return;
           }
         } catch {
