@@ -113,7 +113,7 @@ export function FunnelAccountMenu() {
             </div>
 
             <p className="mt-4 border-t border-border pt-3 text-center text-xs text-muted-foreground">
-              Connec × OneShare
+              Manzuma × OneShare
             </p>
           </div>
         </div>
